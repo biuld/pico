@@ -3,115 +3,30 @@ import {
   CodeRenderable,
   DiffRenderable,
   MarkdownRenderable,
-  ScrollBoxRenderable,
   SyntaxStyle,
   TextAttributes,
   TextRenderable,
   type CliRenderer,
 } from "@opentui/core";
 import {
-  blockText,
   type TranscriptBlock,
   type TranscriptCell,
   type TranscriptCommandBlock,
   type TranscriptFileChangeBlock,
+  type TranscriptPlanBlock,
+  type TranscriptPlanStepStatus,
   type TranscriptTextBlock,
   type TranscriptToolBlock,
-} from "../transcript";
-import type { TuiTheme } from "../theme";
+} from "../../transcript";
+import type { TuiTheme } from "../../theme";
+import {
+  compactTranscriptPreview,
+  formatMainTranscriptOutputPreview,
+  mainTranscriptMuteStrategyForCell,
+  type MainTranscriptMuteStrategy,
+} from "./preview";
 
-export interface TranscriptWidget {
-  root: ScrollBoxRenderable;
-  sync(cells: readonly TranscriptCell[], theme?: TuiTheme): void;
-  scrollBy(delta: number): void;
-  scrollToBottom(): void;
-  applyTheme(theme: TuiTheme): void;
-}
-
-export function createTranscriptWidget(
-  renderer: CliRenderer,
-  theme: TuiTheme,
-): TranscriptWidget {
-  let activeTheme = theme;
-  let lastSignature = "";
-  let lastThemeName = "";
-  let lastCells: readonly TranscriptCell[] = [];
-  let syntaxStyle = createTranscriptSyntaxStyle(activeTheme);
-  const colors = activeTheme.colors;
-
-  const root = new ScrollBoxRenderable(renderer, {
-    id: "pico-transcript-panel",
-    flexGrow: 1,
-    width: "100%",
-    border: false,
-    scrollX: false,
-    scrollY: true,
-    stickyScroll: true,
-    stickyStart: "bottom",
-    backgroundColor: colors.background,
-    viewportOptions: {
-      backgroundColor: colors.background,
-    },
-    contentOptions: {
-      flexDirection: "column",
-      width: "100%",
-      paddingX: 2,
-      paddingY: 1,
-      rowGap: 1,
-      backgroundColor: colors.background,
-    },
-    verticalScrollbarOptions: {
-      visible: false,
-    },
-    horizontalScrollbarOptions: {
-      visible: false,
-    },
-  });
-
-  const sync = (cells: readonly TranscriptCell[], nextTheme = activeTheme) => {
-    const signature = transcriptSignature(cells);
-    if (signature === lastSignature && nextTheme.name === lastThemeName) return;
-
-    const themeChanged = nextTheme.name !== lastThemeName;
-    activeTheme = nextTheme;
-    lastCells = cells;
-    lastSignature = signature;
-    lastThemeName = nextTheme.name;
-    applyContainerTheme(root, activeTheme);
-    clearChildren(root);
-    if (themeChanged) replaceSyntaxStyle();
-
-    for (const [index, cell] of cells.entries()) {
-      root.add(createCellRenderable(renderer, cell, index, activeTheme, syntaxStyle));
-    }
-  };
-
-  return {
-    root,
-    sync,
-    scrollBy: (delta) => {
-      root.scrollBy(delta);
-    },
-    scrollToBottom: () => {
-      root.scrollTo({ x: 0, y: Math.max(0, root.scrollHeight - root.viewport.height) });
-    },
-    applyTheme: (nextTheme) => {
-      activeTheme = nextTheme;
-      applyContainerTheme(root, nextTheme);
-      if (lastThemeName && nextTheme.name !== lastThemeName) {
-        sync(lastCells, nextTheme);
-      }
-    },
-  };
-
-  function replaceSyntaxStyle(): void {
-    const previousStyle = syntaxStyle;
-    syntaxStyle = createTranscriptSyntaxStyle(activeTheme);
-    previousStyle.destroy();
-  }
-}
-
-function createCellRenderable(
+export function createCellRenderable(
   renderer: CliRenderer,
   cell: TranscriptCell,
   index: number,
@@ -147,19 +62,22 @@ function createBlockRenderable(
   syntaxStyle: SyntaxStyle,
 ): BoxRenderable | TextRenderable | MarkdownRenderable | CodeRenderable | DiffRenderable | undefined {
   const id = `pico-transcript-block-${safeId(cell.id)}-${blockIndex}`;
+  const strategy = mainTranscriptMuteStrategyForCell(cell);
   switch (block.type) {
     case "markdown":
       return createMarkdownBlock(renderer, id, block.payload.text, block.payload.streaming, theme, syntaxStyle);
     case "reasoning":
-      return createMutedText(renderer, id, `• ${block.payload.text}`, theme);
+      return createReasoningBlock(renderer, id, block.payload.text, theme, strategy);
+    case "plan":
+      return createPlanBlock(renderer, id, block, theme);
     case "text":
       return createTextBlock(renderer, id, cell, block, theme);
     case "tool":
-      return createToolBlock(renderer, id, block, theme);
+      return createToolBlock(renderer, id, block, theme, strategy);
     case "command":
-      return createCommandBlock(renderer, id, block, theme, syntaxStyle);
+      return createCommandBlock(renderer, id, block, theme, syntaxStyle, strategy);
     case "file_change":
-      return createFileChangeBlock(renderer, id, block, theme, syntaxStyle);
+      return createFileChangeBlock(renderer, id, block, theme, syntaxStyle, strategy);
   }
 }
 
@@ -192,6 +110,77 @@ function createMarkdownBlock(
   });
 }
 
+function createReasoningBlock(
+  renderer: CliRenderer,
+  id: string,
+  text: string,
+  theme: TuiTheme,
+  strategy: MainTranscriptMuteStrategy,
+): TextRenderable {
+  const content = strategy === "expanded"
+    ? text
+    : compactTranscriptPreview(text, 160);
+  return createMutedText(renderer, id, `• ${content}`, theme);
+}
+
+function createPlanBlock(
+  renderer: CliRenderer,
+  id: string,
+  block: TranscriptPlanBlock,
+  theme: TuiTheme,
+): BoxRenderable {
+  const root = new BoxRenderable(renderer, {
+    id,
+    width: "100%",
+    flexDirection: "column",
+    rowGap: 0,
+    backgroundColor: theme.colors.background,
+  });
+  root.add(new TextRenderable(renderer, {
+    id: `${id}-header`,
+    width: "100%",
+    content: "• Updated Plan",
+    fg: theme.colors.textStrong,
+    bg: theme.colors.background,
+    attributes: TextAttributes.BOLD,
+    wrapMode: "word",
+  }));
+  if (block.payload.explanation) {
+    root.add(new TextRenderable(renderer, {
+      id: `${id}-explanation`,
+      width: "100%",
+      content: `  └ ${block.payload.explanation}`,
+      fg: theme.colors.muted,
+      bg: theme.colors.background,
+      attributes: TextAttributes.DIM | TextAttributes.ITALIC,
+      wrapMode: "word",
+    }));
+  }
+  if (block.payload.steps.length === 0) {
+    root.add(new TextRenderable(renderer, {
+      id: `${id}-empty`,
+      width: "100%",
+      content: "  └ (no steps provided)",
+      fg: theme.colors.muted,
+      bg: theme.colors.background,
+      attributes: TextAttributes.DIM | TextAttributes.ITALIC,
+      wrapMode: "word",
+    }));
+    return root;
+  }
+  for (const [index, step] of block.payload.steps.entries()) {
+    root.add(createPlanStepRenderable(
+      renderer,
+      `${id}-step-${index}`,
+      index === 0 && !block.payload.explanation ? "  └ " : "    ",
+      step.status,
+      step.step,
+      theme,
+    ));
+  }
+  return root;
+}
+
 function createTextBlock(
   renderer: CliRenderer,
   id: string,
@@ -212,32 +201,121 @@ function createTextBlock(
   });
 }
 
+function planStepMarker(status: TranscriptPlanStepStatus): string {
+  switch (status) {
+    case "completed":
+      return "✓";
+    case "in_progress":
+    case "pending":
+      return "□";
+  }
+}
+
+function createPlanStepRenderable(
+  renderer: CliRenderer,
+  id: string,
+  prefix: string,
+  status: TranscriptPlanStepStatus,
+  text: string,
+  theme: TuiTheme,
+): BoxRenderable {
+  const style = planStepStyle(status, theme);
+  const root = new BoxRenderable(renderer, {
+    id,
+    width: "100%",
+    flexDirection: "row",
+    flexShrink: 0,
+    rowGap: 0,
+    columnGap: 0,
+    backgroundColor: theme.colors.background,
+  });
+  root.add(new TextRenderable(renderer, {
+    id: `${id}-prefix`,
+    content: `${prefix}${planStepMarker(status)} `,
+    fg: style.fg,
+    bg: theme.colors.background,
+    attributes: style.prefixAttributes,
+    wrapMode: "word",
+  }));
+  root.add(new TextRenderable(renderer, {
+    id: `${id}-text`,
+    content: text,
+    fg: style.fg,
+    bg: theme.colors.background,
+    attributes: style.textAttributes,
+    wrapMode: "word",
+  }));
+  return root;
+}
+
+function planStepStyle(
+  status: TranscriptPlanStepStatus,
+  theme: TuiTheme,
+): { fg: string; prefixAttributes: number; textAttributes: number } {
+  switch (status) {
+    case "completed":
+      return {
+        fg: theme.colors.muted,
+        prefixAttributes: TextAttributes.DIM,
+        textAttributes: TextAttributes.DIM | TextAttributes.STRIKETHROUGH,
+      };
+    case "in_progress":
+      return {
+        fg: theme.colors.status,
+        prefixAttributes: TextAttributes.BOLD,
+        textAttributes: TextAttributes.BOLD,
+      };
+    case "pending":
+      return {
+        fg: theme.colors.muted,
+        prefixAttributes: TextAttributes.DIM,
+        textAttributes: TextAttributes.DIM,
+      };
+  }
+}
+
 function createToolBlock(
   renderer: CliRenderer,
   id: string,
   block: TranscriptToolBlock,
   theme: TuiTheme,
+  strategy: MainTranscriptMuteStrategy,
 ): BoxRenderable {
+  const groupBg = theme.colors.background;
   const root = new BoxRenderable(renderer, {
     id,
     width: "100%",
     flexDirection: "column",
     rowGap: 0,
-    backgroundColor: theme.colors.background,
+    backgroundColor: groupBg,
   });
-  const header = [block.payload.label, block.payload.detail]
+  const showDetail = strategy === "expanded" || strategy === "tool-call-summary";
+  const header = [block.payload.label, showDetail ? block.payload.detail : undefined]
     .filter(Boolean)
     .join(" ");
-  root.add(new TextRenderable(renderer, {
-    id: `${id}-header`,
-    width: "100%",
-    content: `↳ ${header}`,
-    fg: theme.colors.status,
-    bg: theme.colors.background,
-    wrapMode: "word",
-  }));
-  if (block.payload.body) {
-    root.add(createMutedText(renderer, `${id}-body`, block.payload.body, theme));
+  if (header) {
+    root.add(new TextRenderable(renderer, {
+      id: `${id}-header`,
+      width: "100%",
+      content: `↳ ${header}`,
+      fg: theme.colors.status,
+      bg: groupBg,
+      wrapMode: "word",
+    }));
+  }
+  if (block.payload.body && strategy === "expanded") {
+    root.add(createMutedText(renderer, `${id}-body`, block.payload.body, theme, groupBg));
+  } else if (block.payload.body && (strategy === "tool-output-preview" || strategy === "tool-call-summary")) {
+    root.add(createMutedText(
+      renderer,
+      `${id}-body-preview`,
+      formatMainTranscriptOutputPreview(block.payload.body, {
+        includeAnglePipe: Boolean(header),
+        includePrefix: Boolean(header),
+      }),
+      theme,
+      groupBg,
+    ));
   }
   return root;
 }
@@ -248,6 +326,7 @@ function createCommandBlock(
   block: TranscriptCommandBlock,
   theme: TuiTheme,
   syntaxStyle: SyntaxStyle,
+  strategy: MainTranscriptMuteStrategy,
 ): BoxRenderable {
   const root = new BoxRenderable(renderer, {
     id,
@@ -264,7 +343,7 @@ function createCommandBlock(
     bg: theme.colors.background,
     wrapMode: "word",
   }));
-  if (block.payload.output) {
+  if (block.payload.output && strategy === "expanded") {
     root.add(new CodeRenderable(renderer, {
       id: `${id}-output`,
       width: "100%",
@@ -277,6 +356,13 @@ function createCommandBlock(
       conceal: false,
       drawUnstyledText: true,
     }));
+  } else if (block.payload.output && strategy === "command-output-preview") {
+    root.add(createMutedText(
+      renderer,
+      `${id}-output-preview`,
+      formatMainTranscriptOutputPreview(block.payload.output, { includeAnglePipe: false }),
+      theme,
+    ));
   }
   return root;
 }
@@ -287,6 +373,7 @@ function createFileChangeBlock(
   block: TranscriptFileChangeBlock,
   theme: TuiTheme,
   syntaxStyle: SyntaxStyle,
+  strategy: MainTranscriptMuteStrategy,
 ): BoxRenderable {
   const root = new BoxRenderable(renderer, {
     id,
@@ -304,7 +391,10 @@ function createFileChangeBlock(
     bg: theme.colors.background,
     wrapMode: "word",
   }));
-  if (block.payload.diff) {
+  if (block.payload.summary && block.payload.summary !== header) {
+    root.add(createMutedText(renderer, `${id}-summary`, `  ${block.payload.summary}`, theme));
+  }
+  if (block.payload.diff && strategy === "expanded") {
     root.add(createPatchRenderable(renderer, `${id}-diff`, block.payload.diff, theme, syntaxStyle));
   }
   return root;
@@ -351,13 +441,14 @@ function createMutedText(
   id: string,
   text: string,
   theme: TuiTheme,
+  backgroundColor = theme.colors.background,
 ): TextRenderable {
   return new TextRenderable(renderer, {
     id,
     width: "100%",
     content: text,
     fg: theme.colors.muted,
-    bg: theme.colors.background,
+    bg: backgroundColor,
     attributes: TextAttributes.DIM,
     wrapMode: "word",
   });
@@ -379,46 +470,6 @@ function textColorForTone(
     default:
       return theme.colors.text;
   }
-}
-
-function createTranscriptSyntaxStyle(theme: TuiTheme): SyntaxStyle {
-  return SyntaxStyle.fromStyles({
-    text: { fg: theme.colors.text },
-    "markup.heading": { fg: theme.colors.textStrong, bold: true },
-    "markup.bold": { fg: theme.colors.textStrong, bold: true },
-    "markup.italic": { fg: theme.colors.text, italic: true },
-    "markup.link": { fg: theme.colors.status, underline: true },
-    "markup.raw": { fg: theme.colors.status },
-    keyword: { fg: theme.colors.status, bold: true },
-    string: { fg: "#86efac" },
-    number: { fg: "#f0abfc" },
-    comment: { fg: theme.colors.muted, italic: true },
-    function: { fg: "#93c5fd" },
-    variable: { fg: theme.colors.text },
-    type: { fg: "#c4b5fd" },
-  });
-}
-
-function applyContainerTheme(root: ScrollBoxRenderable, theme: TuiTheme): void {
-  root.backgroundColor = theme.colors.background;
-  root.viewport.backgroundColor = theme.colors.background;
-  root.content.backgroundColor = theme.colors.background;
-}
-
-function clearChildren(root: ScrollBoxRenderable): void {
-  for (const child of [...root.getChildren()]) {
-    root.remove(child.id);
-    child.destroyRecursively();
-  }
-}
-
-function transcriptSignature(cells: readonly TranscriptCell[]): string {
-  return JSON.stringify(cells.map((cell) => ({
-    id: cell.id,
-    kind: cell.kind,
-    status: cell.status,
-    blocks: cell.blocks.map((block) => [block.type, blockText(block)]),
-  })));
 }
 
 function looksLikeUnifiedDiff(text: string): boolean {

@@ -1,12 +1,23 @@
 import type { ResponseItem } from "../../thread/store";
 import { responseItemText, shouldDisplayResponseItem } from "../response-items";
 import {
+  formatCommandOutputSummary,
+  formatStructuredPreview,
+  formatToolArgumentSummary,
+  formatToolOutputSummary,
+  normalizeJsonLike,
+  summarizeFileChange,
+} from "./decorate";
+import {
   assistantMarkdownCell,
   commandCell,
   fileChangeCell,
+  planUpdateCell,
   reasoningCell,
   toolCallCell,
   toolOutputCell,
+  type TranscriptPlanBlock,
+  type TranscriptPlanStepStatus,
   type TranscriptCell,
 } from "./cell";
 
@@ -29,34 +40,42 @@ export function transcriptCellsForResponseItem(
     return text ? [reasoningCell(id, text)] : [];
   }
 
+  const planUpdate = planUpdatePayload(item);
+  if (planUpdate && (type.includes("plan") || isUpdatePlanToolCall(item))) {
+    return [planUpdateCell(id, planUpdate, statusText(item))];
+  }
+
   if (type.includes("plan")) {
     return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
   }
 
   if (isToolOutputType(type)) {
-    const body = deepText(item.output) || deepText(item.content) || fallbackText || previewValue(item.output);
-    const callId = firstString(item, ["call_id", "callId"]);
-    const label = callId ? `tool output ${callId}` : "tool output";
-    return body || label ? [toolOutputCell(id, label, body || undefined, statusText(item))] : [];
+    const projectedOutput = toolOutputPreview(item);
+    const body = projectedOutput !== undefined ? projectedOutput : fallbackText || previewValue(item.output);
+    return body ? [toolOutputCell(id, body, statusText(item), callId(item))] : [];
   }
 
   if (isCommandType(type, item)) {
     const command = commandPreview(item) || fallbackText;
     if (!command) return [];
-    const output = deepText(item.output) || deepText(item.content);
-    return [commandCell(id, command, output || undefined, statusText(item))];
+    const output = commandOutputPreview(item);
+    return [commandCell(id, command, output || undefined, statusText(item), callId(item))];
   }
 
   if (isFileChangeType(type, item)) {
     const path = firstString(item, ["path", "file", "filename"]);
     const diff = firstString(item, ["patch", "diff"]) || deepText(item.content) || fallbackText;
-    return [fileChangeCell(id, { path, diff: diff || undefined })];
+    return [fileChangeCell(id, {
+      path,
+      summary: summarizeFileChange(diff),
+      diff: diff || undefined,
+    })];
   }
 
   if (isToolCallType(type, item)) {
     const name = toolName(item);
-    const label = name ? `tool call: ${name}` : "tool call";
-    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item))];
+    const label = name || "tool";
+    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item), callId(item))];
   }
 
   return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
@@ -91,7 +110,8 @@ function isCommandType(type: string, item: ResponseItem): boolean {
   return (
     type.includes("command") ||
     type.includes("shell") ||
-    Boolean(commandPreview(item))
+    Boolean(firstString(item, ["command", "cmd"])) ||
+    (isShellToolCall(item) && Boolean(commandPreview(item)))
   );
 }
 
@@ -113,9 +133,87 @@ function toolName(item: ResponseItem): string | undefined {
   return undefined;
 }
 
+function isUpdatePlanToolCall(item: ResponseItem): boolean {
+  const name = toolName(item)?.toLowerCase();
+  return name === "update_plan" || name?.endsWith(".update_plan") || false;
+}
+
+function planUpdatePayload(item: ResponseItem): TranscriptPlanBlock["payload"] | undefined {
+  const source = planPayloadSource(item);
+  if (!source) return undefined;
+
+  const rawPlan = source.plan ?? source.steps ?? source.items;
+  if (!Array.isArray(rawPlan)) return undefined;
+
+  const steps = rawPlan
+    .map(planStep)
+    .filter((step): step is NonNullable<ReturnType<typeof planStep>> => Boolean(step));
+  const explanation = firstString(source, ["explanation", "note", "message"]);
+  return {
+    ...(explanation ? { explanation } : {}),
+    steps,
+  };
+}
+
+function planPayloadSource(item: ResponseItem): Record<string, unknown> | undefined {
+  const candidates = [
+    item,
+    argumentValue(item),
+    item.input,
+    item.params,
+    item.output,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeJsonLike(candidate);
+    if (isRecord(normalized) && Array.isArray(normalized.plan ?? normalized.steps ?? normalized.items)) {
+      return normalized;
+    }
+  }
+  return undefined;
+}
+
+function planStep(value: unknown): { step: string; status: TranscriptPlanStepStatus } | undefined {
+  const normalized = normalizeJsonLike(value);
+  if (typeof normalized === "string") {
+    const step = normalized.trim();
+    return step ? { step, status: "pending" } : undefined;
+  }
+  if (!isRecord(normalized)) return undefined;
+
+  const step = firstString(normalized, ["step", "text", "title", "description"])?.trim();
+  if (!step) return undefined;
+  return {
+    step,
+    status: normalizePlanStatus(firstString(normalized, ["status", "state"])),
+  };
+}
+
+function normalizePlanStatus(status: string | undefined): TranscriptPlanStepStatus {
+  const normalized = status?.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+  if (normalized === "completed" || normalized === "done" || normalized === "complete") {
+    return "completed";
+  }
+  if (normalized === "in_progress" || normalized === "active" || normalized === "running") {
+    return "in_progress";
+  }
+  return "pending";
+}
+
 function argumentPreview(item: ResponseItem): string {
-  const value = item.arguments ?? item.args ?? item.input ?? item.params;
-  return previewValue(value);
+  const value = argumentValue(item);
+  return formatToolArgumentSummary(toolName(item), value);
+}
+
+function toolOutputPreview(item: ResponseItem): string | undefined {
+  if (item.output !== undefined) return formatToolOutputSummary(item.output);
+  if (item.content !== undefined) return formatToolOutputSummary(item.content);
+  return undefined;
+}
+
+function commandOutputPreview(item: ResponseItem): string {
+  if (item.output !== undefined) return formatCommandOutputSummary(item.output);
+  if (item.content !== undefined) return formatCommandOutputSummary(item.content);
+  return "";
 }
 
 function commandPreview(item: ResponseItem): string {
@@ -127,11 +225,20 @@ function commandPreview(item: ResponseItem): string {
   if (actionCommand) return actionCommand;
 
   const commandValue = isRecord(item.command) ? item.command : undefined;
-  return commandValue ? firstString(commandValue, ["command", "cmd", "line"]) || "" : "";
+  const nestedCommand = commandValue ? firstString(commandValue, ["command", "cmd", "line"]) : undefined;
+  if (nestedCommand) return nestedCommand;
+
+  const args = argumentValue(item);
+  if (isRecord(args)) return firstString(args, ["command", "cmd", "line", "script"]) || "";
+  return "";
 }
 
 function statusText(item: ResponseItem): string | undefined {
   return firstString(item, ["status", "state"]);
+}
+
+function callId(item: ResponseItem): string | undefined {
+  return firstString(item, ["call_id", "callId"]);
 }
 
 function deepText(value: unknown): string {
@@ -166,16 +273,24 @@ function firstString(
 
 function previewValue(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "string") return compact(value);
-  try {
-    return compact(JSON.stringify(value));
-  } catch {
-    return "";
-  }
+  return formatStructuredPreview(value);
 }
 
-function compact(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+function argumentValue(item: ResponseItem): unknown {
+  const value = item.arguments ?? item.args ?? item.input ?? item.params;
+  return normalizeJsonLike(value);
+}
+
+function isShellToolCall(item: ResponseItem): boolean {
+  const name = toolName(item)?.toLowerCase();
+  return Boolean(
+    name === "exec_command" ||
+    name === "shell.exec" ||
+    name === "shell_exec" ||
+    name === "local_shell" ||
+    name?.endsWith(".exec_command") ||
+    name?.endsWith(".shell_exec"),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -36,8 +36,8 @@ test("history overlay groups each turn as a tree node with an agent summary", as
     userText: "Explain Pico history",
     agentSummary: "agent: Pico history is a turn tree.",
   });
-  expect(formatted).toContain("└──   Explain Pico history");
-  expect(formatted).toContain("      agent: Pico history is a turn tree.");
+  expect(formatted).toContain("└── Explain Pico history");
+  expect(formatted).toContain("    agent: Pico history is a turn tree.");
   expect(formatted).not.toContain("hidden instructions");
   expect(historySelectionTargetId(store)).toBe(store.leafId);
 });

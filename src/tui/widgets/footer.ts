@@ -33,7 +33,7 @@ export function footerMode(state: TuiState): FooterMode {
 }
 
 export function formatTransientStatusLine(transientStatus = ""): string {
-  return transientStatus ? `  ${transientStatus}` : "";
+  return transientStatus;
 }
 
 const IDLE_COMPOSER_PLACEHOLDERS = [

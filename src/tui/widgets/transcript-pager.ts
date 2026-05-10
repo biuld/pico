@@ -37,6 +37,7 @@ function cellPrefix(cell: TranscriptCell): string {
     case "user_message":
       return "›";
     case "reasoning":
+    case "plan_update":
       return "•";
     case "tool_call":
     case "tool_output":

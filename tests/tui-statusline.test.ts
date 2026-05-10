@@ -29,7 +29,7 @@ test("bottom statusline renders an unsaved thread before first submit", () => {
   const state = createTuiState();
 
   expect(formatBottomStatusLine(undefined, state, "", 32)).toBe("");
-  expect(formatTransientStatusLine("• waiting for model")).toBe("  • waiting for model");
+  expect(formatTransientStatusLine("• waiting for model")).toBe("• waiting for model");
   expect(formatTransientStatusLine()).toBe("");
   expect(formatComposerPlaceholder(state)).toBe("Ask Pico to do anything");
   expect(formatComposerPlaceholder(state, 1)).toBe("? for shortcuts");

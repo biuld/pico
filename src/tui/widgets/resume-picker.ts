@@ -78,11 +78,11 @@ export function formatThreadRow(row: ThreadRow, maxWidth = 120): string {
   const prefix = row.isCurrent ? "* " : "  ";
   const updated = row.updatedAt.slice(0, 19).replace("T", " ");
   const title = headlineText(row.label || row.preview) || "Untitled thread";
-  const titleBudget = Math.max(0, maxWidth - displayWidth(prefix) - displayWidth(updated) - 2);
+  const titleBudget = Math.max(0, maxWidth - displayWidth(prefix) - displayWidth(updated) - 1);
   const titleText = titleBudget > 0 && title
     ? truncateInlineText(title, titleBudget)
     : "";
-  const left = titleText ? `${prefix} ${titleText}` : prefix;
+  const left = titleText ? `${prefix}${titleText}` : prefix;
   const gap = Math.max(1, maxWidth - displayWidth(left) - displayWidth(updated));
   const line = `${left}${" ".repeat(gap)}${updated}`;
   return displayWidth(line) <= maxWidth ? line : truncateInlineText(line, maxWidth);

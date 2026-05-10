@@ -33,7 +33,7 @@ interface TurnNode {
 }
 
 const ROOT = "__pico_history_root__";
-const USER_MARKER_WIDTH = 2;
+const USER_MARKER_WIDTH = 0;
 const AGENT_SUMMARY_MAX_LENGTH = 36;
 
 export function buildHistoryTurnRows(
@@ -137,7 +137,7 @@ export function formatHistoryTurnRow(row: HistoryTurnRow): string {
 }
 
 export function historyUserMarker(_row: Pick<HistoryTurnRow, "isSelected">): string {
-  return "  ";
+  return "";
 }
 
 function addResponseItem(nodes: Map<string, TurnNode>, entry: ResponseItemEntry): void {

@@ -2,6 +2,7 @@ export type TranscriptCellKind =
   | "user_message"
   | "assistant_markdown"
   | "reasoning"
+  | "plan_update"
   | "tool_call"
   | "tool_output"
   | "command"
@@ -14,6 +15,7 @@ export type TranscriptBlock =
   | TranscriptMarkdownBlock
   | TranscriptTextBlock
   | TranscriptReasoningBlock
+  | TranscriptPlanBlock
   | TranscriptToolBlock
   | TranscriptCommandBlock
   | TranscriptFileChangeBlock;
@@ -41,14 +43,30 @@ export interface TranscriptReasoningBlock {
   };
 }
 
+export type TranscriptPlanStepStatus = "pending" | "in_progress" | "completed";
+
+export interface TranscriptPlanStep {
+  step: string;
+  status: TranscriptPlanStepStatus;
+}
+
+export interface TranscriptPlanBlock {
+  type: "plan";
+  payload: {
+    explanation?: string;
+    steps: TranscriptPlanStep[];
+  };
+}
+
 export interface TranscriptToolBlock {
   type: "tool";
   payload: {
-    label: string;
+    label?: string;
     detail?: string;
     body?: string;
     status?: string;
     output?: boolean;
+    callId?: string;
   };
 }
 
@@ -58,6 +76,7 @@ export interface TranscriptCommandBlock {
     command: string;
     output?: string;
     status?: string;
+    callId?: string;
   };
 }
 
@@ -116,31 +135,45 @@ export function reasoningCell(
   };
 }
 
+export function planUpdateCell(
+  id: string,
+  payload: TranscriptPlanBlock["payload"],
+  status?: string,
+): TranscriptCell {
+  return {
+    id,
+    kind: "plan_update",
+    status,
+    blocks: [{ type: "plan", payload }],
+  };
+}
+
 export function toolCallCell(
   id: string,
   label: string,
   detail?: string,
   status?: string,
+  callId?: string,
 ): TranscriptCell {
   return {
     id,
     kind: "tool_call",
     status,
-    blocks: [{ type: "tool", payload: { label, detail, status } }],
+    blocks: [{ type: "tool", payload: { label, detail, status, callId } }],
   };
 }
 
 export function toolOutputCell(
   id: string,
-  label: string,
   body?: string,
   status?: string,
+  callId?: string,
 ): TranscriptCell {
   return {
     id,
     kind: "tool_output",
     status,
-    blocks: [{ type: "tool", payload: { label, body, status, output: true } }],
+    blocks: [{ type: "tool", payload: { body, status, output: true, callId } }],
   };
 }
 
@@ -149,12 +182,13 @@ export function commandCell(
   command: string,
   output?: string,
   status?: string,
+  callId?: string,
 ): TranscriptCell {
   return {
     id,
     kind: "command",
     status,
-    blocks: [{ type: "command", payload: { command, output, status } }],
+    blocks: [{ type: "command", payload: { command, output, status, callId } }],
   };
 }
 
@@ -195,6 +229,16 @@ export function blockText(block: TranscriptBlock): string {
     case "text":
     case "reasoning":
       return block.payload.text;
+    case "plan":
+      return [
+        "Updated Plan",
+        block.payload.explanation,
+        ...(block.payload.steps.length > 0
+          ? block.payload.steps.map((step) => `${planStepMarker(step.status)} ${step.step}`)
+          : ["(no steps provided)"]),
+      ]
+        .filter(Boolean)
+        .join("\n");
     case "tool":
       return [block.payload.label, block.payload.detail, block.payload.body]
         .filter(Boolean)
@@ -202,8 +246,18 @@ export function blockText(block: TranscriptBlock): string {
     case "command":
       return [block.payload.command, block.payload.output].filter(Boolean).join("\n");
     case "file_change":
-      return [block.payload.path || block.payload.summary, block.payload.diff]
+      return [block.payload.path || "file change", block.payload.summary]
         .filter(Boolean)
         .join("\n");
+  }
+}
+
+function planStepMarker(status: TranscriptPlanStepStatus): string {
+  switch (status) {
+    case "completed":
+      return "✓";
+    case "in_progress":
+    case "pending":
+      return "□";
   }
 }

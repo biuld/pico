@@ -33,6 +33,6 @@ export function buildHistoryOverlayView(
 function historyRowText(row: HistoryTurnRow): string {
   return [
     `${row.userPrefix}${historyUserMarker(row)}${row.userText}`,
-    `${row.summaryPrefix}  ${row.agentSummary}`,
+    `${row.summaryPrefix}${historyUserMarker(row)}${row.agentSummary}`,
   ].join("\n");
 }

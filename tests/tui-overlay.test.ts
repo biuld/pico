@@ -6,6 +6,7 @@ import { SLASH_COMMANDS } from "../src/tui/commands";
 import { buildApprovalOverlayView } from "../src/tui/widgets/approval-overlay";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";
+import { buildHistoryOverlayView } from "../src/tui/widgets/history-picker";
 import { overlayFrame } from "../src/tui/widgets/overlay";
 import {
   buildResumeOverlayView,
@@ -100,6 +101,8 @@ test("resume overlay keeps thread rows single-line and width bounded", () => {
   expect(line).not.toContain("\n");
   expect(line.length).toBeLessThanOrEqual(72);
   expect(line).not.toStartWith(">");
+  expect(line).toStartWith("  Handover summary");
+  expect(line).not.toStartWith("   ");
   expect(line).toContain("Handover summary");
   expect(line).not.toContain("codex_01");
   expect(line).not.toContain("Project:");
@@ -107,6 +110,10 @@ test("resume overlay keeps thread rows single-line and width bounded", () => {
   expect(line).not.toContain("items=");
   expect(line).toEndWith("2026-05-10 12:18:18");
   expect(line.length).toBe(72);
+
+  const currentLine = formatThreadRow({ ...row, isCurrent: true, label: "current thread" }, 72);
+  expect(currentLine).toStartWith("* current thread");
+  expect(currentLine).not.toStartWith("*  ");
 });
 
 test("resume overlay applies renderer width to rows", () => {
@@ -171,6 +178,33 @@ test("navigable picker overlays render row views without textual selection marke
   const state = createTuiState();
   const themeRows = buildThemeRows(TUI_THEMES, state.themeName, 1);
   const statusRows = buildStatusLineRows(["model"], 1);
+  const resumeRows = [
+    {
+      id: "thread-1",
+      isCurrent: true,
+      isSelected: true,
+      label: "current thread",
+      createdAt: "2026-05-10T00:00:00.000Z",
+      updatedAt: "2026-05-10T12:18:18.000Z",
+      preview: "fallback",
+      turnCount: 1,
+      responseItemCount: 2,
+    },
+  ];
+  const historyRows = [
+    {
+      id: "entry-1",
+      turnId: "turn-1",
+      depth: 0,
+      isActive: true,
+      isSelected: true,
+      userPrefix: "└── ",
+      summaryPrefix: "    ",
+      userText: "restore this turn",
+      agentSummary: "agent: summary",
+      status: "completed" as const,
+    },
+  ];
   const approvalView = buildApprovalOverlayView(
     { id: 1, method: "item/permissions/requestApproval" },
     1,
@@ -179,6 +213,8 @@ test("navigable picker overlays render row views without textual selection marke
   );
   const views = [
     buildSlashCommandOverlayView(SLASH_COMMANDS, 1, theme, 8),
+    buildResumeOverlayView(resumeRows, state, theme, 8, 80),
+    buildHistoryOverlayView(historyRows, state, theme),
     buildThemeOverlayView(themeRows, theme, 8, 1),
     buildStatusLineOverlayView(statusRows, "preview", theme, 8, 1),
     approvalView,
@@ -186,7 +222,7 @@ test("navigable picker overlays render row views without textual selection marke
 
   for (const view of views) {
     expect(view.rows?.length).toBeGreaterThan(0);
-    expect(view.rows?.some((row) => String(row.content).startsWith(">"))).toBe(false);
+    expect(view.rows?.some((row) => /(^|\n)\s*>/.test(String(row.content)))).toBe(false);
     expect(view.rows?.some((row) => row.backgroundColor === theme.colors.overlayRowSelected)).toBe(true);
   }
 });

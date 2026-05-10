@@ -32,7 +32,7 @@ import type { OpenTuiLayout } from "./widgets/layout";
 import { buildThreadRows } from "./widgets/resume-picker";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "./widgets/statusline-picker";
 import { buildThemeRows } from "./widgets/theme-picker";
-import { formatMainTranscriptStyled } from "./transcript";
+import { buildTranscriptCellsWithLive } from "./transcript";
 import {
   formatCodexStatusLineStyled,
   formatConfiguredStatusPreviewText,
@@ -175,16 +175,12 @@ export function runOpenTuiRuntime(
     const codexStatus = currentApp.codex.statusSnapshot;
 
     layout.applyTheme(theme);
-    layout.transcript.setContent(formatMainTranscriptStyled(
+    layout.transcript.sync(buildTranscriptCellsWithLive(
       currentApp,
       streamingText,
-      layout.transcriptHeight(renderer.height),
-      Math.max(1, renderer.width - 4),
-      theme,
       liveTranscriptStatus,
       liveLeafId,
-    ));
-    layout.transcript.resetScroll();
+    ), theme);
     const statusText = formatComposerStatus({
       pendingApproval: pendingApproval?.request,
       running,

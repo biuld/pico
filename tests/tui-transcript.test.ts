@@ -1,20 +1,15 @@
 import { expect, test } from "bun:test";
-import { parseColor } from "@opentui/core";
 import { formatStatusLine } from "../src/tui/render";
 import { createTuiState, setTurnStatus } from "../src/tui/state";
-import { TUI_THEMES } from "../src/tui/theme";
 import {
-  buildTranscriptRows,
-  buildTranscriptRowsWithLive,
-  formatTranscriptRow,
-  formatTranscriptRowStyled,
-  renderTranscriptPlain,
-  type TranscriptBlockRenderer,
+  blockText,
+  buildTranscriptCells,
+  buildTranscriptCellsWithLive,
   type TranscriptCell,
 } from "../src/tui/transcript";
 import { createStore } from "./tui-test-helpers";
 
-test("render helpers build transcript models from Pico JSONL entries", async () => {
+test("transcript cells project Pico JSONL entries without changing thread storage", async () => {
   const store = await createStore();
   const turn = await store.appendTurn(store.leafId, "Explain Pico");
   const item = await store.appendResponseItem(turn.id, turn.id, {
@@ -24,18 +19,26 @@ test("render helpers build transcript models from Pico JSONL entries", async () 
   await store.appendTurnCompleted(item.id, turn.id);
 
   const state = setTurnStatus(createTuiState(store), "idle");
-  const transcript = buildTranscriptRows(store);
+  const transcript = buildTranscriptCells(store);
 
   expect(transcript).toEqual([
-    { id: turn.id, role: "user", text: "Explain Pico", status: "completed" },
-    { id: item.id, role: "assistant", text: "Pico stores raw Codex items." },
+    {
+      id: turn.id,
+      kind: "user_message",
+      status: "completed",
+      blocks: [{ type: "text", payload: { text: "Explain Pico", tone: "strong" } }],
+    },
+    {
+      id: item.id,
+      kind: "assistant_markdown",
+      blocks: [{ type: "markdown", payload: { text: "Pico stores raw Codex items.", streaming: undefined } }],
+      status: undefined,
+    },
   ]);
-  expect(formatTranscriptRow(transcript[0])).toBe("› Explain Pico");
-  expect(formatTranscriptRow(transcript[1])).toBe("• Pico stores raw Codex items.");
   expect(formatStatusLine(store, state)).toContain("pico");
 });
 
-test("transcript projects agent item types into semantic rows", async () => {
+test("transcript projects Codex item types into semantic cells", async () => {
   const store = await createStore();
   const turn = await store.appendTurn(store.leafId, "Inspect the repo");
   let parentId = turn.id;
@@ -71,164 +74,57 @@ test("transcript projects agent item types into semantic rows", async () => {
   });
   await store.appendTurnCompleted(fileItem.id, turn.id);
 
-  const rows = buildTranscriptRows(store);
+  const cells = buildTranscriptCells(store).slice(1);
 
-  expect(rows.slice(1)).toEqual([
-    {
-      id: expect.any(String),
-      role: "assistant",
-      kind: "reasoning",
-      text: "reasoning: checking project files",
-    },
-    {
-      id: expect.any(String),
-      role: "assistant",
-      kind: "tool",
-      text: 'tool call: shell.exec {"cmd":"ls"}',
-    },
-    {
-      id: expect.any(String),
-      role: "assistant",
-      kind: "tool",
-      text: "tool output call-1: done",
-    },
-    {
-      id: expect.any(String),
-      role: "assistant",
-      kind: "command",
-      text: "command: bun test",
-    },
-    {
-      id: expect.any(String),
-      role: "assistant",
-      kind: "file",
-      text: "file change: src/index.ts: @@ changed",
-    },
+  expect(kinds(cells)).toEqual([
+    "reasoning",
+    "tool_call",
+    "tool_output",
+    "command",
+    "file_change",
   ]);
+  expect(cells.map((cell) => cell.blocks[0]?.type)).toEqual([
+    "reasoning",
+    "tool",
+    "tool",
+    "command",
+    "file_change",
+  ]);
+  expect(blockText(cells[0].blocks[0]!)).toBe("checking project files");
+  expect(blockText(cells[1].blocks[0]!)).toBe('tool call: shell.exec\n{"cmd":"ls"}');
+  expect(blockText(cells[2].blocks[0]!)).toBe("tool output call-1\ndone");
+  expect(blockText(cells[3].blocks[0]!)).toBe("bun test");
+  expect(blockText(cells[4].blocks[0]!)).toBe("src/index.ts\n@@ changed");
 });
 
-test("transcript includes non-persisted live loading and streaming rows", async () => {
+test("transcript includes non-persisted live loading and streaming cells", async () => {
   const store = await createStore();
   const turn = await store.appendTurn(store.leafId, "Explain streaming");
-  const app = { store } as Parameters<typeof buildTranscriptRowsWithLive>[0];
+  const app = { store } as Parameters<typeof buildTranscriptCellsWithLive>[0];
 
-  expect(buildTranscriptRowsWithLive(app, "", "waiting for model...", turn.id)).toEqual([
-    { id: turn.id, role: "user", text: "Explain streaming", status: "started" },
+  expect(buildTranscriptCellsWithLive(app, "", "waiting for model...", turn.id)).toEqual([
+    {
+      id: turn.id,
+      kind: "user_message",
+      status: "started",
+      blocks: [{ type: "text", payload: { text: "Explain streaming", tone: "strong" } }],
+    },
     {
       id: "live-loading",
-      role: "assistant",
       kind: "reasoning",
-      text: "waiting for model...",
       status: "running",
+      blocks: [{ type: "reasoning", payload: { text: "waiting for model..." } }],
     },
   ]);
 
-  expect(buildTranscriptRowsWithLive(app, "partial response", "waiting for model...", turn.id).at(-1)).toEqual({
+  expect(buildTranscriptCellsWithLive(app, "partial response", "waiting for model...", turn.id).at(-1)).toEqual({
     id: "live",
-    role: "assistant",
-    text: "partial response",
+    kind: "assistant_markdown",
+    status: undefined,
+    blocks: [{ type: "markdown", payload: { text: "partial response", streaming: true } }],
   });
 });
 
-test("transcript renderer wraps cells with Codex-style prefixes", () => {
-  expect(
-    formatTranscriptRow(
-      { id: "u", role: "user", text: "one two three four five six" },
-      12,
-    ),
-  ).toBe(["› one two", "  three", "  four five", "  six"].join("\n"));
-
-  expect(
-    formatTranscriptRow(
-      { id: "a", role: "assistant", text: "alpha beta gamma" },
-      12,
-    ),
-  ).toBe(["• alpha", "  beta", "  gamma"].join("\n"));
-
-  expect(
-    formatTranscriptRow(
-      { id: "e", role: "system", status: "failed", text: "network denied" },
-      12,
-    ),
-  ).toBe(["! network", "  denied"].join("\n"));
-});
-
-test("transcript renderer gives semantic agent rows distinct prefixes and theme colors", () => {
-  const theme = TUI_THEMES[0];
-
-  expect(formatTranscriptRow(
-    { id: "r", role: "assistant", kind: "reasoning", text: "reasoning: checking" },
-    40,
-  )).toBe("· reasoning: checking");
-  expect(formatTranscriptRow(
-    { id: "t", role: "assistant", kind: "tool", text: "tool call: shell.exec" },
-    40,
-  )).toBe("↳ tool call: shell.exec");
-  expect(formatTranscriptRow(
-    { id: "c", role: "assistant", kind: "command", text: "command: bun test" },
-    40,
-  )).toBe("$ command: bun test");
-  expect(formatTranscriptRow(
-    { id: "f", role: "assistant", kind: "file", text: "file change: src/index.ts" },
-    40,
-  )).toBe("~ file change: src/index.ts");
-
-  const command = formatTranscriptRowStyled(
-    { id: "c", role: "assistant", kind: "command", text: "command: bun test" },
-    40,
-    theme,
-  );
-  const expectedStatus = parseColor(theme.colors.status);
-  expect(command.chunks.some((chunk) => chunk.text === "command: bun test" && chunk.fg?.equals(expectedStatus))).toBe(true);
-});
-
-test("transcript user rows fill their full line background from the active theme", () => {
-  const theme = TUI_THEMES[0];
-  const styled = formatTranscriptRowStyled(
-    { id: "u", role: "user", text: "hello" },
-    12,
-    theme,
-  );
-
-  const expectedBackground = parseColor(theme.colors.userMessageBackground);
-  expect(styled.chunks.map((chunk) => chunk.text).join("")).toBe([
-    "            ",
-    "› hello     ",
-    "            ",
-  ].join("\n"));
-  expect(
-    styled.chunks
-      .filter((chunk) => chunk.text !== "\n")
-      .every((chunk) => chunk.bg?.equals(expectedBackground)),
-  ).toBe(true);
-});
-
-test("transcript renderer accepts block renderers for future formatted surfaces", () => {
-  const formattedCell: TranscriptCell = {
-    id: "formatted",
-    kind: "assistant",
-    blocks: [{ type: "example-formatted", payload: { lead: "hello", rest: " world" } }],
-  };
-  const formattedRenderer: TranscriptBlockRenderer = {
-    type: "example-formatted",
-    render: (block) => {
-      if (!isExampleFormattedPayload(block.payload)) return [];
-      return [[{ text: block.payload.lead, tone: "strong" }, { text: block.payload.rest }]];
-    },
-  };
-
-  expect(renderTranscriptPlain([formattedCell], 80, {
-    blockRenderers: [formattedRenderer],
-  })).toBe("• hello world");
-});
-
-function isExampleFormattedPayload(
-  payload: unknown,
-): payload is { lead: string; rest: string } {
-  return (
-    typeof payload === "object" &&
-    payload !== null &&
-    typeof (payload as { lead?: unknown }).lead === "string" &&
-    typeof (payload as { rest?: unknown }).rest === "string"
-  );
+function kinds(cells: readonly TranscriptCell[]): string[] {
+  return cells.map((cell) => cell.kind);
 }

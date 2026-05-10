@@ -1,11 +1,19 @@
 import type { ResponseItem } from "../../thread/store";
 import { responseItemText, shouldDisplayResponseItem } from "../response-items";
-import type { TranscriptRow, TranscriptRowKind } from "./model";
+import {
+  assistantMarkdownCell,
+  commandCell,
+  fileChangeCell,
+  reasoningCell,
+  toolCallCell,
+  toolOutputCell,
+  type TranscriptCell,
+} from "./cell";
 
-export function transcriptRowsForResponseItem(
+export function transcriptCellsForResponseItem(
   id: string,
   item: ResponseItem,
-): TranscriptRow[] {
+): TranscriptCell[] {
   if (!shouldDisplayResponseItem(item)) return [];
 
   const type = normalizedItemType(item);
@@ -13,46 +21,45 @@ export function transcriptRowsForResponseItem(
   const fallbackText = responseItemText(item) || deepText(item);
 
   if (role === "assistant" || type === "message") {
-    return fallbackText ? [assistantRow(id, fallbackText)] : [];
+    return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
   }
 
   if (type.includes("reasoning")) {
-    return semanticRow(id, "reasoning", reasoningText(item, fallbackText));
+    const text = deepText(item.summary) || deepText(item.content) || fallbackText;
+    return text ? [reasoningCell(id, text)] : [];
   }
 
   if (type.includes("plan")) {
-    return semanticRow(id, "plan", prefixText("plan", fallbackText));
+    return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
   }
 
   if (isToolOutputType(type)) {
-    return semanticRow(id, "tool", toolOutputText(item, fallbackText));
+    const body = deepText(item.output) || deepText(item.content) || fallbackText || previewValue(item.output);
+    const callId = firstString(item, ["call_id", "callId"]);
+    const label = callId ? `tool output ${callId}` : "tool output";
+    return body || label ? [toolOutputCell(id, label, body || undefined, statusText(item))] : [];
   }
 
   if (isCommandType(type, item)) {
-    return semanticRow(id, "command", commandText(item, fallbackText));
+    const command = commandPreview(item) || fallbackText;
+    if (!command) return [];
+    const output = deepText(item.output) || deepText(item.content);
+    return [commandCell(id, command, output || undefined, statusText(item))];
   }
 
   if (isFileChangeType(type, item)) {
-    return semanticRow(id, "file", fileChangeText(item, fallbackText));
+    const path = firstString(item, ["path", "file", "filename"]);
+    const diff = firstString(item, ["patch", "diff"]) || deepText(item.content) || fallbackText;
+    return [fileChangeCell(id, { path, diff: diff || undefined })];
   }
 
   if (isToolCallType(type, item)) {
-    return semanticRow(id, "tool", toolCallText(item, fallbackText));
+    const name = toolName(item);
+    const label = name ? `tool call: ${name}` : "tool call";
+    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item))];
   }
 
-  return fallbackText ? [assistantRow(id, fallbackText)] : [];
-}
-
-function assistantRow(id: string, text: string): TranscriptRow {
-  return { id, role: "assistant", text };
-}
-
-function semanticRow(
-  id: string,
-  kind: TranscriptRowKind,
-  text: string,
-): TranscriptRow[] {
-  return text ? [{ id, role: "assistant", kind, text }] : [];
+  return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
 }
 
 function normalizedItemType(item: ResponseItem): string {
@@ -60,46 +67,13 @@ function normalizedItemType(item: ResponseItem): string {
   return value ? value.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase() : "";
 }
 
-function reasoningText(item: ResponseItem, fallbackText: string): string {
-  const text = deepText(item.summary) || deepText(item.content) || fallbackText;
-  return prefixText("reasoning", text);
-}
-
-function toolCallText(item: ResponseItem, fallbackText: string): string {
-  const name = toolName(item);
-  const args = argumentPreview(item);
-  const label = name ? `tool call: ${name}` : "tool call";
-  if (args) return `${label} ${args}`;
-  return prefixText(label, fallbackText);
-}
-
-function toolOutputText(item: ResponseItem, fallbackText: string): string {
-  const text = deepText(item.output) || deepText(item.content) || fallbackText || previewValue(item.output);
-  const callId = firstString(item, ["call_id", "callId"]);
-  const label = callId ? `tool output ${callId}` : "tool output";
-  return prefixText(label, text);
-}
-
-function commandText(item: ResponseItem, fallbackText: string): string {
-  const command = commandPreview(item);
-  const output = deepText(item.output) || deepText(item.content);
-  if (command && output) return `command: ${command}\n${output}`;
-  if (command) return `command: ${command}`;
-  return prefixText("command", output || fallbackText);
-}
-
-function fileChangeText(item: ResponseItem, fallbackText: string): string {
-  const path = firstString(item, ["path", "file", "filename"]);
-  const patch = firstString(item, ["patch", "diff"]) || deepText(item.content) || fallbackText;
-  const label = path ? `file change: ${path}` : "file change";
-  return prefixText(label, patch);
-}
-
 function isToolCallType(type: string, item: ResponseItem): boolean {
   return (
     type.includes("function_call") ||
     type.includes("tool_call") ||
     type.includes("mcp_call") ||
+    type.includes("web_search") ||
+    type.includes("image_generation") ||
     Boolean(toolName(item))
   );
 }
@@ -156,9 +130,8 @@ function commandPreview(item: ResponseItem): string {
   return commandValue ? firstString(commandValue, ["command", "cmd", "line"]) || "" : "";
 }
 
-function prefixText(label: string, text: string): string {
-  const normalized = text.trim();
-  return normalized ? `${label}: ${normalized}` : label;
+function statusText(item: ResponseItem): string | undefined {
+  return firstString(item, ["status", "state"]);
 }
 
 function deepText(value: unknown): string {

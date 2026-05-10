@@ -39,9 +39,8 @@ export {
   type ThemeRow,
 } from "./widgets/theme-picker";
 export {
-  buildTranscriptRows,
-  formatTranscriptRow,
-  type TranscriptRow,
+  buildTranscriptCells,
+  type TranscriptCell,
 } from "./transcript";
 
 export function formatStatusLine(store: PicoThreadStore, state: TuiState): string {

@@ -1,62 +1,46 @@
 import type { DraftAppState } from "../../app/controller";
 import type { PicoThreadStore } from "../../thread/store";
-import { transcriptRowsForResponseItem } from "./response-item";
+import {
+  assistantMarkdownCell,
+  reasoningCell,
+  systemNoticeCell,
+  userMessageCell,
+  type TranscriptCell,
+} from "./cell";
+import { transcriptCellsForResponseItem } from "./response-item";
 
-export type TranscriptRole = "user" | "assistant" | "system";
-export type TranscriptRowKind =
-  | TranscriptRole
-  | "reasoning"
-  | "tool"
-  | "command"
-  | "file"
-  | "plan";
-
-export interface TranscriptRow {
-  id: string;
-  role: TranscriptRole;
-  kind?: TranscriptRowKind;
-  text: string;
-  status?: string;
-}
-
-export function buildTranscriptRows(
+export function buildTranscriptCells(
   store: PicoThreadStore,
   leafId = store.leafId,
-): TranscriptRow[] {
-  return store.getPathEntries(leafId).flatMap((entry): TranscriptRow[] => {
+): TranscriptCell[] {
+  return store.getPathEntries(leafId).flatMap((entry): TranscriptCell[] => {
     if (entry.type === "turn") {
-      return [{ id: entry.id, role: "user", text: entry.userInput, status: entry.status }];
+      return [userMessageCell(entry.id, entry.userInput, entry.status)];
     }
     if (entry.type === "response_item") {
-      return transcriptRowsForResponseItem(entry.id, entry.responseItem);
+      return transcriptCellsForResponseItem(entry.id, entry.responseItem);
     }
     if (entry.type === "turn_failed") {
-      return [{ id: entry.id, role: "system", text: entry.error, status: "failed" }];
+      return [systemNoticeCell(entry.id, entry.error, "failed")];
     }
     if (entry.type === "turn_aborted") {
-      return [{ id: entry.id, role: "system", text: entry.reason || "Turn aborted", status: "aborted" }];
+      return [systemNoticeCell(entry.id, entry.reason || "Turn aborted", "aborted")];
     }
     return [];
   });
 }
 
-export function buildTranscriptRowsWithLive(
+export function buildTranscriptCellsWithLive(
   app: DraftAppState,
   streamingText: string,
   liveStatus = "",
   liveLeafId?: string,
-): TranscriptRow[] {
-  const rows = app.store ? buildTranscriptRows(app.store, liveLeafId || app.store.leafId) : [];
+): TranscriptCell[] {
+  const cells = app.store ? buildTranscriptCells(app.store, liveLeafId || app.store.leafId) : [];
   if (streamingText.length > 0) {
-    rows.push({ id: "live", role: "assistant", text: streamingText });
+    cells.push(assistantMarkdownCell("live", streamingText, { streaming: true }));
   } else if (liveStatus.length > 0) {
-    rows.push({
-      id: "live-loading",
-      role: "assistant",
-      kind: "reasoning",
-      text: liveStatus,
-      status: "running",
-    });
+    cells.push(reasoningCell("live-loading", liveStatus, "running"));
   }
-  return rows;
+  return cells;
 }

@@ -13,7 +13,6 @@ export interface OpenTuiLayout {
   applyTheme(theme: TuiTheme): void;
   applyOverlay(view: OverlayView): void;
   resize(width: number, height: number): void;
-  transcriptHeight(rendererHeight: number): number;
 }
 
 export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): OpenTuiLayout {
@@ -67,9 +66,6 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
       overlay.applyView(view);
     },
     resize,
-    transcriptHeight: (rendererHeight) => {
-      return transcript.contentHeight(rendererHeight, composer.height);
-    },
   };
 }
 

@@ -8,16 +8,18 @@
   ],
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build ./src/index.ts --outdir dist --target bun --format esm",
-    "compile": "bun build --compile ./src/index.ts --outfile pico",
+    "build": "bun run scripts/build.ts",
+    "compile": "bun run scripts/build.ts --compile",
     "test": "bun test",
     "typecheck": "bun run scripts/typecheck.ts",
     "check": "bun run typecheck && bun test",
     "sync:codex-protocol": "bun run scripts/sync-codex-app-server-protocol.ts"
   },
   "dependencies": {
+    "@opentui/core": "^0.2.6",
+    "@opentui/solid": "^0.2.6",
     "@pico/codex-app-server-protocol": "workspace:*",
-    "@opentui/core": "^0.2.6"
+    "solid-js": "^1.9.12"
   },
   "devDependencies": {
     "@types/bun": "latest",

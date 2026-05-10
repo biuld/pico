@@ -12,7 +12,6 @@ export function buildTranscriptPagerOverlayView(
   app: DraftAppState,
   state: TuiState,
   streamingText: string,
-  liveStatus = "",
   liveLeafId?: string,
 ): OverlayView {
   return {
@@ -20,7 +19,7 @@ export function buildTranscriptPagerOverlayView(
     title: "Transcript",
     fullScreen: true,
     scrollY: state.transcriptScroll,
-    content: transcriptPagerText(buildTranscriptCellsWithLive(app, streamingText, liveStatus, liveLeafId)),
+    content: transcriptPagerText(buildTranscriptCellsWithLive(app, streamingText, liveLeafId)),
     footer: OVERLAY_HINTS.transcript,
   };
 }

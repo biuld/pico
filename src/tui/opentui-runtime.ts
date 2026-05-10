@@ -26,8 +26,17 @@ import { createTuiState, type TuiState } from "./state";
 import { getTheme, themeIndex, TUI_THEMES } from "./theme";
 import { updateTuiState, type TuiMsg } from "./update";
 import type { ApprovalDecision } from "./widgets/approval-overlay";
+import { ACTIVITY_SPINNER_INTERVAL_MS } from "./widgets/activity-indicator";
 import { COMPOSER_OVERLAY_INSET, formatComposerStatus } from "./widgets/composer";
-import { formatComposerPlaceholder, formatTransientStatusLine } from "./widgets/footer";
+import {
+  composerPlaceholderMode,
+  COMPOSER_PLACEHOLDER_INTERVAL_MS,
+  formatComposerPlaceholder,
+  type ComposerPlaceholderMode,
+} from "./widgets/composer-placeholder";
+import {
+  formatTransientStatusLine,
+} from "./widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "./widgets/history-picker";
 import type { OpenTuiLayout } from "./widgets/layout";
 import { buildThreadRows } from "./widgets/resume-picker";
@@ -50,21 +59,20 @@ export function runOpenTuiRuntime(
   layout: OpenTuiLayout,
   app: DraftAppState,
 ): Promise<void> {
-  const { input } = layout.composer;
-
   let currentApp = app;
   let state: TuiState = createTuiState(currentApp.store, {
     statusLineItems: currentApp.config.statusLineItems,
   });
   let streamingText = "";
-  let liveTranscriptStatus = "";
   let liveLeafId: string | undefined;
   let threads: PicoThreadInfo[] = [];
   let pendingApproval: PendingApproval | undefined;
   let running = false;
-  let loadingFrame = 1;
-  let loadingTimer: ReturnType<typeof setInterval> | undefined;
+  let activityFrame = 0;
+  let activityStartedAtMs: number | undefined;
+  let activityTimer: ReturnType<typeof setInterval> | undefined;
   let placeholderFrame = 0;
+  let placeholderMode: ComposerPlaceholderMode = composerPlaceholderMode(state);
   let placeholderTimer: ReturnType<typeof setInterval> | undefined;
   let closing = false;
   let detachCodexStatus: (() => void) | undefined;
@@ -123,34 +131,29 @@ export function runOpenTuiRuntime(
     state.turnStatus === "running"
   );
 
-  const stopLoadingTimer = () => {
-    if (!loadingTimer) return;
-    clearInterval(loadingTimer);
-    loadingTimer = undefined;
-    loadingFrame = 1;
+  const stopActivityTimer = () => {
+    if (!activityTimer) return;
+    clearInterval(activityTimer);
+    activityTimer = undefined;
+    activityFrame = 0;
   };
 
-  const syncLoadingTimer = () => {
+  const syncActivityTimer = () => {
     if (!composerShouldAnimate()) {
-      stopLoadingTimer();
+      stopActivityTimer();
       return;
     }
-    if (loadingTimer) return;
+    if (activityTimer) return;
 
-    loadingTimer = setInterval(() => {
+    activityTimer = setInterval(() => {
       if (closing || !composerShouldAnimate()) {
-        stopLoadingTimer();
+        stopActivityTimer();
         return;
       }
-      loadingFrame = (loadingFrame + 1) % 4;
+      activityFrame = (activityFrame + 1) % Number.MAX_SAFE_INTEGER;
       render();
-    }, 300);
+    }, ACTIVITY_SPINNER_INTERVAL_MS);
   };
-
-  const composerPlaceholderVisible = () => (
-    state.overlay === "none" &&
-    state.inputValue.trim().length === 0
-  );
 
   const stopPlaceholderTimer = () => {
     if (!placeholderTimer) return;
@@ -158,33 +161,49 @@ export function runOpenTuiRuntime(
     placeholderTimer = undefined;
   };
 
+  const syncPlaceholderMode = () => {
+    const nextMode = composerPlaceholderMode(state);
+    const changed = nextMode !== placeholderMode;
+    if (nextMode !== placeholderMode) {
+      placeholderMode = nextMode;
+      placeholderFrame = 0;
+    }
+    return { mode: nextMode, changed };
+  };
+
   const syncPlaceholderTimer = () => {
-    if (!composerPlaceholderVisible()) {
+    const { mode } = syncPlaceholderMode();
+    if (mode === "hidden") {
       stopPlaceholderTimer();
       return;
     }
     if (placeholderTimer) return;
 
     placeholderTimer = setInterval(() => {
-      if (closing || !composerPlaceholderVisible()) {
+      const next = syncPlaceholderMode();
+      if (closing || next.mode === "hidden") {
         stopPlaceholderTimer();
+        return;
+      }
+      if (next.changed) {
+        render();
         return;
       }
       placeholderFrame += 1;
       render();
-    }, 2600);
+    }, COMPOSER_PLACEHOLDER_INTERVAL_MS);
   };
 
   const render = () => {
-    syncLoadingTimer();
+    syncActivityTimer();
     syncPlaceholderTimer();
     const pickerViewportHeight = overlayListViewportHeight(renderer.height);
     const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
     const theme = getTheme(state.themeName);
-    const slashCommands = filterSlashCommands(input.value);
+    const inputValue = layout.getInputValue();
+    const slashCommands = filterSlashCommands(inputValue);
     dispatch({ type: "syncSlash", total: slashCommands.length });
 
-    layout.resize(renderer.width, renderer.height);
     const store = currentApp.store;
     const selectedEntryId = state.selectedEntryId || store?.leafId || "";
     const historyRows = store ? buildHistoryTurnRows(store, selectedEntryId) : [];
@@ -204,19 +223,22 @@ export function runOpenTuiRuntime(
     dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
     const codexStatus = currentApp.codex.statusSnapshot;
 
-    layout.applyTheme(theme);
-    layout.transcript.sync(buildTranscriptCellsWithLive(
+    const activeFrame = composerShouldAnimate() ? activityFrame : undefined;
+    const activeElapsedMs = composerShouldAnimate() && activityStartedAtMs !== undefined
+      ? Date.now() - activityStartedAtMs
+      : undefined;
+    const transcriptCells = buildTranscriptCellsWithLive(
       currentApp,
       streamingText,
-      liveTranscriptStatus,
       liveLeafId,
-    ), theme);
+    );
     const statusText = formatComposerStatus({
       pendingApproval: pendingApproval?.request,
       running,
       turnStatus: state.turnStatus,
       statusMessage: state.statusMessage,
-      loadingFrame: composerShouldAnimate() ? loadingFrame : undefined,
+      frame: activeFrame,
+      elapsedMs: activeElapsedMs,
     });
     const statusLineRows = buildStatusLineRows(
       state.statusLineItems,
@@ -228,22 +250,27 @@ export function runOpenTuiRuntime(
       store,
       state.statusLineItems,
     );
-    layout.composer.setTransientStatus(formatTransientStatusLine(statusText));
-    layout.composer.setPlaceholder(formatComposerPlaceholder(state, placeholderFrame));
-    layout.composer.setStatusLine(formatCodexStatusLineStyled({
-      store,
-      state,
-      codex: codexStatus,
-      items: state.statusLineItems,
-      width: Math.max(1, renderer.width - 4),
-    }, theme));
-    layout.applyOverlay(
-      buildOverlayView({
+    layout.update({
+      width: renderer.width,
+      height: renderer.height,
+      theme,
+      transcriptCells,
+      composer: {
+        transientStatus: formatTransientStatusLine(statusText),
+        placeholder: formatComposerPlaceholder(state, placeholderFrame),
+        statusLine: formatCodexStatusLineStyled({
+          store,
+          state,
+          codex: codexStatus,
+          items: state.statusLineItems,
+          width: Math.max(1, renderer.width - 4),
+        }, theme),
+      },
+      overlay: buildOverlayView({
         app: currentApp,
         state,
         theme,
         streamingText,
-        liveTranscriptStatus,
         liveLeafId,
         slashCommands,
         historyRows,
@@ -256,7 +283,7 @@ export function runOpenTuiRuntime(
         rendererWidth: renderer.width,
         pendingApproval: pendingApproval?.request,
       }),
-    );
+    });
     renderer.requestRender();
   };
 
@@ -272,19 +299,19 @@ export function runOpenTuiRuntime(
 
   const setComposerFocus = () => {
     dispatch({ type: "closeOverlay" });
-    input.focus();
+    layout.focusInput();
     render();
   };
 
   const setInputValue = (value: string) => {
-    input.value = value;
+    layout.setInputValue(value);
     dispatch({ type: "setInput", value });
   };
 
   const showHistory = () => {
     if (!currentApp.store) {
       dispatch({ type: "openHistory", leafId: "" });
-      input.blur();
+      layout.blurInput();
       render();
       return;
     }
@@ -293,14 +320,14 @@ export function runOpenTuiRuntime(
       type: "openHistory",
       leafId: historySelectionTargetId(currentApp.store) || currentApp.store.id,
     });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
   const showThreads = async () => {
     threads = await PicoThreadStore.list(currentApp.store?.cwd || currentApp.cwd);
     dispatch({ type: "openThreads", threadId: currentApp.store?.id || threads[0]?.id || "" });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
@@ -311,25 +338,25 @@ export function runOpenTuiRuntime(
       total: TUI_THEMES.length,
       delta: themeIndex(state.themeName) - state.themeSelection,
     });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
   const showStatusLine = () => {
     dispatch({ type: "openStatusLine" });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
   const showTranscript = () => {
     dispatch({ type: "openTranscript" });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
   const showShortcuts = () => {
     dispatch({ type: "openShortcuts" });
-    input.blur();
+    layout.blurInput();
     render();
   };
 
@@ -374,7 +401,7 @@ export function runOpenTuiRuntime(
   const selectTheme = () => {
     const theme = TUI_THEMES[state.themeSelection] || TUI_THEMES[0];
     dispatch({ type: "themeSelected", themeName: theme.name });
-    input.focus();
+    layout.focusInput();
     render();
   };
 
@@ -435,10 +462,9 @@ export function runOpenTuiRuntime(
     });
     dispatch({ type: "resumeCompleted", threadId });
     streamingText = "";
-    liveTranscriptStatus = "";
     liveLeafId = undefined;
     setInputValue("");
-    input.focus();
+    layout.focusInput();
     render();
   };
 
@@ -503,7 +529,7 @@ export function runOpenTuiRuntime(
   };
 
   const acceptSlashSelection = async () => {
-    const commands = filterSlashCommands(input.value);
+    const commands = filterSlashCommands(layout.getInputValue());
     const command = commands[state.slashSelection] || commands[0];
     if (!command) {
       dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no matching command" });
@@ -514,7 +540,7 @@ export function runOpenTuiRuntime(
     if (command.takesArgument) {
       setInputValue(`/${command.name} `);
       dispatch({ type: "closeOverlay" });
-      input.focus();
+      layout.focusInput();
       render();
       return;
     }
@@ -533,7 +559,7 @@ export function runOpenTuiRuntime(
     }
     detachCodexStatus?.();
     detachCodexStatus = undefined;
-    stopLoadingTimer();
+    stopActivityTimer();
     stopPlaceholderTimer();
     await currentApp.codex.shutdown().catch(() => {});
     renderer.destroy();
@@ -543,7 +569,7 @@ export function runOpenTuiRuntime(
     return new Promise((resolve) => {
       pendingApproval = { request, resolve };
       dispatch({ type: "showApproval" });
-      input.blur();
+      layout.blurInput();
       render();
     });
   };
@@ -554,15 +580,15 @@ export function runOpenTuiRuntime(
     pendingApproval = undefined;
     dispatch({ type: "setTurnStatus", status: running ? "running" : "idle" });
     dispatch({ type: "closeOverlay" });
-    input.focus();
+    layout.focusInput();
     render();
   };
 
   const emit = (event: string, payload: unknown) => {
     if (event === "turn:started") {
       const started = payload as { turnId?: string };
+      activityStartedAtMs ??= Date.now();
       liveLeafId = started.turnId;
-      liveTranscriptStatus = "starting turn...";
       if (currentApp.store) {
         dispatch({ type: "selectEntry", entryId: currentApp.store.leafId });
       }
@@ -571,13 +597,11 @@ export function runOpenTuiRuntime(
       return;
     }
     if (event === "turn:codex-started") {
-      liveTranscriptStatus = "waiting for model...";
       dispatch({ type: "setTurnStatus", status: "running", message: "waiting for model" });
       render();
       return;
     }
     if (event === "assistant:delta") {
-      liveTranscriptStatus = "";
       streamingText += (payload as AssistantDeltaEvent).delta;
       render();
       return;
@@ -586,7 +610,6 @@ export function runOpenTuiRuntime(
       const item = payload as RawItemEvent;
       liveLeafId = item.entryId || liveLeafId;
       if (rawItemHasOutputText(item.item)) streamingText = "";
-      liveTranscriptStatus = "";
       dispatch({ type: "setTurnStatus", status: "running", message: `stored ${item.entryId || "raw item"}` });
       render();
       return;
@@ -594,7 +617,7 @@ export function runOpenTuiRuntime(
     if (event === "turn:completed") {
       const result = payload as TurnCompletedEvent;
       streamingText = "";
-      liveTranscriptStatus = "";
+      activityStartedAtMs = undefined;
       liveLeafId = undefined;
       dispatch({ type: "selectEntry", entryId: result.leafId });
       dispatch({
@@ -609,7 +632,7 @@ export function runOpenTuiRuntime(
       const failed = payload as TurnFailedEvent;
       const message = failed.error instanceof Error ? failed.error.message : String(failed.error);
       streamingText = "";
-      liveTranscriptStatus = "";
+      activityStartedAtMs = undefined;
       liveLeafId = undefined;
       if (currentApp.store) {
         dispatch({ type: "selectEntry", entryId: currentApp.store.leafId });
@@ -626,7 +649,7 @@ export function runOpenTuiRuntime(
     }
     if (state.overlay !== "none") return;
 
-    const command = parseTuiInput(input.value);
+    const command = parseTuiInput(layout.getInputValue());
     const handledLocally = await handleLocalCommand(command);
     if (handledLocally) {
       setInputValue("");
@@ -644,8 +667,9 @@ export function runOpenTuiRuntime(
     dispatch({ type: "setTurnStatus", status: "running", message: "starting" });
     dispatch({ type: "closeOverlay" });
     streamingText = "";
-    liveTranscriptStatus = "starting turn...";
     liveLeafId = undefined;
+    activityStartedAtMs = Date.now();
+    activityFrame = 0;
     running = true;
     render();
 
@@ -659,7 +683,7 @@ export function runOpenTuiRuntime(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       running = false;
-      liveTranscriptStatus = "";
+      activityStartedAtMs = undefined;
       liveLeafId = undefined;
       dispatch({ type: "setTurnStatus", status: "failed", message });
       render();
@@ -670,7 +694,7 @@ export function runOpenTuiRuntime(
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
         streamingText = "";
-        liveTranscriptStatus = "";
+        activityStartedAtMs = undefined;
         liveLeafId = undefined;
         dispatch({ type: "selectEntry", entryId: activeApp.store.leafId });
         dispatch({ type: "setTurnStatus", status: "failed", message });
@@ -678,33 +702,31 @@ export function runOpenTuiRuntime(
       })
       .finally(() => {
         running = false;
-        if (!closing && state.overlay === "none") input.focus();
+        activityStartedAtMs = undefined;
+        if (!closing && state.overlay === "none") layout.focusInput();
       });
   };
 
-  input.on("enter", () => {
-    void submitInput();
-  });
-
-  input.onSubmit = () => {
-    void submitInput();
-  };
-
-  input.on("input", () => {
-    dispatch({ type: "inputChanged", value: input.value });
-    render();
+  layout.setInputHandlers({
+    onSubmit: () => {
+      void submitInput();
+    },
+    onInput: (value) => {
+      dispatch({ type: "inputChanged", value });
+      render();
+    },
   });
 
   installOpenTuiKeybindings(renderer, {
     getState: () => state,
-    getInputValue: () => input.value,
+    getInputValue: () => layout.getInputValue(),
     hasPendingApproval: () => Boolean(pendingApproval),
     pendingApprovalMethod: () => pendingApproval?.request.method,
     isRunning: () => running,
     dispatch,
     render,
     close: () => void close(),
-    focusInput: () => input.focus(),
+    focusInput: () => layout.focusInput(),
     setComposerFocus,
     showHistory,
     showThreads: () => void showThreads(),
@@ -734,12 +756,12 @@ export function runOpenTuiRuntime(
     renderer.keyInput.off("keypress", copyKeyHandler);
     detachCodexStatus?.();
     detachCodexStatus = undefined;
-    stopLoadingTimer();
+    stopActivityTimer();
     stopPlaceholderTimer();
     void currentApp.codex.shutdown().catch(() => {});
   });
 
-  input.focus();
+  layout.focusInput();
   render();
 
   return new Promise((resolve) => {

@@ -261,7 +261,11 @@ test("main transcript uses Codex-style mute strategies by cell type", async () =
   await store.appendTurnCompleted(item.id, turn.id);
 
   const cells = buildTranscriptCells(store);
-  const liveCells = buildTranscriptCellsWithLive({ store } as Parameters<typeof buildTranscriptCellsWithLive>[0], "", "waiting", turn.id);
+  const liveCells = buildTranscriptCellsWithLive(
+    { store } as Parameters<typeof buildTranscriptCellsWithLive>[0],
+    "partial response",
+    turn.id,
+  );
 
   expect(cells.map(isMainTranscriptCellExpandedByDefault)).toEqual([true, true]);
   expect(mainTranscriptMuteStrategyForCell({
@@ -329,27 +333,21 @@ test("main transcript output previews keep head tail and transcript hint", () =>
   });
 });
 
-test("transcript includes non-persisted live loading and streaming cells", async () => {
+test("transcript only appends non-persisted live streaming cells", async () => {
   const store = await createStore();
   const turn = await store.appendTurn(store.leafId, "Explain streaming");
   const app = { store } as Parameters<typeof buildTranscriptCellsWithLive>[0];
 
-  expect(buildTranscriptCellsWithLive(app, "", "waiting for model...", turn.id)).toEqual([
+  expect(buildTranscriptCellsWithLive(app, "", turn.id)).toEqual([
     {
       id: turn.id,
       kind: "user_message",
       status: "started",
       blocks: [{ type: "text", payload: { text: "Explain streaming", tone: "strong" } }],
     },
-    {
-      id: "live-loading",
-      kind: "reasoning",
-      status: "running",
-      blocks: [{ type: "reasoning", payload: { text: "waiting for model..." } }],
-    },
   ]);
 
-  expect(buildTranscriptCellsWithLive(app, "partial response", "waiting for model...", turn.id).at(-1)).toEqual({
+  expect(buildTranscriptCellsWithLive(app, "partial response", turn.id).at(-1)).toEqual({
     id: "live",
     kind: "assistant_markdown",
     status: undefined,

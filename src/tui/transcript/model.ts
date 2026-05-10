@@ -2,7 +2,6 @@ import type { DraftAppState } from "../../app/controller";
 import type { PicoThreadStore } from "../../thread/store";
 import {
   assistantMarkdownCell,
-  reasoningCell,
   systemNoticeCell,
   userMessageCell,
   type TranscriptCell,
@@ -40,14 +39,11 @@ export function buildTranscriptCells(
 export function buildTranscriptCellsWithLive(
   app: DraftAppState,
   streamingText: string,
-  liveStatus = "",
   liveLeafId?: string,
 ): TranscriptCell[] {
   const cells = app.store ? buildTranscriptCells(app.store, liveLeafId || app.store.leafId) : [];
   if (streamingText.length > 0) {
     cells.push(assistantMarkdownCell("live", streamingText, { streaming: true }));
-  } else if (liveStatus.length > 0) {
-    cells.push(reasoningCell("live-loading", liveStatus, "running"));
   }
   return cells;
 }

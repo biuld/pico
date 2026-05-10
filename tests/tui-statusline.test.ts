@@ -12,9 +12,13 @@ import { TUI_THEMES } from "../src/tui/theme";
 import { updateTuiState } from "../src/tui/update";
 import { formatComposerStatus } from "../src/tui/widgets/composer";
 import {
+  composerPlaceholderMode,
+  COMPOSER_PLACEHOLDER_INTERVAL_MS,
+  formatComposerPlaceholder,
+} from "../src/tui/widgets/composer-placeholder";
+import {
   footerMode,
   formatBottomStatusLine,
-  formatComposerPlaceholder,
   formatTransientStatusLine,
 } from "../src/tui/widgets/footer";
 import { OVERLAY_HINTS } from "../src/tui/widgets/overlay-hints";
@@ -34,14 +38,31 @@ test("bottom statusline renders an unsaved thread before first submit", () => {
   expect(formatComposerPlaceholder(state)).toBe("Ask Pico to do anything");
   expect(formatComposerPlaceholder(state, 1)).toBe("? for shortcuts");
   expect(formatComposerPlaceholder(setTurnStatus(state, "running"), 1)).toBe("Ctrl+T for transcript");
+  expect(composerPlaceholderMode(state)).toBe("idle");
+  expect(composerPlaceholderMode(setTurnStatus(state, "running"))).toBe("working");
+  expect(COMPOSER_PLACEHOLDER_INTERVAL_MS).toBeGreaterThan(3000);
   expect(formatComposerStatus({ running: false, turnStatus: "idle" })).toBe("");
-  expect(formatComposerStatus({ running: true, turnStatus: "running", statusMessage: "starting" })).toBe("• starting");
+  expect(formatComposerStatus({ running: true, turnStatus: "running", statusMessage: "starting" })).toBe("⠋ starting");
   expect(formatComposerStatus({
     running: true,
     turnStatus: "running",
     statusMessage: "waiting for model",
-    loadingFrame: 2,
-  })).toBe("• waiting for model.. ");
+    frame: 2,
+  })).toBe("⠹ waiting for model");
+  expect(formatComposerStatus({
+    running: true,
+    turnStatus: "running",
+    statusMessage: "waiting for model",
+    frame: 2,
+    elapsedMs: 65_400,
+  })).toBe("⠹ waiting for model · 1m 05s");
+  expect(formatComposerStatus({
+    running: true,
+    turnStatus: "idle",
+    statusMessage: "stored 1 raw item(s)",
+    frame: 2,
+    elapsedMs: 65_400,
+  })).toBe("• stored 1 raw item(s)");
   expect(formatCodexStatusLine({
     state,
     codex: { connected: true, turnStatus: "running", model: "gpt-test" },

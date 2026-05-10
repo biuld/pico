@@ -1,8 +1,9 @@
 export {
-  createTranscriptWidget,
+  TranscriptPanelView,
+  transcriptSignature,
 } from "./widget";
 export type {
-  TranscriptWidget,
+  TranscriptPanelHandle,
 } from "./types";
 export {
   compactTranscriptPreview,

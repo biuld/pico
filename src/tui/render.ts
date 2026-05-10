@@ -9,12 +9,16 @@ export {
 } from "./widgets/approval-overlay";
 export {
   footerMode,
-  formatComposerPlaceholder,
   formatBottomStatusLine,
   formatFooterLine,
   formatTransientStatusLine,
   type FooterMode,
 } from "./widgets/footer";
+export {
+  composerPlaceholderMode,
+  formatComposerPlaceholder,
+  type ComposerPlaceholderMode,
+} from "./widgets/composer-placeholder";
 export {
   buildThreadRows,
   formatThreadRow,

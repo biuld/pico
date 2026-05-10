@@ -21,7 +21,6 @@ export interface OverlayViewInput {
   state: TuiState;
   theme: TuiTheme;
   streamingText: string;
-  liveTranscriptStatus: string;
   liveLeafId?: string;
   slashCommands: readonly SlashCommandSpec[];
   historyRows: readonly HistoryTurnRow[];
@@ -41,7 +40,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     state,
     theme,
     streamingText,
-    liveTranscriptStatus,
     liveLeafId,
     slashCommands,
     historyRows,
@@ -60,7 +58,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
         app,
         state,
         streamingText,
-        liveTranscriptStatus,
         liveLeafId,
       );
     case "shortcuts":

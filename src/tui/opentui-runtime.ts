@@ -1,4 +1,4 @@
-import { CliRenderEvents, type CliRenderer } from "@opentui/core";
+import { CliRenderEvents, type CliRenderer, type KeyEvent } from "@opentui/core";
 import {
   approvalResult,
   ensureAppThread,
@@ -87,6 +87,34 @@ export function runOpenTuiRuntime(
       dispatch({ type: "setTurnStatus", status: "failed", message });
       render();
     }
+  };
+
+  const copySelection = async (notifyWhenEmpty = false) => {
+    const text = renderer.getSelection()?.getSelectedText() || "";
+    if (text.trim().length === 0) {
+      if (notifyWhenEmpty) {
+        dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no selection" });
+        render();
+      }
+      return;
+    }
+
+    const copied = await copyTextToClipboard(renderer, text);
+    dispatch({
+      type: "setTurnStatus",
+      status: state.turnStatus,
+      message: copied
+        ? `copied ${formatCopySize(text)}`
+        : "clipboard unavailable",
+    });
+    render();
+  };
+
+  const copyKeyHandler = (event: KeyEvent) => {
+    if (event.name.toLowerCase() !== "c" || !event.ctrl || !event.shift) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void copySelection(true);
   };
 
   const composerShouldAnimate = () => (
@@ -698,7 +726,12 @@ export function runOpenTuiRuntime(
   });
 
   renderer.on(CliRenderEvents.RESIZE, render);
+  renderer.on(CliRenderEvents.SELECTION, () => {
+    void copySelection(false);
+  });
+  renderer.keyInput.on("keypress", copyKeyHandler);
   renderer.on(CliRenderEvents.DESTROY, () => {
+    renderer.keyInput.off("keypress", copyKeyHandler);
     detachCodexStatus?.();
     detachCodexStatus = undefined;
     stopLoadingTimer();
@@ -721,6 +754,29 @@ function shortId(id: string): string {
 function overlayListViewportHeight(rendererHeight: number): number {
   const overlayHeight = Math.max(1, rendererHeight - COMPOSER_OVERLAY_INSET);
   return Math.max(1, overlayHeight - 3);
+}
+
+async function copyTextToClipboard(renderer: CliRenderer, text: string): Promise<boolean> {
+  if (renderer.copyToClipboardOSC52(text)) return true;
+  if (process.platform !== "darwin") return false;
+
+  try {
+    const proc = Bun.spawn(["pbcopy"], {
+      stdin: "pipe",
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    proc.stdin.write(text);
+    proc.stdin.end();
+    return await proc.exited === 0;
+  } catch {
+    return false;
+  }
+}
+
+function formatCopySize(text: string): string {
+  const count = Array.from(text).length;
+  return `${count} char${count === 1 ? "" : "s"}`;
 }
 
 function rawItemHasOutputText(item: Record<string, unknown>): boolean {

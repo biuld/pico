@@ -5,7 +5,7 @@ import { getTheme } from "./theme";
 import { createOpenTuiLayout } from "./widgets/layout";
 
 export async function startOpenTui(app: DraftAppState): Promise<void> {
-  const initialTheme = getTheme("codex-dark");
+  const initialTheme = getTheme("vscode-dark-modern");
   const renderer = await createCliRenderer({
     screenMode: "alternate-screen",
     consoleMode: "disabled",

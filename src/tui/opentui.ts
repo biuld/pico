@@ -1,6 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import type { DraftAppState } from "../app/controller";
-import { runOpenTuiRuntime } from "./opentui-runtime";
+import { runOpenTuiRuntime } from "./runtime";
 import { getTheme } from "./theme";
 import { createOpenTuiLayout } from "./widgets/layout";
 

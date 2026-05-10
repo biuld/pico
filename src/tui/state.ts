@@ -1,4 +1,5 @@
 import type { SessionStore } from "../session/store";
+import { normalizeStatusLineItems, type StatusLineItemId } from "./statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "./theme";
 
 export type OverlayMode =
@@ -7,6 +8,7 @@ export type OverlayMode =
   | "history"
   | "sessions"
   | "theme"
+  | "statusline"
   | "transcript"
   | "shortcuts"
   | "approval";
@@ -22,6 +24,8 @@ export interface TuiState {
   transcriptScroll: number;
   slashSelection: number;
   themeSelection: number;
+  statusLineSelection: number;
+  statusLineItems: StatusLineItemId[];
   approvalSelection: number;
   themeName: ThemeName;
   inputValue: string;
@@ -29,7 +33,14 @@ export interface TuiState {
   statusMessage?: string;
 }
 
-export function createTuiState(store?: SessionStore): TuiState {
+export interface CreateTuiStateOptions {
+  statusLineItems?: readonly string[];
+}
+
+export function createTuiState(
+  store?: SessionStore,
+  options: CreateTuiStateOptions = {},
+): TuiState {
   return {
     selectedEntryId: store?.leafId || "",
     selectedSessionId: store?.id || "",
@@ -39,6 +50,8 @@ export function createTuiState(store?: SessionStore): TuiState {
     transcriptScroll: 0,
     slashSelection: 0,
     themeSelection: 0,
+    statusLineSelection: 0,
+    statusLineItems: normalizeStatusLineItems(options.statusLineItems),
     approvalSelection: 0,
     themeName: DEFAULT_THEME_NAME,
     inputValue: "",
@@ -110,6 +123,7 @@ export function setOverlay(state: TuiState, overlay: OverlayMode): TuiState {
     overlay,
     slashSelection: overlay === "slash" ? state.slashSelection : 0,
     themeSelection: overlay === "theme" ? state.themeSelection : 0,
+    statusLineSelection: overlay === "statusline" ? state.statusLineSelection : 0,
     approvalSelection: overlay === "approval" ? state.approvalSelection : 0,
   };
 }
@@ -169,6 +183,29 @@ export function syncThemeSelection(state: TuiState, total: number): TuiState {
 
 export function selectTheme(state: TuiState, themeName: ThemeName): TuiState {
   return { ...state, themeName };
+}
+
+export function moveStatusLineSelection(state: TuiState, total: number, delta: number): TuiState {
+  if (total <= 0) return { ...state, statusLineSelection: 0 };
+  return {
+    ...state,
+    statusLineSelection: clamp(state.statusLineSelection + delta, 0, total - 1),
+  };
+}
+
+export function syncStatusLineSelection(state: TuiState, total: number): TuiState {
+  if (total <= 0) return { ...state, statusLineSelection: 0 };
+  return { ...state, statusLineSelection: clamp(state.statusLineSelection, 0, total - 1) };
+}
+
+export function toggleStatusLineItem(state: TuiState, item: StatusLineItemId): TuiState {
+  const isEnabled = state.statusLineItems.includes(item);
+  return {
+    ...state,
+    statusLineItems: isEnabled
+      ? state.statusLineItems.filter((id) => id !== item)
+      : [...state.statusLineItems, item],
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

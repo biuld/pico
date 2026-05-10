@@ -1,4 +1,4 @@
-import type { JSONRPCRequest } from "../codex/types";
+import type { JSONRPCRequest } from "../codex/app-server";
 import type { DraftAppState } from "../app/controller";
 import type { SlashCommandSpec } from "./commands";
 import type { HistoryTurnRow } from "./history";
@@ -10,6 +10,7 @@ import { buildHistoryOverlayView } from "./widgets/history-picker";
 import { buildResumeOverlayView, type SessionRow } from "./widgets/resume-picker";
 import { buildShortcutOverlayView } from "./widgets/shortcut-overlay";
 import { buildSlashCommandOverlayView } from "./widgets/slash-command-popup";
+import { buildStatusLineOverlayView, type StatusLineRow } from "./widgets/statusline-picker";
 import { buildThemeOverlayView, type ThemeRow } from "./widgets/theme-picker";
 import { buildTranscriptPagerOverlayView } from "./widgets/transcript-pager";
 
@@ -20,10 +21,14 @@ export interface OverlayViewInput {
   state: TuiState;
   theme: TuiTheme;
   streamingText: string;
+  liveTranscriptStatus: string;
+  liveLeafId?: string;
   slashCommands: readonly SlashCommandSpec[];
   historyRows: readonly HistoryTurnRow[];
   sessionRows: readonly SessionRow[];
   themeRows: readonly ThemeRow[];
+  statusLineRows: readonly StatusLineRow[];
+  statusLinePreview: string;
   historyViewportHeight: number;
   sessionViewportHeight: number;
   rendererHeight: number;
@@ -36,10 +41,14 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     state,
     theme,
     streamingText,
+    liveTranscriptStatus,
+    liveLeafId,
     slashCommands,
     historyRows,
     sessionRows,
     themeRows,
+    statusLineRows,
+    statusLinePreview,
     pendingApproval,
   } = input;
 
@@ -47,7 +56,14 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     case "none":
       return emptyOverlay();
     case "transcript":
-      return buildTranscriptPagerOverlayView(app, state, streamingText, input.rendererHeight);
+      return buildTranscriptPagerOverlayView(
+        app,
+        state,
+        streamingText,
+        input.rendererHeight,
+        liveTranscriptStatus,
+        liveLeafId,
+      );
     case "shortcuts":
       return buildShortcutOverlayView();
     case "approval":
@@ -73,5 +89,7 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
       );
     case "theme":
       return buildThemeOverlayView(themeRows);
+    case "statusline":
+      return buildStatusLineOverlayView(statusLineRows, statusLinePreview);
   }
 }

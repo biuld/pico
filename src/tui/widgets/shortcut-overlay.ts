@@ -1,13 +1,15 @@
 import type { OverlayView } from "../overlay-model";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export function buildShortcutOverlayView(): OverlayView {
   return {
     visible: true,
     title: "Shortcuts",
-    height: 11,
+    height: 13,
     fullScreen: false,
     scrollY: 0,
     content: shortcutOverlayText(),
+    footer: OVERLAY_HINTS.shortcuts,
   };
 }
 

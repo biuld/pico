@@ -18,14 +18,17 @@ export interface KeybindingRuntime {
   showHistory(): void;
   showSessions(): void;
   showTheme(): void;
+  showStatusLine(): void;
   showTranscript(): void;
   showShortcuts(): void;
   moveHistorySelection(delta: number): void;
   moveSessionSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
+  moveStatusLineSelection(delta: number): void;
   restoreSelected(): void;
   resumeSelected(): void;
   selectTheme(): void;
+  toggleStatusLineItem(): void;
   setInputValue(value: string): void;
   acceptSlashSelection(): void;
   resolveApproval(decision: ApprovalDecision): void;
@@ -101,6 +104,9 @@ export function installOpenTuiKeybindings(
     }
     if (state.overlay === "theme") {
       return handleThemeKey(sequence, runtime);
+    }
+    if (state.overlay === "statusline") {
+      return handleStatusLineKey(sequence, runtime);
     }
     if (state.overlay === "transcript") {
       return handleTranscriptKey(sequence, runtime);
@@ -259,6 +265,30 @@ function handleThemeKey(sequence: string, runtime: KeybindingRuntime): boolean {
   }
   if (sequence === "\r") {
     runtime.selectTheme();
+    return true;
+  }
+  if (sequence === "\u001b") {
+    runtime.setComposerFocus();
+    return true;
+  }
+  return true;
+}
+
+function handleStatusLineKey(sequence: string, runtime: KeybindingRuntime): boolean {
+  if (sequence === "\u001b[A" || sequence === "k" || sequence === "\u0010") {
+    runtime.moveStatusLineSelection(-1);
+    return true;
+  }
+  if (sequence === "\u001b[B" || sequence === "j" || sequence === "\u000e") {
+    runtime.moveStatusLineSelection(1);
+    return true;
+  }
+  if (sequence === " ") {
+    runtime.toggleStatusLineItem();
+    return true;
+  }
+  if (sequence === "\r") {
+    runtime.setComposerFocus();
     return true;
   }
   if (sequence === "\u001b") {

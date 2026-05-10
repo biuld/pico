@@ -11,7 +11,8 @@ import {
   type TurnCompletedEvent,
   type TurnFailedEvent,
 } from "../app/controller";
-import type { JSONRPCRequest } from "../codex/types";
+import type { JSONRPCRequest } from "../codex/app-server";
+import { updateProjectPicoConfig } from "../config";
 import { SessionStore, type SessionInfo } from "../session/store";
 import {
   filterSlashCommands,
@@ -26,11 +27,17 @@ import { getTheme, themeIndex, TUI_THEMES } from "./theme";
 import { updateTuiState, type TuiMsg } from "./update";
 import type { ApprovalDecision } from "./widgets/approval-overlay";
 import { formatComposerStatus } from "./widgets/composer";
-import { formatFooterLine } from "./widgets/footer";
+import { formatComposerPlaceholder, formatTransientStatusLine } from "./widgets/footer";
 import type { OpenTuiLayout } from "./widgets/layout";
 import { buildSessionRows } from "./widgets/resume-picker";
+import { buildStatusLineRows, STATUS_LINE_ITEMS } from "./widgets/statusline-picker";
 import { buildThemeRows } from "./widgets/theme-picker";
 import { formatMainTranscriptStyled } from "./transcript";
+import {
+  formatCodexStatusLineStyled,
+  formatConfiguredStatusPreviewText,
+  statusLineItemValue,
+} from "./statusline";
 
 interface PendingApproval {
   request: JSONRPCRequest;
@@ -45,15 +52,36 @@ export function runOpenTuiRuntime(
   const { input } = layout.composer;
 
   let currentApp = app;
-  let state: TuiState = createTuiState(currentApp.store);
+  let state: TuiState = createTuiState(currentApp.store, {
+    statusLineItems: currentApp.config.statusLineItems,
+  });
   let streamingText = "";
+  let liveTranscriptStatus = "";
+  let liveLeafId: string | undefined;
   let sessions: SessionInfo[] = [];
   let pendingApproval: PendingApproval | undefined;
   let running = false;
   let closing = false;
+  let detachCodexStatus: (() => void) | undefined;
 
   const dispatch = (msg: TuiMsg) => {
     state = updateTuiState(state, msg);
+  };
+
+  const persistStatusLineItems = async (items: readonly string[]) => {
+    try {
+      const nextConfig = await updateProjectPicoConfig(currentApp.cwd, {
+        statusLineItems: [...items],
+      });
+      currentApp.config = {
+        ...currentApp.config,
+        statusLineItems: nextConfig.statusLineItems,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      dispatch({ type: "setTurnStatus", status: "failed", message });
+      render();
+    }
   };
 
   const render = () => {
@@ -79,6 +107,8 @@ export function runOpenTuiRuntime(
     });
     dispatch({ type: "syncTheme", total: TUI_THEMES.length });
     const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
+    dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
+    const codexStatus = currentApp.codex.statusSnapshot;
 
     layout.applyTheme(theme);
     layout.transcript.setContent(formatMainTranscriptStyled(
@@ -87,29 +117,49 @@ export function runOpenTuiRuntime(
       layout.transcriptHeight(renderer.height),
       Math.max(1, renderer.width - 4),
       theme,
+      liveTranscriptStatus,
+      liveLeafId,
     ));
     layout.transcript.resetScroll();
-    layout.composer.setStatus(formatComposerStatus({
+    const statusText = formatComposerStatus({
       pendingApproval: pendingApproval?.request,
       running,
       turnStatus: state.turnStatus,
       statusMessage: state.statusMessage,
-    }));
-    layout.composer.setFooter(formatFooterLine(
+    });
+    const statusLineRows = buildStatusLineRows(
+      state.statusLineItems,
+      state.statusLineSelection,
+      (item) => statusLineItemValue(item, codexStatus, store),
+    );
+    const statusLinePreview = formatConfiguredStatusPreviewText(
+      codexStatus,
+      store,
+      state.statusLineItems,
+    );
+    layout.composer.setTransientStatus(formatTransientStatusLine(statusText));
+    layout.composer.setPlaceholder(formatComposerPlaceholder(state));
+    layout.composer.setStatusLine(formatCodexStatusLineStyled({
       store,
       state,
-      Math.max(1, renderer.width - 4),
-    ));
+      codex: codexStatus,
+      items: state.statusLineItems,
+      width: Math.max(1, renderer.width - 4),
+    }, theme));
     layout.applyOverlay(
       buildOverlayView({
         app: currentApp,
         state,
         theme,
         streamingText,
+        liveTranscriptStatus,
+        liveLeafId,
         slashCommands,
         historyRows,
         sessionRows,
         themeRows,
+        statusLineRows,
+        statusLinePreview,
         historyViewportHeight: listHeight,
         sessionViewportHeight: listHeight,
         rendererHeight: renderer.height,
@@ -118,6 +168,16 @@ export function runOpenTuiRuntime(
     );
     renderer.requestRender();
   };
+
+  const attachCodexStatus = (nextApp: DraftAppState): (() => void) => {
+    const onStatus = () => {
+      if (!closing) render();
+    };
+    nextApp.codex.on("status", onStatus);
+    return () => nextApp.codex.off("status", onStatus);
+  };
+
+  detachCodexStatus = attachCodexStatus(currentApp);
 
   const setComposerFocus = () => {
     dispatch({ type: "closeOverlay" });
@@ -160,6 +220,12 @@ export function runOpenTuiRuntime(
       total: TUI_THEMES.length,
       delta: themeIndex(state.themeName) - state.themeSelection,
     });
+    input.blur();
+    render();
+  };
+
+  const showStatusLine = () => {
+    dispatch({ type: "openStatusLine" });
     input.blur();
     render();
   };
@@ -209,10 +275,23 @@ export function runOpenTuiRuntime(
     render();
   };
 
+  const moveStatusLineSelection = (delta: number) => {
+    dispatch({ type: "moveStatusLine", total: STATUS_LINE_ITEMS.length, delta });
+    render();
+  };
+
   const selectTheme = () => {
     const theme = TUI_THEMES[state.themeSelection] || TUI_THEMES[0];
     dispatch({ type: "themeSelected", themeName: theme.name });
     input.focus();
+    render();
+  };
+
+  const toggleStatusLineItem = () => {
+    const item = STATUS_LINE_ITEMS[state.statusLineSelection];
+    if (!item) return;
+    dispatch({ type: "toggleStatusLineItem", item: item.id });
+    void persistStatusLineItems(state.statusLineItems);
     render();
   };
 
@@ -256,11 +335,17 @@ export function runOpenTuiRuntime(
     }
 
     const cwd = currentApp.store?.cwd || currentApp.cwd;
+    detachCodexStatus?.();
     await currentApp.codex.shutdown().catch(() => {});
     currentApp = await loadApp(cwd, sessionId);
-    state = createTuiState(currentApp.store);
+    detachCodexStatus = attachCodexStatus(currentApp);
+    state = createTuiState(currentApp.store, {
+      statusLineItems: currentApp.config.statusLineItems,
+    });
     dispatch({ type: "resumeCompleted", sessionId });
     streamingText = "";
+    liveTranscriptStatus = "";
+    liveLeafId = undefined;
     setInputValue("");
     input.focus();
     render();
@@ -293,6 +378,10 @@ export function runOpenTuiRuntime(
     }
     if (command.type === "theme") {
       showTheme();
+      return true;
+    }
+    if (command.type === "statusline") {
+      showStatusLine();
       return true;
     }
     if (command.type === "status") {
@@ -351,6 +440,8 @@ export function runOpenTuiRuntime(
       pendingApproval = undefined;
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
+    detachCodexStatus?.();
+    detachCodexStatus = undefined;
     await currentApp.codex.shutdown().catch(() => {});
     renderer.destroy();
   };
@@ -375,13 +466,34 @@ export function runOpenTuiRuntime(
   };
 
   const emit = (event: string, payload: unknown) => {
+    if (event === "turn:started") {
+      const started = payload as { turnId?: string };
+      liveLeafId = started.turnId;
+      liveTranscriptStatus = "starting turn...";
+      if (currentApp.store) {
+        dispatch({ type: "selectEntry", entryId: currentApp.store.leafId });
+      }
+      dispatch({ type: "setTurnStatus", status: "running", message: "starting turn" });
+      render();
+      return;
+    }
+    if (event === "turn:codex-started") {
+      liveTranscriptStatus = "waiting for model...";
+      dispatch({ type: "setTurnStatus", status: "running", message: "waiting for model" });
+      render();
+      return;
+    }
     if (event === "assistant:delta") {
+      liveTranscriptStatus = "";
       streamingText += (payload as AssistantDeltaEvent).delta;
       render();
       return;
     }
     if (event === "raw-item:completed") {
       const item = payload as RawItemEvent;
+      liveLeafId = item.entryId || liveLeafId;
+      if (rawItemHasOutputText(item.item)) streamingText = "";
+      liveTranscriptStatus = "";
       dispatch({ type: "setTurnStatus", status: "running", message: `stored ${item.entryId || "raw item"}` });
       render();
       return;
@@ -389,6 +501,8 @@ export function runOpenTuiRuntime(
     if (event === "turn:completed") {
       const result = payload as TurnCompletedEvent;
       streamingText = "";
+      liveTranscriptStatus = "";
+      liveLeafId = undefined;
       dispatch({ type: "selectEntry", entryId: result.leafId });
       dispatch({
         type: "setTurnStatus",
@@ -402,6 +516,8 @@ export function runOpenTuiRuntime(
       const failed = payload as TurnFailedEvent;
       const message = failed.error instanceof Error ? failed.error.message : String(failed.error);
       streamingText = "";
+      liveTranscriptStatus = "";
+      liveLeafId = undefined;
       if (currentApp.store) {
         dispatch({ type: "selectEntry", entryId: currentApp.store.leafId });
       }
@@ -435,6 +551,8 @@ export function runOpenTuiRuntime(
     dispatch({ type: "setTurnStatus", status: "running", message: "starting" });
     dispatch({ type: "closeOverlay" });
     streamingText = "";
+    liveTranscriptStatus = "starting turn...";
+    liveLeafId = undefined;
     running = true;
     render();
 
@@ -448,6 +566,8 @@ export function runOpenTuiRuntime(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       running = false;
+      liveTranscriptStatus = "";
+      liveLeafId = undefined;
       dispatch({ type: "setTurnStatus", status: "failed", message });
       render();
       return;
@@ -457,6 +577,8 @@ export function runOpenTuiRuntime(
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
         streamingText = "";
+        liveTranscriptStatus = "";
+        liveLeafId = undefined;
         dispatch({ type: "selectEntry", entryId: activeApp.store.leafId });
         dispatch({ type: "setTurnStatus", status: "failed", message });
         render();
@@ -494,14 +616,17 @@ export function runOpenTuiRuntime(
     showHistory,
     showSessions: () => void showSessions(),
     showTheme,
+    showStatusLine,
     showTranscript,
     showShortcuts,
     moveHistorySelection,
     moveSessionSelection,
     moveThemeSelection,
+    moveStatusLineSelection,
     restoreSelected: () => void restoreSelected(),
     resumeSelected: () => void resumeSelected(),
     selectTheme,
+    toggleStatusLineItem,
     setInputValue,
     acceptSlashSelection: () => void acceptSlashSelection(),
     resolveApproval,
@@ -509,6 +634,8 @@ export function runOpenTuiRuntime(
 
   renderer.on(CliRenderEvents.RESIZE, render);
   renderer.on(CliRenderEvents.DESTROY, () => {
+    detachCodexStatus?.();
+    detachCodexStatus = undefined;
     void currentApp.codex.shutdown().catch(() => {});
   });
 
@@ -526,4 +653,15 @@ function shortId(id: string): string {
 
 function listViewportHeight(rendererHeight: number): number {
   return Math.max(1, Math.min(12, Math.max(6, rendererHeight - 8)) - 2);
+}
+
+function rawItemHasOutputText(item: Record<string, unknown>): boolean {
+  if (item.type !== "message") return false;
+  const content = item.content;
+  return Array.isArray(content) && content.some((part) => {
+    if (!part || typeof part !== "object") return false;
+    const value = part as Record<string, unknown>;
+    return typeof value.text === "string" &&
+      (value.type === "output_text" || value.type === "text");
+  });
 }

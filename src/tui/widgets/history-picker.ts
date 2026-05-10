@@ -3,6 +3,7 @@ import type { HistoryTurnRow } from "../history";
 import type { OverlayView } from "../overlay-model";
 import type { TuiState } from "../state";
 import type { TuiTheme } from "../theme";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export function buildHistoryOverlayView(
   rows: readonly HistoryTurnRow[],
@@ -14,7 +15,7 @@ export function buildHistoryOverlayView(
   return {
     visible: true,
     title: "History",
-    height: Math.min(12, Math.max(6, rendererHeight - 8)),
+    height: Math.min(14, Math.max(8, rendererHeight - 8)),
     fullScreen: false,
     scrollY: 0,
     content:
@@ -24,6 +25,7 @@ export function buildHistoryOverlayView(
             theme,
           )
         : "No turns yet",
+    footer: OVERLAY_HINTS.history,
   };
 }
 

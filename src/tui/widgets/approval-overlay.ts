@@ -1,5 +1,6 @@
-import type { JSONRPCRequest } from "../../codex/types";
+import type { JSONRPCRequest } from "../../codex/app-server";
 import type { OverlayView } from "../overlay-model";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export type ApprovalDecision = "accept" | "session" | "decline";
 
@@ -19,10 +20,11 @@ export function buildApprovalOverlayView(
   return {
     visible: true,
     title: "Approval",
-    height: Math.min(10, options.length + 4),
+    height: Math.min(12, options.length + 6),
     fullScreen: false,
     scrollY: 0,
     content: [`Request: ${request.method}`, "", ...options.map(formatApprovalOption)].join("\n"),
+    footer: OVERLAY_HINTS.approval,
   };
 }
 

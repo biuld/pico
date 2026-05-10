@@ -3,6 +3,7 @@ export type TuiInputCommand =
   | { type: "submit"; text: string }
   | { type: "resume" }
   | { type: "theme" }
+  | { type: "statusline" }
   | { type: "rename"; label: string }
   | { type: "status" }
   | { type: "quit" }
@@ -17,6 +18,7 @@ export interface SlashCommandSpec {
 export const SLASH_COMMANDS: readonly SlashCommandSpec[] = [
   { name: "resume", description: "resume a saved thread" },
   { name: "theme", description: "choose a color theme" },
+  { name: "statusline", description: "configure status line items" },
   { name: "rename", description: "rename the current thread", takesArgument: true },
   { name: "status", description: "show current session status" },
   { name: "quit", description: "exit Pico" },
@@ -33,6 +35,7 @@ export function parseTuiInput(input: string): TuiInputCommand {
 
   if (command === "resume") return { type: "resume" };
   if (command === "theme") return { type: "theme" };
+  if (command === "statusline") return { type: "statusline" };
   if (command === "rename") {
     if (!body) return { type: "unknown", message: `/${command} requires a name` };
     return { type: "rename", label: body };

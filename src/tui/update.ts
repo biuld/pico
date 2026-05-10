@@ -4,6 +4,7 @@ import {
   moveSelection,
   moveSessionSelection,
   moveSlashSelection,
+  moveStatusLineSelection,
   moveThemeSelection,
   resetTranscriptScroll,
   scrollTranscript,
@@ -15,11 +16,14 @@ import {
   syncListScroll,
   syncSessionScroll,
   syncSlashSelection,
+  syncStatusLineSelection,
   syncThemeSelection,
+  toggleStatusLineItem,
   updateInput,
   type TuiState,
   type TurnStatus,
 } from "./state";
+import type { StatusLineItemId } from "./statusline";
 import type { ThemeName } from "./theme";
 
 export type TuiMsg =
@@ -29,6 +33,7 @@ export type TuiMsg =
   | { type: "openHistory"; leafId: string }
   | { type: "openSessions"; sessionId: string }
   | { type: "openTheme" }
+  | { type: "openStatusLine" }
   | { type: "openTranscript" }
   | { type: "openShortcuts" }
   | { type: "showApproval" }
@@ -40,6 +45,9 @@ export type TuiMsg =
   | { type: "syncSlash"; total: number }
   | { type: "moveTheme"; total: number; delta: number }
   | { type: "syncTheme"; total: number }
+  | { type: "moveStatusLine"; total: number; delta: number }
+  | { type: "syncStatusLine"; total: number }
+  | { type: "toggleStatusLineItem"; item: StatusLineItemId }
   | { type: "moveApproval"; total: number; delta: number }
   | { type: "scrollTranscript"; delta: number }
   | { type: "jumpTranscriptTop" }
@@ -73,6 +81,8 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return setOverlay(selectSession(state, msg.sessionId), "sessions");
     case "openTheme":
       return setOverlay(state, "theme");
+    case "openStatusLine":
+      return setOverlay(state, "statusline");
     case "openTranscript":
       return setOverlay(resetTranscriptScroll(state), "transcript");
     case "openShortcuts":
@@ -103,6 +113,12 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return moveThemeSelection(state, msg.total, msg.delta);
     case "syncTheme":
       return syncThemeSelection(state, msg.total);
+    case "moveStatusLine":
+      return moveStatusLineSelection(state, msg.total, msg.delta);
+    case "syncStatusLine":
+      return syncStatusLineSelection(state, msg.total);
+    case "toggleStatusLineItem":
+      return toggleStatusLineItem(state, msg.item);
     case "moveApproval":
       return moveApprovalSelection(state, msg.total, msg.delta);
     case "scrollTranscript":

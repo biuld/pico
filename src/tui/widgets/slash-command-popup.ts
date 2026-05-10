@@ -1,5 +1,6 @@
 import type { SlashCommandSpec } from "../commands";
 import type { OverlayView } from "../overlay-model";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export interface SlashCommandRow {
   name: string;
@@ -16,10 +17,11 @@ export function buildSlashCommandOverlayView(
   return {
     visible: true,
     title: "Commands",
-    height: Math.min(8, Math.max(3, rows.length + 2)),
+    height: Math.min(10, Math.max(5, rows.length + 4)),
     fullScreen: false,
     scrollY: 0,
     content: rows.length > 0 ? rows.map(formatSlashCommandRow).join("\n") : "No matching commands",
+    footer: OVERLAY_HINTS.slash,
   };
 }
 

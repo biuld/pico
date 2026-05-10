@@ -61,8 +61,13 @@ export {
   wrapTranscriptText,
 } from "./wrap";
 
-export function formatTranscript(app: DraftAppState, streamingText: string): string {
-  return renderTranscriptPlain(transcriptCellsForApp(app, streamingText), 80);
+export function formatTranscript(
+  app: DraftAppState,
+  streamingText: string,
+  liveStatus = "",
+  liveLeafId?: string,
+): string {
+  return renderTranscriptPlain(transcriptCellsForApp(app, streamingText, liveStatus, liveLeafId), 80);
 }
 
 export function formatMainTranscript(
@@ -70,8 +75,10 @@ export function formatMainTranscript(
   streamingText: string,
   maxLines: number,
   width = 80,
+  liveStatus = "",
+  liveLeafId?: string,
 ): string {
-  const lines = renderTranscriptLines(transcriptCellsForApp(app, streamingText), width)
+  const lines = renderTranscriptLines(transcriptCellsForApp(app, streamingText, liveStatus, liveLeafId), width)
     .map(transcriptLineText);
   return lines.slice(-Math.max(1, maxLines)).join("\n");
 }
@@ -82,8 +89,10 @@ export function formatMainTranscriptStyled(
   maxLines: number,
   width: number,
   theme: TuiTheme,
+  liveStatus = "",
+  liveLeafId?: string,
 ): StyledText {
-  const lines = renderTranscriptLines(transcriptCellsForApp(app, streamingText), width)
+  const lines = renderTranscriptLines(transcriptCellsForApp(app, streamingText, liveStatus, liveLeafId), width)
     .slice(-Math.max(1, maxLines));
   return renderTranscriptLinesStyled(lines, theme);
 }
@@ -103,6 +112,8 @@ export function formatTranscriptRow(row: TranscriptRow, width = 80): string {
 function transcriptCellsForApp(
   app: DraftAppState,
   streamingText: string,
+  liveStatus = "",
+  liveLeafId?: string,
 ): TranscriptCell[] {
-  return transcriptCellsFromRows(buildTranscriptRowsWithLive(app, streamingText));
+  return transcriptCellsFromRows(buildTranscriptRowsWithLive(app, streamingText, liveStatus, liveLeafId));
 }

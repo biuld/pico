@@ -1,19 +1,19 @@
 import { EventEmitter } from "events";
-import { CodexClient } from "../codex/client";
-import type { JSONRPCRequest } from "../codex/types";
+import { CodexAppServerClient } from "../codex/app-server";
+import type { JSONRPCRequest } from "../codex/app-server";
 import { loadPicoConfig, type PicoConfig } from "../config";
 import { SessionStore, type TurnOverrides } from "../session/store";
 
 export interface AppState {
   store: SessionStore;
-  codex: CodexClient;
+  codex: CodexAppServerClient;
   config: PicoConfig;
   cwd: string;
 }
 
 export interface DraftAppState {
   store?: SessionStore;
-  codex: CodexClient;
+  codex: CodexAppServerClient;
   config: PicoConfig;
   cwd: string;
 }
@@ -50,6 +50,9 @@ export interface TurnStartedEvent {
   turnId: string;
   codexTurnId?: string;
   userInput: string;
+  threadStatus?: string;
+  model?: string;
+  modelProvider?: string;
 }
 
 export interface TurnCompletedEvent extends TurnResult {
@@ -74,7 +77,7 @@ export class PicoController extends EventEmitter {
     return this.state.store;
   }
 
-  get codex(): CodexClient {
+  get codex(): CodexAppServerClient {
     return this.state.codex;
   }
 
@@ -126,9 +129,9 @@ export async function createApp(cwd: string = process.cwd()): Promise<AppState> 
 
 export async function createDraftApp(cwd: string = process.cwd()): Promise<DraftAppState> {
   const config = await loadPicoConfig(cwd);
-  const codex = new CodexClient({ binary: config.codexBinary });
-  await codex.start();
-  return { codex, config, cwd: config.cwd || cwd };
+  const appCwd = config.cwd || cwd;
+  const codex = await createCodexClient(config, appCwd);
+  return { codex, config, cwd: appCwd };
 }
 
 export async function ensureAppSession(app: DraftAppState): Promise<AppState> {
@@ -146,9 +149,38 @@ export async function ensureAppSession(app: DraftAppState): Promise<AppState> {
 export async function loadApp(cwd: string, sessionId: string): Promise<AppState> {
   const config = await loadPicoConfig(cwd);
   const store = await SessionStore.load(cwd, sessionId);
-  const codex = new CodexClient({ binary: config.codexBinary });
-  await codex.start();
+  const codex = await createCodexClient(config, store.cwd);
   return { store, codex, config, cwd: store.cwd };
+}
+
+async function createCodexClient(config: PicoConfig, cwd: string): Promise<CodexAppServerClient> {
+  const codex = new CodexAppServerClient({ binary: config.codexBinary });
+  await codex.start();
+  await seedCodexStatus(codex, config, cwd);
+  return codex;
+}
+
+async function seedCodexStatus(
+  codex: CodexAppServerClient,
+  config: PicoConfig,
+  cwd: string,
+): Promise<void> {
+  const overrides = codexStatusOverrides(config);
+  if (overrides) codex.applyConfigStatus(overrides);
+
+  try {
+    await codex.refreshConfigStatus({ cwd, overrides });
+  } catch {
+    // Older app-server builds may not expose config/read. Thread start still refreshes status.
+  }
+}
+
+function codexStatusOverrides(config: PicoConfig) {
+  if (!config.model && !config.modelProvider) return undefined;
+  return {
+    model: config.model,
+    modelProvider: config.modelProvider,
+  };
 }
 
 export async function runTurn(
@@ -193,7 +225,14 @@ export async function runTurn(
     picoTurnId = picoTurn.id;
     parentId = picoTurn.id;
     codexTurnId = picoTurn.id;
-    emit?.("turn:started", { threadId, turnId: picoTurn.id, userInput } satisfies TurnStartedEvent);
+    emit?.("turn:started", {
+      threadId,
+      turnId: picoTurn.id,
+      userInput,
+      threadStatus: thread.thread.status,
+      model: thread.model,
+      modelProvider: thread.modelProvider,
+    } satisfies TurnStartedEvent);
 
     let rawItemCount = 0;
     const bufferedRawItems: Record<string, unknown>[] = [];
@@ -280,6 +319,9 @@ export async function runTurn(
         turnId: picoTurn.id,
         codexTurnId: turnId,
         userInput,
+        threadStatus: started.turn.status,
+        model: turnOverrides.model || thread.model,
+        modelProvider: turnOverrides.modelProvider || thread.modelProvider,
       } satisfies TurnStartedEvent);
 
       for (const item of bufferedRawItems) {

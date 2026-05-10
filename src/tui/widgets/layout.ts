@@ -31,7 +31,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
   });
   const transcript = createTranscriptWidget(renderer, theme);
   const composer = createComposerWidget(renderer, theme);
-  const overlay = createOverlayWidget(renderer, theme, () => composer.height);
+  const overlay = createOverlayWidget(renderer, theme, () => composer.overlayInset);
 
   renderer.root.add(screen);
   screen.add(transcript.root);

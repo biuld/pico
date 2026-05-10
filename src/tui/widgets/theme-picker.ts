@@ -1,5 +1,6 @@
 import type { OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export interface ThemeRow {
   name: string;
@@ -13,10 +14,11 @@ export function buildThemeOverlayView(rows: readonly ThemeRow[]): OverlayView {
   return {
     visible: true,
     title: "Theme",
-    height: Math.min(8, Math.max(4, rows.length + 2)),
+    height: Math.min(10, Math.max(6, rows.length + 4)),
     fullScreen: false,
     scrollY: 0,
     content: rows.map(formatThemeRow).join("\n"),
+    footer: OVERLAY_HINTS.theme,
   };
 }
 

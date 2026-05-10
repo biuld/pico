@@ -9,7 +9,10 @@ export {
 } from "./widgets/approval-overlay";
 export {
   footerMode,
+  formatComposerPlaceholder,
+  formatBottomStatusLine,
   formatFooterLine,
+  formatTransientStatusLine,
   type FooterMode,
 } from "./widgets/footer";
 export {
@@ -20,6 +23,11 @@ export {
 export {
   shortcutOverlayText,
 } from "./widgets/shortcut-overlay";
+export {
+  formatCodexStatusLine,
+  formatCodexStatusLineStyled,
+  type StatusLineInput,
+} from "./statusline";
 export {
   buildSlashCommandRows,
   formatSlashCommandRow,

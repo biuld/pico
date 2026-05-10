@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+
 export interface PicoConfig {
   model?: string;
   modelProvider?: string;
@@ -7,9 +9,11 @@ export interface PicoConfig {
   personality?: string;
   developerInstructions?: string;
   codexBinary?: string;
+  statusLineItems?: string[];
 }
 
 const CONFIG_PATH = ".pico/config.json";
+const CONFIG_DIR = ".pico";
 
 export async function loadPicoConfig(cwd: string = process.cwd()): Promise<PicoConfig> {
   const home = Bun.env.HOME || process.env.HOME || ".";
@@ -34,4 +38,22 @@ async function readConfig(path: string): Promise<PicoConfig> {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`Invalid Pico config ${path}: ${message}`);
   }
+}
+
+export async function updateProjectPicoConfig(
+  cwd: string = process.cwd(),
+  patch: Partial<PicoConfig>,
+): Promise<PicoConfig> {
+  const path = `${cwd}/${CONFIG_PATH}`;
+  const current = await readConfig(path);
+  const next = pruneUndefined({ ...current, ...patch });
+  await mkdir(`${cwd}/${CONFIG_DIR}`, { recursive: true });
+  await Bun.write(path, `${JSON.stringify(next, null, 2)}\n`);
+  return next;
+}
+
+function pruneUndefined(config: PicoConfig): PicoConfig {
+  return Object.fromEntries(
+    Object.entries(config).filter(([, value]) => value !== undefined),
+  ) as PicoConfig;
 }

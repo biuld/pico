@@ -1,5 +1,5 @@
-// Codex app-server JSON-RPC protocol types
-// Based on codex-rs app-server-protocol
+// Codex app-server JSON-RPC protocol types.
+// Based on codex-rs app-server-protocol.
 
 export type RequestId = number | string;
 
@@ -35,7 +35,6 @@ export type JSONRPCMessage =
   | { type: "error"; value: JSONRPCError }
   | { type: "notification"; value: JSONRPCNotification };
 
-// Initialize
 export interface InitializeParams {
   clientInfo: {
     name: string;
@@ -56,7 +55,49 @@ export interface InitializeResponse {
   platformOs: string;
 }
 
-// Thread
+export interface ConfigReadParams {
+  includeLayers: boolean;
+  cwd?: string | null;
+}
+
+export interface ConfigReadResponse {
+  config: CodexConfig;
+  origins?: Record<string, unknown>;
+  layers?: unknown[] | null;
+}
+
+export interface CodexConfig {
+  model?: string | null;
+  modelProvider?: string | null;
+  model_provider?: string | null;
+  approvalPolicy?: string | null;
+  approval_policy?: string | null;
+  sandbox?: unknown;
+  sandboxMode?: unknown;
+  sandbox_mode?: unknown;
+  [key: string]: unknown;
+}
+
+export interface ModelListParams {
+  cursor?: string | null;
+  limit?: number | null;
+  includeHidden?: boolean | null;
+}
+
+export interface ModelListResponse {
+  data: CodexModel[];
+  nextCursor?: string | null;
+}
+
+export interface CodexModel {
+  id: string;
+  model: string;
+  displayName?: string;
+  hidden?: boolean;
+  isDefault?: boolean;
+  [key: string]: unknown;
+}
+
 export interface ThreadStartParams {
   model?: string;
   modelProvider?: string;
@@ -79,38 +120,15 @@ export interface ThreadStartResponse {
 
 export interface ThreadInfo {
   id: string;
-  sessionId: string;
-  forkedFromId: string | null;
-  preview: string;
-  ephemeral: boolean;
-  modelProvider: string;
-  createdAt: number;
-  updatedAt: number;
   status: string;
-  path: string | null;
-  cwd: string;
-  cliVersion: string;
-  source: string;
-  turns: TurnInfo[];
+  [key: string]: unknown;
 }
 
-export interface TurnInfo {
-  id: string;
-  status: string;
-  items: unknown[];
-  itemsView: string;
-  startedAt: number | null;
-  completedAt: number | null;
-  durationMs: number | null;
-}
-
-// Inject items
 export interface ThreadInjectItemsParams {
   threadId: string;
-  items: unknown[]; // ResponseItem[]
+  items: unknown[];
 }
 
-// Turn
 export interface TurnStartParams {
   threadId: string;
   input: UserInputItem[];
@@ -137,33 +155,6 @@ export interface TextElement {
   placeholder?: string;
 }
 
-// Turn start response
 export interface TurnStartResponse {
   turn: { id: string; status: string };
-}
-
-// Turn interrupt
-export interface TurnInterruptParams {
-  threadId: string;
-  turnId: string;
-}
-
-// Search
-export interface FuzzyFileSearchParams {
-  query: string;
-  roots: string[];
-  cancellationToken?: string;
-}
-
-export interface FuzzyFileSearchResult {
-  root: string;
-  path: string;
-  matchType: string;
-  fileName: string;
-  score: number;
-  indices?: number[];
-}
-
-export interface FuzzyFileSearchResponse {
-  files: FuzzyFileSearchResult[];
 }

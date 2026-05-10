@@ -1,21 +1,29 @@
 import {
   BoxRenderable,
   InputRenderable,
+  StyledText,
   TextRenderable,
   type CliRenderer,
 } from "@opentui/core";
-import type { JSONRPCRequest } from "../../codex/types";
+import type { JSONRPCRequest } from "../../codex/app-server";
 import type { TuiState } from "../state";
 import type { TuiTheme } from "../theme";
 
-export const COMPOSER_HEIGHT = 5;
+export const COMPOSER_TRANSIENT_STATUS_HEIGHT = 1;
+export const COMPOSER_ROW_HEIGHT = 3;
+export const COMPOSER_STATUS_LINE_HEIGHT = 1;
+export const COMPOSER_HEIGHT =
+  COMPOSER_TRANSIENT_STATUS_HEIGHT + COMPOSER_ROW_HEIGHT + COMPOSER_STATUS_LINE_HEIGHT;
+export const COMPOSER_OVERLAY_INSET = COMPOSER_HEIGHT;
 
 export interface ComposerWidget {
   root: BoxRenderable;
   input: InputRenderable;
   height: number;
-  setStatus(content: string): void;
-  setFooter(content: string): void;
+  overlayInset: number;
+  setTransientStatus(content: string): void;
+  setPlaceholder(content: string): void;
+  setStatusLine(content: string | StyledText): void;
   applyTheme(theme: TuiTheme): void;
 }
 
@@ -35,12 +43,12 @@ export function createComposerWidget(
     backgroundColor: colors.background,
   });
 
-  const statusText = new TextRenderable(renderer, {
-    id: "pico-status",
+  const transientStatusText = new TextRenderable(renderer, {
+    id: "pico-transient-status",
     width: "100%",
-    height: 1,
+    height: COMPOSER_TRANSIENT_STATUS_HEIGHT,
     content: "",
-    fg: colors.status,
+    fg: colors.muted,
     wrapMode: "none",
     truncate: true,
   });
@@ -49,7 +57,7 @@ export function createComposerWidget(
     id: "pico-composer-row",
     flexDirection: "row",
     width: "100%",
-    height: 3,
+    height: COMPOSER_ROW_HEIGHT,
     border: ["top", "bottom"],
     borderColor: colors.border,
     borderStyle: "single",
@@ -81,36 +89,40 @@ export function createComposerWidget(
     placeholderColor: colors.placeholder,
   });
 
-  const footerText = new TextRenderable(renderer, {
-    id: "pico-footer",
+  const statusLineText = new TextRenderable(renderer, {
+    id: "pico-statusline",
     width: "100%",
-    height: 1,
+    height: COMPOSER_STATUS_LINE_HEIGHT,
     content: "",
-    fg: colors.muted,
+    fg: colors.status,
     wrapMode: "none",
     truncate: true,
   });
 
   composerRow.add(promptText);
   composerRow.add(input);
-  root.add(statusText);
+  root.add(transientStatusText);
   root.add(composerRow);
-  root.add(footerText);
+  root.add(statusLineText);
 
   return {
     root,
     input,
     height: COMPOSER_HEIGHT,
-    setStatus: (content) => {
-      statusText.content = content;
+    overlayInset: COMPOSER_OVERLAY_INSET,
+    setTransientStatus: (content) => {
+      transientStatusText.content = content;
     },
-    setFooter: (content) => {
-      footerText.content = content;
+    setPlaceholder: (content) => {
+      input.placeholder = content;
+    },
+    setStatusLine: (content) => {
+      statusLineText.content = content;
     },
     applyTheme: (nextTheme) => {
       const next = nextTheme.colors;
       root.backgroundColor = next.background;
-      statusText.fg = next.status;
+      transientStatusText.fg = next.muted;
       composerRow.backgroundColor = next.background;
       composerRow.borderColor = next.border;
       promptText.fg = next.textStrong;
@@ -119,7 +131,7 @@ export function createComposerWidget(
       input.backgroundColor = next.background;
       input.focusedBackgroundColor = next.background;
       input.placeholderColor = next.placeholder;
-      footerText.fg = next.muted;
+      statusLineText.fg = next.status;
     },
   };
 }

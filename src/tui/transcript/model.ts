@@ -43,10 +43,20 @@ export function buildTranscriptRows(
 export function buildTranscriptRowsWithLive(
   app: DraftAppState,
   streamingText: string,
+  liveStatus = "",
+  liveLeafId?: string,
 ): TranscriptRow[] {
-  const rows = app.store ? buildTranscriptRows(app.store) : [];
+  const rows = app.store ? buildTranscriptRows(app.store, liveLeafId || app.store.leafId) : [];
   if (streamingText.length > 0) {
     rows.push({ id: "live", role: "assistant", text: streamingText });
+  } else if (liveStatus.length > 0) {
+    rows.push({
+      id: "live-loading",
+      role: "assistant",
+      kind: "reasoning",
+      text: liveStatus,
+      status: "running",
+    });
   }
   return rows;
 }

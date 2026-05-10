@@ -10,7 +10,7 @@ import {
   type DraftAppState,
 } from "../src/app/controller";
 import { SessionStore } from "../src/session/store";
-import type { JSONRPCRequest } from "../src/codex/types";
+import type { JSONRPCRequest } from "../src/codex/app-server";
 
 class FakeCodex extends EventEmitter {
   userAgent = "fake-codex";

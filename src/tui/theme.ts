@@ -15,6 +15,20 @@ export interface TuiTheme {
     status: string;
     placeholder: string;
     userMessageBackground: string;
+    statusLine: {
+      model: string;
+      provider: string;
+      path: string;
+      branch: string;
+      state: string;
+      usage: string;
+      limit: string;
+      metadata: string;
+      mode: string;
+      thread: string;
+      progress: string;
+      separator: string;
+    };
   };
 }
 
@@ -34,6 +48,20 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       status: "#9fb0bf",
       placeholder: "#6f7b86",
       userMessageBackground: "#1b2127",
+      statusLine: {
+        model: "#c4b5fd",
+        provider: "#93c5fd",
+        path: "#86efac",
+        branch: "#f0abfc",
+        state: "#7dd3fc",
+        usage: "#86efac",
+        limit: "#f0abfc",
+        metadata: "#9fb0bf",
+        mode: "#7dd3fc",
+        thread: "#f0abfc",
+        progress: "#86efac",
+        separator: "#52606c",
+      },
     },
   },
   {
@@ -51,6 +79,20 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       status: "#4f6f68",
       placeholder: "#8a8178",
       userMessageBackground: "#e8dfd2",
+      statusLine: {
+        model: "#6d28d9",
+        provider: "#1d4ed8",
+        path: "#15803d",
+        branch: "#a21caf",
+        state: "#075985",
+        usage: "#15803d",
+        limit: "#a21caf",
+        metadata: "#4f6f68",
+        mode: "#075985",
+        thread: "#a21caf",
+        progress: "#15803d",
+        separator: "#8d7f6f",
+      },
     },
   },
   {
@@ -68,6 +110,20 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       status: "#c0c0c0",
       placeholder: "#777777",
       userMessageBackground: "#1f1f1f",
+      statusLine: {
+        model: "#d0d0d0",
+        provider: "#b8b8b8",
+        path: "#e0e0e0",
+        branch: "#c8c8c8",
+        state: "#ffffff",
+        usage: "#e0e0e0",
+        limit: "#c8c8c8",
+        metadata: "#c0c0c0",
+        mode: "#ffffff",
+        thread: "#c8c8c8",
+        progress: "#e0e0e0",
+        separator: "#808080",
+      },
     },
   },
 ];

@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test";
-import { classifyJsonRpcMessage } from "../src/codex/client";
+import {
+  classifyJsonRpcMessage,
+  createCodexStatusSnapshot,
+  formatCodexStatusText,
+  updateCodexStatusFromConfig,
+  updateCodexStatusFromConfigRead,
+  updateCodexStatusFromModelList,
+  updateCodexStatusFromNotification,
+  updateCodexStatusFromThreadStart,
+  updateCodexStatusFromTurnStart,
+} from "../src/codex/app-server";
 
 test("classifies server requests before notifications", () => {
   const message = {
@@ -29,4 +39,63 @@ test("rejects malformed JSON-RPC objects", () => {
   expect(() => classifyJsonRpcMessage({ jsonrpc: "2.0", id: 1 })).toThrow(
     "Malformed JSON-RPC message",
   );
+});
+
+test("projects app-server status from SDK responses and notifications", () => {
+  let status = createCodexStatusSnapshot({ userAgent: "codex-test" });
+
+  status = updateCodexStatusFromThreadStart(status, {
+    thread: { id: "thread-1", status: "idle" },
+    model: "gpt-test",
+    modelProvider: "openai",
+    cwd: "/tmp/project",
+  });
+  status = updateCodexStatusFromTurnStart(status, "thread-1", {
+    turn: { id: "turn-1", status: "running" },
+  });
+  status = updateCodexStatusFromNotification(status, {
+    method: "thread/tokenUsage/updated",
+    params: { tokenUsage: { inputTokens: 12, outputTokens: 4 } },
+  });
+  status = updateCodexStatusFromNotification(status, {
+    method: "model/rerouted",
+    params: { fromModel: "gpt-test", toModel: "gpt-next" },
+  });
+
+  const text = formatCodexStatusText(status);
+  expect(text).toContain("codex running");
+  expect(text).toContain("model gpt-next");
+  expect(text).toContain("16 used");
+});
+
+test("projects startup config and default model into status before a turn starts", () => {
+  let status = createCodexStatusSnapshot({ userAgent: "codex-test" });
+
+  status = updateCodexStatusFromConfigRead(status, {
+    config: { model: null, model_provider: "openai" },
+  });
+  status = updateCodexStatusFromModelList(status, {
+    data: [
+      { id: "gpt-other", model: "gpt-other", isDefault: false },
+      { id: "gpt-default", model: "gpt-default", isDefault: true },
+    ],
+  });
+
+  expect(status.model).toBe("gpt-default");
+  expect(status.modelProvider).toBe("openai");
+});
+
+test("pico config overrides app-server startup status", () => {
+  let status = createCodexStatusSnapshot({ userAgent: "codex-test" });
+
+  status = updateCodexStatusFromConfigRead(status, {
+    config: { model: "codex-config-model", model_provider: "openai" },
+  });
+  status = updateCodexStatusFromConfig(status, {
+    model: "pico-model",
+    modelProvider: "pico-provider",
+  });
+
+  expect(status.model).toBe("pico-model");
+  expect(status.modelProvider).toBe("pico-provider");
 });

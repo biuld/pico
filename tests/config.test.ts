@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPicoConfig } from "../src/config";
+import { loadPicoConfig, updateProjectPicoConfig } from "../src/config";
 
 let home: string;
 let cwd: string;
@@ -11,6 +11,24 @@ beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "pico-home-"));
   cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   Bun.env.HOME = home;
+});
+
+test("persists project statusline items without dropping existing config", async () => {
+  await mkdir(join(cwd, ".pico"), { recursive: true });
+  await Bun.write(
+    join(cwd, ".pico", "config.json"),
+    JSON.stringify({ model: "project-model" }),
+  );
+
+  await updateProjectPicoConfig(cwd, {
+    statusLineItems: ["run-state", "model", "thread-id"],
+  });
+
+  await expect(loadPicoConfig(cwd)).resolves.toEqual({
+    model: "project-model",
+    statusLineItems: ["run-state", "model", "thread-id"],
+    cwd,
+  });
 });
 
 test("loads global and project Pico config with project overrides", async () => {

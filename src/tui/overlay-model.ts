@@ -7,6 +7,7 @@ export interface OverlayView {
   fullScreen: boolean;
   scrollY: number;
   content: string | StyledText;
+  footer?: string;
 }
 
 export function emptyOverlay(): OverlayView {
@@ -17,5 +18,6 @@ export function emptyOverlay(): OverlayView {
     fullScreen: false,
     scrollY: 0,
     content: "",
+    footer: "",
   };
 }

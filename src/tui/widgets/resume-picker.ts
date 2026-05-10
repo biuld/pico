@@ -1,6 +1,7 @@
 import type { SessionInfo } from "../../session/store";
 import type { OverlayView } from "../overlay-model";
 import type { TuiState } from "../state";
+import { OVERLAY_HINTS } from "./overlay-hints";
 
 export interface SessionRow {
   id: string;
@@ -21,16 +22,16 @@ export function buildResumeOverlayView(
   return {
     visible: true,
     title: "Resume",
-    height: Math.min(12, Math.max(6, rendererHeight - 8)),
+    height: Math.min(14, Math.max(8, rendererHeight - 8)),
     fullScreen: false,
     scrollY: 0,
-    content:
-      rows.length > 0
-        ? rows
-            .slice(state.sessionScroll, state.sessionScroll + viewportHeight)
-            .map(formatSessionRow)
-            .join("\n")
-        : "No saved sessions",
+    content: rows.length > 0
+      ? rows
+        .slice(state.sessionScroll, state.sessionScroll + viewportHeight)
+        .map(formatSessionRow)
+        .join("\n")
+      : "No saved sessions",
+    footer: OVERLAY_HINTS.resume,
   };
 }
 

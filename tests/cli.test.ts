@@ -5,15 +5,15 @@ test("parses default TUI command", () => {
   expect(parseCliArgs([], "/repo")).toEqual({ command: "tui", cwd: "/repo" });
 });
 
-test("parses session listing and resume options", () => {
-  expect(parseCliArgs(["--cwd", "/work", "--sessions"], "/repo")).toEqual({
-    command: "sessions",
+test("parses thread listing and resume options", () => {
+  expect(parseCliArgs(["--cwd", "/work", "--threads"], "/repo")).toEqual({
+    command: "threads",
     cwd: "/work",
   });
-  expect(parseCliArgs(["--resume", "session-1"], "/repo")).toEqual({
+  expect(parseCliArgs(["--resume", "thread-1"], "/repo")).toEqual({
     command: "tui",
     cwd: "/repo",
-    resumeSessionId: "session-1",
+    resumeThreadId: "thread-1",
   });
 });
 

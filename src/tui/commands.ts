@@ -20,7 +20,7 @@ export const SLASH_COMMANDS: readonly SlashCommandSpec[] = [
   { name: "theme", description: "choose a color theme" },
   { name: "statusline", description: "configure status line items" },
   { name: "rename", description: "rename the current thread", takesArgument: true },
-  { name: "status", description: "show current session status" },
+  { name: "status", description: "show current thread status" },
   { name: "quit", description: "exit Pico" },
   { name: "exit", description: "exit Pico" },
 ];

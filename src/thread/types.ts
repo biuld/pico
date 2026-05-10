@@ -14,8 +14,8 @@ export type RawResponseItem = Record<string, unknown> & (
 
 export type ResponseItem = RawResponseItem;
 
-export interface SessionHeader {
-  type: "session";
+export interface PicoThreadHeader {
+  type: "thread";
   version: 1;
   id: string;
   createdAt: string;
@@ -85,7 +85,7 @@ export interface ConfigChangeEntry extends BaseEntry {
   config: PicoConfigSnapshot;
 }
 
-export type SessionEntry =
+export type PicoThreadEntry =
   | TurnEntry
   | ResponseItemEntry
   | TurnCompletedEntry
@@ -105,11 +105,13 @@ export interface TurnOverrides {
   developerInstructions?: string;
 }
 
-export interface SessionInfo {
+export interface PicoThreadInfo {
   id: string;
   leafId: string;
   cwd: string;
   createdAt: string;
+  updatedAt: string;
+  preview: string;
   turnCount: number;
   responseItemCount: number;
   label?: string;

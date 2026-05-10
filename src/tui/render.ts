@@ -1,4 +1,4 @@
-import type { SessionStore } from "../session/store";
+import type { PicoThreadStore } from "../thread/store";
 import type { TuiState } from "./state";
 
 export {
@@ -16,9 +16,9 @@ export {
   type FooterMode,
 } from "./widgets/footer";
 export {
-  buildSessionRows,
-  formatSessionRow,
-  type SessionRow,
+  buildThreadRows,
+  formatThreadRow,
+  type ThreadRow,
 } from "./widgets/resume-picker";
 export {
   shortcutOverlayText,
@@ -44,7 +44,7 @@ export {
   type TranscriptRow,
 } from "./transcript";
 
-export function formatStatusLine(store: SessionStore, state: TuiState): string {
+export function formatStatusLine(store: PicoThreadStore, state: TuiState): string {
   const selected = state.selectedEntryId === store.leafId ? "leaf" : shortId(state.selectedEntryId);
   const message = state.statusMessage ? ` ${state.statusMessage}` : "";
   return `pico ${shortId(store.id)} | ${state.turnStatus} | branch ${selected}${message}`;

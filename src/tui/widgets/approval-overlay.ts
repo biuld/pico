@@ -2,7 +2,7 @@ import type { JSONRPCRequest } from "../../codex/app-server";
 import type { OverlayView } from "../overlay-model";
 import { OVERLAY_HINTS } from "./overlay-hints";
 
-export type ApprovalDecision = "accept" | "session" | "decline";
+export type ApprovalDecision = "accept" | "acceptForSession" | "decline";
 
 export interface ApprovalOption {
   decision: ApprovalDecision;
@@ -53,7 +53,7 @@ export function buildApprovalOptions(method: string, selectedIndex: number): App
           description: "allow this operation",
         },
         {
-          decision: "session",
+          decision: "acceptForSession",
           shortcut: "s",
           label: "Approve for session",
           description: "allow matching operations this session",

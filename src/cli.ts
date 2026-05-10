@@ -1,7 +1,7 @@
 export interface CliOptions {
-  command: "tui" | "sessions" | "help";
+  command: "tui" | "threads" | "help";
   cwd: string;
-  resumeSessionId?: string;
+  resumeThreadId?: string;
 }
 
 export function parseCliArgs(argv: string[], defaultCwd: string = process.cwd()): CliOptions {
@@ -17,11 +17,11 @@ export function parseCliArgs(argv: string[], defaultCwd: string = process.cwd())
       case "-h":
         options.command = "help";
         break;
-      case "--sessions":
-        options.command = "sessions";
+      case "--threads":
+        options.command = "threads";
         break;
       case "--resume":
-        options.resumeSessionId = requireValue(argv, ++i, arg);
+        options.resumeThreadId = requireValue(argv, ++i, arg);
         break;
       case "--cwd":
         options.cwd = requireValue(argv, ++i, arg);
@@ -39,8 +39,8 @@ export function formatCliHelp(binaryName = "pico"): string {
     `Usage: ${binaryName} [options]`,
     "",
     "Options:",
-    "  --sessions          list Pico sessions for the cwd",
-    "  --resume <id>       resume a Pico session",
+    "  --threads          list Pico threads for the cwd",
+    "  --resume <id>       resume a Pico thread",
     "  --cwd <path>        use a different project cwd",
     "  --help, -h          show this help",
   ].join("\n");

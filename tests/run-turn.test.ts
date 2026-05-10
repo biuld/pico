@@ -4,12 +4,12 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  ensureAppSession,
+  ensureAppThread,
   runTurn,
   type AppState,
   type DraftAppState,
 } from "../src/app/controller";
-import { SessionStore, type TurnEntry } from "../src/session/store";
+import { PicoThreadStore, type TurnEntry } from "../src/thread/store";
 import type { JSONRPCRequest } from "../src/codex/app-server";
 
 class FakeCodex extends EventEmitter {
@@ -22,7 +22,7 @@ class FakeCodex extends EventEmitter {
     return {
       thread: {
         id: "thread-1",
-        sessionId: "session-1",
+        sessionId: "codex-session-1",
         forkedFromId: null,
         preview: "",
         ephemeral: true,
@@ -78,7 +78,7 @@ class FakeCodex extends EventEmitter {
   rejectServerRequest() {}
 }
 
-test("ensureAppSession creates Pico JSONL only when a turn needs persistence", async () => {
+test("ensureAppThread creates Pico JSONL only when a turn needs persistence", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
@@ -89,14 +89,14 @@ test("ensureAppSession creates Pico JSONL only when a turn needs persistence", a
     codex: new FakeCodex(),
   } as unknown as DraftAppState;
 
-  expect(await SessionStore.list(cwd)).toEqual([]);
+  expect(await PicoThreadStore.list(cwd)).toEqual([]);
 
-  const activeApp = await ensureAppSession(app);
+  const activeApp = await ensureAppThread(app);
   const draftStore = app.store;
-  if (!draftStore) throw new Error("ensureAppSession did not attach a store");
+  if (!draftStore) throw new Error("ensureAppThread did not attach a store");
 
   expect(activeApp.store).toBe(draftStore);
-  expect((await SessionStore.list(cwd)).map((session) => session.id)).toEqual([
+  expect((await PicoThreadStore.list(cwd)).map((thread) => thread.id)).toEqual([
     activeApp.store.id,
   ]);
 });
@@ -106,7 +106,7 @@ test("runTurn injects branch history, filters raw items, and persists completion
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
 
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const previousTurn = await store.appendTurn(store.leafId, "previous");
   const previousItem = await store.appendResponseItem(previousTurn.id, previousTurn.id, {
     id: "previous-item",
@@ -136,7 +136,7 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
 
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const rootTurn = await store.appendTurn(store.leafId, "root");
   const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
     id: "root-item",
@@ -159,7 +159,7 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
   });
   await store.appendTurnCompleted(rightItem.id, rightTurn.id);
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
   const codex = new FakeCodex();
   const app = { store: loaded, codex, config: {} } as unknown as AppState;
 
@@ -193,7 +193,7 @@ test("runTurn resolves approval server requests", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const codex = new ApprovalCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
 

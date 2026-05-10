@@ -1,4 +1,4 @@
-import type { SessionStore } from "../../session/store";
+import type { PicoThreadStore } from "../../thread/store";
 import type { TuiState } from "../state";
 
 export type FooterMode =
@@ -20,7 +20,7 @@ export function footerMode(state: TuiState): FooterMode {
   if (state.overlay === "approval") return "Approval";
   if (state.overlay === "slash") return "SlashPalette";
   if (state.overlay === "history") return "HistoryPicker";
-  if (state.overlay === "sessions") return "ResumePicker";
+  if (state.overlay === "threads") return "ResumePicker";
   if (state.overlay === "theme") return "ThemePicker";
   if (state.overlay === "statusline") return "StatusLinePicker";
   if (state.overlay === "transcript") return "TranscriptPager";
@@ -66,7 +66,7 @@ function rotatingPlaceholder(values: readonly string[], frame: number): string {
 }
 
 export function formatBottomStatusLine(
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
   state: TuiState,
   statusText = "",
   width = 0,
@@ -74,6 +74,6 @@ export function formatBottomStatusLine(
   return statusText ? `  ${statusText}` : "";
 }
 
-export function formatFooterLine(store: SessionStore | undefined, state: TuiState, width = 0): string {
+export function formatFooterLine(store: PicoThreadStore | undefined, state: TuiState, width = 0): string {
   return formatBottomStatusLine(store, state, "", width);
 }

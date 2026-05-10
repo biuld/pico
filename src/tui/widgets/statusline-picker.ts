@@ -18,7 +18,7 @@ export const STATUS_LINE_ITEMS: readonly StatusLineItemSpec[] = [
   { id: "model", label: "Model", description: "current Codex model" },
   { id: "provider", label: "Provider", description: "current Codex model provider (Pico extension)" },
   { id: "current-dir", label: "Current dir", description: "current working directory" },
-  { id: "used-tokens", label: "Used tokens", description: "total tokens used in session" },
+  { id: "used-tokens", label: "Used tokens", description: "total tokens used in the current thread" },
   { id: "five-hour-limit", label: "5h limit", description: "remaining 5-hour usage limit" },
   { id: "weekly-limit", label: "Weekly limit", description: "remaining weekly usage limit" },
   { id: "thread-id", label: "Thread id", description: "active Codex thread id" },

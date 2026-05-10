@@ -2,19 +2,19 @@ import { slashQuery } from "./commands";
 import {
   moveApprovalSelection,
   moveSelection,
-  moveSessionSelection,
+  moveThreadSelection,
   moveSlashSelection,
   moveStatusLineSelection,
   moveThemeSelection,
   resetTranscriptScroll,
   scrollTranscript,
   selectEntry,
-  selectSession,
+  selectThread,
   selectTheme,
   setOverlay,
   setTurnStatus,
   syncListScroll,
-  syncSessionScroll,
+  syncThreadScroll,
   syncSlashSelection,
   syncStatusLineSelection,
   syncThemeSelection,
@@ -31,7 +31,7 @@ export type TuiMsg =
   | { type: "setInput"; value: string }
   | { type: "closeOverlay" }
   | { type: "openHistory"; leafId: string }
-  | { type: "openSessions"; sessionId: string }
+  | { type: "openThreads"; threadId: string }
   | { type: "openTheme" }
   | { type: "openStatusLine" }
   | { type: "openTranscript" }
@@ -39,8 +39,8 @@ export type TuiMsg =
   | { type: "showApproval" }
   | { type: "moveHistory"; entryIds: readonly string[]; delta: number; viewportHeight: number }
   | { type: "syncHistory"; entryIds: readonly string[]; viewportHeight: number }
-  | { type: "moveSession"; sessionIds: readonly string[]; delta: number; viewportHeight: number }
-  | { type: "syncSessions"; sessionIds: readonly string[]; viewportHeight: number }
+  | { type: "moveThread"; threadIds: readonly string[]; delta: number; viewportHeight: number }
+  | { type: "syncThreads"; threadIds: readonly string[]; viewportHeight: number }
   | { type: "moveSlash"; total: number; delta: number }
   | { type: "syncSlash"; total: number }
   | { type: "moveTheme"; total: number; delta: number }
@@ -56,7 +56,7 @@ export type TuiMsg =
   | { type: "setTurnStatus"; status: TurnStatus; message?: string }
   | { type: "restoreCompleted"; branchId: string; targetId: string }
   | { type: "renameCompleted"; entryId: string }
-  | { type: "resumeCompleted"; sessionId: string }
+  | { type: "resumeCompleted"; threadId: string }
   | { type: "themeSelected"; themeName: ThemeName };
 
 export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
@@ -77,8 +77,8 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return setOverlay(state, "none");
     case "openHistory":
       return setOverlay(selectEntry(state, msg.leafId), "history");
-    case "openSessions":
-      return setOverlay(selectSession(state, msg.sessionId), "sessions");
+    case "openThreads":
+      return setOverlay(selectThread(state, msg.threadId), "threads");
     case "openTheme":
       return setOverlay(state, "theme");
     case "openStatusLine":
@@ -97,14 +97,14 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       );
     case "syncHistory":
       return syncListScroll(state, msg.entryIds, msg.viewportHeight);
-    case "moveSession":
-      return syncSessionScroll(
-        moveSessionSelection(state, msg.sessionIds, msg.delta),
-        msg.sessionIds,
+    case "moveThread":
+      return syncThreadScroll(
+        moveThreadSelection(state, msg.threadIds, msg.delta),
+        msg.threadIds,
         msg.viewportHeight,
       );
-    case "syncSessions":
-      return syncSessionScroll(state, msg.sessionIds, msg.viewportHeight);
+    case "syncThreads":
+      return syncThreadScroll(state, msg.threadIds, msg.viewportHeight);
     case "moveSlash":
       return moveSlashSelection(state, msg.total, msg.delta);
     case "syncSlash":
@@ -140,7 +140,7 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return setTurnStatus(state, "idle", `renamed ${shortId(msg.entryId)}`);
     case "resumeCompleted":
       return setOverlay(
-        setTurnStatus(selectSession(state, msg.sessionId), "idle", `resumed ${shortId(msg.sessionId)}`),
+        setTurnStatus(selectThread(state, msg.threadId), "idle", `resumed ${shortId(msg.threadId)}`),
         "none",
       );
     case "themeSelected":

@@ -1,6 +1,6 @@
 import { StyledText, dim, fg } from "@opentui/core";
 import type { CodexStatusSnapshot } from "../codex/app-server";
-import type { SessionStore } from "../session/store";
+import type { PicoThreadStore } from "../thread/store";
 import type { TuiState } from "./state";
 import type { TuiTheme } from "./theme";
 
@@ -51,7 +51,7 @@ export interface StatusLineSegment {
 }
 
 export interface StatusLineInput {
-  store?: SessionStore;
+  store?: PicoThreadStore;
   state: TuiState;
   codex: CodexStatusSnapshot;
   items?: readonly StatusLineItemId[];
@@ -80,7 +80,7 @@ export function buildAlignedStatusLineSegments(input: StatusLineInput): StatusLi
 
 export function formatConfiguredStatusText(
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
   items: readonly StatusLineItemId[],
 ): string {
   return statusLineSegmentsText(buildStatusLineSegments(codex, store, items));
@@ -88,7 +88,7 @@ export function formatConfiguredStatusText(
 
 export function formatConfiguredStatusPreviewText(
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
   items: readonly StatusLineItemId[],
 ): string {
   return statusLineSegmentsText(buildStatusLinePreviewSegments(codex, store, items));
@@ -96,7 +96,7 @@ export function formatConfiguredStatusPreviewText(
 
 export function buildStatusLineSegments(
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
   items: readonly StatusLineItemId[],
 ): StatusLineSegment[] {
   const values: StatusLineSegment[] = [];
@@ -109,7 +109,7 @@ export function buildStatusLineSegments(
 
 export function buildStatusLinePreviewSegments(
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
   items: readonly StatusLineItemId[],
 ): StatusLineSegment[] {
   const values: StatusLineSegment[] = [];
@@ -139,7 +139,7 @@ export function isStatusLineItemId(item: string): item is StatusLineItemId {
 export function statusLineItemValue(
   item: StatusLineItemId,
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
 ): string | undefined {
   return statusLineItemSegment(item, codex, store)?.text;
 }
@@ -163,7 +163,7 @@ function normalizeStatusLineItem(item: string): StatusLineItemId | undefined {
 function statusLineItemSegment(
   item: StatusLineItemId,
   codex: CodexStatusSnapshot,
-  store: SessionStore | undefined,
+  store: PicoThreadStore | undefined,
 ): StatusLineSegment | undefined {
   switch (item) {
     case "model":

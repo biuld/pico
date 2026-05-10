@@ -1,4 +1,4 @@
-import type { ResponseItem } from "../session/store";
+import type { ResponseItem } from "../thread/store";
 
 export function responseItemText(item: ResponseItem): string {
   const direct = firstString(item, ["text", "output_text", "message", "summary"]);

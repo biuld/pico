@@ -1,5 +1,5 @@
 import type { DraftAppState } from "../../app/controller";
-import type { SessionStore } from "../../session/store";
+import type { PicoThreadStore } from "../../thread/store";
 import { transcriptRowsForResponseItem } from "./response-item";
 
 export type TranscriptRole = "user" | "assistant" | "system";
@@ -20,7 +20,7 @@ export interface TranscriptRow {
 }
 
 export function buildTranscriptRows(
-  store: SessionStore,
+  store: PicoThreadStore,
   leafId = store.leafId,
 ): TranscriptRow[] {
   return store.getPathEntries(leafId).flatMap((entry): TranscriptRow[] => {

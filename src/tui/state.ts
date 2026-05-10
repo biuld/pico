@@ -1,4 +1,4 @@
-import type { SessionStore } from "../session/store";
+import type { PicoThreadStore } from "../thread/store";
 import { normalizeStatusLineItems, type StatusLineItemId } from "./statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "./theme";
 
@@ -6,7 +6,7 @@ export type OverlayMode =
   | "none"
   | "slash"
   | "history"
-  | "sessions"
+  | "threads"
   | "theme"
   | "statusline"
   | "transcript"
@@ -17,10 +17,10 @@ export type TurnStatus = "idle" | "running" | "approval" | "failed";
 
 export interface TuiState {
   selectedEntryId: string;
-  selectedSessionId: string;
+  selectedThreadId: string;
   overlay: OverlayMode;
   historyScroll: number;
-  sessionScroll: number;
+  threadScroll: number;
   transcriptScroll: number;
   slashSelection: number;
   themeSelection: number;
@@ -38,15 +38,15 @@ export interface CreateTuiStateOptions {
 }
 
 export function createTuiState(
-  store?: SessionStore,
+  store?: PicoThreadStore,
   options: CreateTuiStateOptions = {},
 ): TuiState {
   return {
     selectedEntryId: store?.leafId || "",
-    selectedSessionId: store?.id || "",
+    selectedThreadId: store?.id || "",
     overlay: "none",
     historyScroll: 0,
-    sessionScroll: 0,
+    threadScroll: 0,
     transcriptScroll: 0,
     slashSelection: 0,
     themeSelection: 0,
@@ -67,8 +67,8 @@ export function selectEntry(state: TuiState, selectedEntryId: string): TuiState 
   return { ...state, selectedEntryId };
 }
 
-export function selectSession(state: TuiState, selectedSessionId: string): TuiState {
-  return { ...state, selectedSessionId };
+export function selectThread(state: TuiState, selectedThreadId: string): TuiState {
+  return { ...state, selectedThreadId };
 }
 
 export function moveSelection(state: TuiState, entryIds: readonly string[], delta: number): TuiState {
@@ -92,29 +92,29 @@ export function syncListScroll(
   return { ...state, historyScroll: Math.max(0, historyScroll) };
 }
 
-export function moveSessionSelection(
+export function moveThreadSelection(
   state: TuiState,
-  sessionIds: readonly string[],
+  threadIds: readonly string[],
   delta: number,
 ): TuiState {
-  if (sessionIds.length === 0) return state;
-  const current = Math.max(0, sessionIds.indexOf(state.selectedSessionId));
-  const next = Math.max(0, Math.min(sessionIds.length - 1, current + delta));
-  return { ...state, selectedSessionId: sessionIds[next] };
+  if (threadIds.length === 0) return state;
+  const current = Math.max(0, threadIds.indexOf(state.selectedThreadId));
+  const next = Math.max(0, Math.min(threadIds.length - 1, current + delta));
+  return { ...state, selectedThreadId: threadIds[next] };
 }
 
-export function syncSessionScroll(
+export function syncThreadScroll(
   state: TuiState,
-  sessionIds: readonly string[],
+  threadIds: readonly string[],
   viewportHeight: number,
 ): TuiState {
-  const selectedIndex = sessionIds.indexOf(state.selectedSessionId);
+  const selectedIndex = threadIds.indexOf(state.selectedThreadId);
   if (selectedIndex < 0) return state;
   const height = Math.max(1, viewportHeight);
-  let sessionScroll = state.sessionScroll;
-  if (selectedIndex < sessionScroll) sessionScroll = selectedIndex;
-  if (selectedIndex >= sessionScroll + height) sessionScroll = selectedIndex - height + 1;
-  return { ...state, sessionScroll: Math.max(0, sessionScroll) };
+  let threadScroll = state.threadScroll;
+  if (selectedIndex < threadScroll) threadScroll = selectedIndex;
+  if (selectedIndex >= threadScroll + height) threadScroll = selectedIndex - height + 1;
+  return { ...state, threadScroll: Math.max(0, threadScroll) };
 }
 
 export function setOverlay(state: TuiState, overlay: OverlayMode): TuiState {

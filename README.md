@@ -7,7 +7,7 @@
 
 Codex is a powerful AI coding agent, but extending it requires modifying its Rust codebase. Want custom persistence? A different conversation model? Multi-model routing? You'd need to fork.
 
-Pico treats Codex as a **stateless execution harness** — a black box that takes context + input, runs tools, and streams results. Everything else — persistence, session management, model routing, branching — lives in Pico, written in TypeScript, running on Bun, easy to modify.
+Pico treats Codex as a **stateless execution harness** — a black box that takes context + input, runs tools, and streams results. Everything else — persistence, thread management, model routing, branching — lives in Pico, written in TypeScript, running on Bun, easy to modify.
 
 This unlocks things that are impractical inside Codex itself:
 
@@ -20,9 +20,9 @@ This unlocks things that are impractical inside Codex itself:
 ## Scope
 
 **In scope:**
-- Terminal UI for interactive AI coding sessions
+- Terminal UI for interactive AI coding threads
 - Conversation tree with branching, switching, and navigation
-- Session persistence in Pico JSONL v1 with raw Codex `ResponseItem` round-trip
+- Thread persistence in Pico JSONL v1 with raw Codex `ResponseItem` round-trip
 - Model proxy for multi-backend routing
 - Extensibility through configuration and scripting
 
@@ -45,7 +45,7 @@ This unlocks things that are impractical inside Codex itself:
 ```
 
 - **No fork of Codex.** Uses the official `codex app-server` binary via JSON-RPC over stdio.
-- **Stateless server.** Every session starts as an ephemeral thread. History is injected from Pico's JSONL store.
+- **Stateless server.** Every Pico thread starts as an ephemeral Codex thread. History is injected from Pico's JSONL store.
 - **Tree-based branching.** `parentId` in JSONL entries defines the conversation tree. Switch branches, fork from any point, all in Pico.
 - **Codex-first format.** Pico JSONL stores branch metadata outside raw Codex `ResponseItem` objects, then replays the current branch with `thread/inject_items`.
 
@@ -76,8 +76,8 @@ The target Codex-style interaction model is specified in `docs/ui-ux.md`.
 - [x] Branch via `parentId` tree
 - [ ] Codex-style single-column TUI per `docs/ui-ux.md`
 - [ ] Branch picker overlay
-- [ ] Full branch/session management workflow
-- [ ] Multi-session management (list, switch, archive)
+- [ ] Full branch/thread management workflow
+- [ ] Multi-thread management (list, switch, archive)
 - [ ] Model proxy endpoint (POST /v1/responses → multi-backend routing)
 - [ ] Compaction-aware recovery (choose condensed or full history)
 
@@ -103,12 +103,12 @@ Build out the OpenTUI client surface.
 - [ ] Keyboard-driven workflow matching the spec
 - [ ] Full approval overlay for Codex ServerRequests
 
-### Phase 3 — Session Management
+### Phase 3 — Thread Management
 
-- [ ] Session list/switch/archive
+- [ ] Thread list/switch/archive
 - [ ] Branch labels and metadata
-- [ ] Import existing Codex JSONL sessions
-- [ ] Session export
+- [ ] Import existing Codex JSONL threads
+- [ ] Thread export
 
 ### Phase 4 — Model Proxy
 

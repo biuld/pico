@@ -3,7 +3,7 @@ export {
   createApp,
   createDraftApp,
   defaultServerRequestResult,
-  ensureAppSession,
+  ensureAppThread,
   loadApp,
   PicoController,
   runTurn,

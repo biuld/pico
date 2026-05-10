@@ -1,7 +1,7 @@
 import { CliRenderEvents, type CliRenderer } from "@opentui/core";
 import {
   approvalResult,
-  ensureAppSession,
+  ensureAppThread,
   loadApp,
   runTurn,
   type AppState,
@@ -13,7 +13,7 @@ import {
 } from "../app/controller";
 import type { JSONRPCRequest } from "../codex/app-server";
 import { updateProjectPicoConfig } from "../config";
-import { SessionStore, type SessionInfo } from "../session/store";
+import { PicoThreadStore, type PicoThreadInfo } from "../thread/store";
 import {
   filterSlashCommands,
   parseTuiInput,
@@ -29,7 +29,7 @@ import type { ApprovalDecision } from "./widgets/approval-overlay";
 import { formatComposerStatus } from "./widgets/composer";
 import { formatComposerPlaceholder, formatTransientStatusLine } from "./widgets/footer";
 import type { OpenTuiLayout } from "./widgets/layout";
-import { buildSessionRows } from "./widgets/resume-picker";
+import { buildThreadRows } from "./widgets/resume-picker";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "./widgets/statusline-picker";
 import { buildThemeRows } from "./widgets/theme-picker";
 import { formatMainTranscriptStyled } from "./transcript";
@@ -58,7 +58,7 @@ export function runOpenTuiRuntime(
   let streamingText = "";
   let liveTranscriptStatus = "";
   let liveLeafId: string | undefined;
-  let sessions: SessionInfo[] = [];
+  let threads: PicoThreadInfo[] = [];
   let pendingApproval: PendingApproval | undefined;
   let running = false;
   let loadingFrame = 1;
@@ -163,10 +163,10 @@ export function runOpenTuiRuntime(
       entryIds: historyRows.map((row) => row.id),
       viewportHeight: listHeight,
     });
-    const sessionRows = buildSessionRows(sessions, state.selectedSessionId, store?.id);
+    const threadRows = buildThreadRows(threads, state.selectedThreadId, store?.id);
     dispatch({
-      type: "syncSessions",
-      sessionIds: sessionRows.map((row) => row.id),
+      type: "syncThreads",
+      threadIds: threadRows.map((row) => row.id),
       viewportHeight: listHeight,
     });
     dispatch({ type: "syncTheme", total: TUI_THEMES.length });
@@ -221,12 +221,12 @@ export function runOpenTuiRuntime(
         liveLeafId,
         slashCommands,
         historyRows,
-        sessionRows,
+        threadRows,
         themeRows,
         statusLineRows,
         statusLinePreview,
         historyViewportHeight: listHeight,
-        sessionViewportHeight: listHeight,
+        threadViewportHeight: listHeight,
         rendererHeight: renderer.height,
         pendingApproval: pendingApproval?.request,
       }),
@@ -271,9 +271,9 @@ export function runOpenTuiRuntime(
     render();
   };
 
-  const showSessions = async () => {
-    sessions = await SessionStore.list(currentApp.store?.cwd || currentApp.cwd);
-    dispatch({ type: "openSessions", sessionId: currentApp.store?.id || sessions[0]?.id || "" });
+  const showThreads = async () => {
+    threads = await PicoThreadStore.list(currentApp.store?.cwd || currentApp.cwd);
+    dispatch({ type: "openThreads", threadId: currentApp.store?.id || threads[0]?.id || "" });
     input.blur();
     render();
   };
@@ -324,11 +324,11 @@ export function runOpenTuiRuntime(
     render();
   };
 
-  const moveSessionSelection = (delta: number) => {
-    const rows = buildSessionRows(sessions, state.selectedSessionId, currentApp.store?.id);
+  const moveThreadSelection = (delta: number) => {
+    const rows = buildThreadRows(threads, state.selectedThreadId, currentApp.store?.id);
     dispatch({
-      type: "moveSession",
-      sessionIds: rows.map((row) => row.id),
+      type: "moveThread",
+      threadIds: rows.map((row) => row.id),
       delta,
       viewportHeight: listViewportHeight(renderer.height),
     });
@@ -393,8 +393,8 @@ export function runOpenTuiRuntime(
       return;
     }
 
-    const sessionId = state.selectedSessionId;
-    if (!sessionId || sessionId === currentApp.store?.id) {
+    const threadId = state.selectedThreadId;
+    if (!threadId || threadId === currentApp.store?.id) {
       setComposerFocus();
       return;
     }
@@ -402,12 +402,12 @@ export function runOpenTuiRuntime(
     const cwd = currentApp.store?.cwd || currentApp.cwd;
     detachCodexStatus?.();
     await currentApp.codex.shutdown().catch(() => {});
-    currentApp = await loadApp(cwd, sessionId);
+    currentApp = await loadApp(cwd, threadId);
     detachCodexStatus = attachCodexStatus(currentApp);
     state = createTuiState(currentApp.store, {
       statusLineItems: currentApp.config.statusLineItems,
     });
-    dispatch({ type: "resumeCompleted", sessionId });
+    dispatch({ type: "resumeCompleted", threadId });
     streamingText = "";
     liveTranscriptStatus = "";
     liveLeafId = undefined;
@@ -438,7 +438,7 @@ export function runOpenTuiRuntime(
     if (command.type === "empty") return true;
     if (command.type === "submit") return false;
     if (command.type === "resume") {
-      await showSessions();
+      await showThreads();
       return true;
     }
     if (command.type === "theme") {
@@ -454,8 +454,8 @@ export function runOpenTuiRuntime(
         type: "setTurnStatus",
         status: state.turnStatus,
         message: currentApp.store
-          ? `session ${shortId(currentApp.store.id)} leaf ${shortId(currentApp.store.leafId)}`
-          : "session new",
+          ? `thread ${shortId(currentApp.store.id)} leaf ${shortId(currentApp.store.leafId)}`
+          : "thread new",
       });
       render();
       return true;
@@ -625,7 +625,7 @@ export function runOpenTuiRuntime(
 
     let activeApp: AppState;
     try {
-      activeApp = await ensureAppSession(currentApp);
+      activeApp = await ensureAppThread(currentApp);
       currentApp = activeApp;
       if (!state.selectedEntryId) {
         dispatch({ type: "selectEntry", entryId: activeApp.store.leafId });
@@ -681,13 +681,13 @@ export function runOpenTuiRuntime(
     focusInput: () => input.focus(),
     setComposerFocus,
     showHistory,
-    showSessions: () => void showSessions(),
+    showThreads: () => void showThreads(),
     showTheme,
     showStatusLine,
     showTranscript,
     showShortcuts,
     moveHistorySelection,
-    moveSessionSelection,
+    moveThreadSelection,
     moveThemeSelection,
     moveStatusLineSelection,
     restoreSelected: () => void restoreSelected(),

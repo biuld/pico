@@ -5,7 +5,7 @@ import { updateTuiState } from "../src/tui/update";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";
 import { overlayFrame } from "../src/tui/widgets/overlay";
-import { buildSessionRows } from "../src/tui/widgets/resume-picker";
+import { buildThreadRows } from "../src/tui/widgets/resume-picker";
 import { buildThemeRows } from "../src/tui/widgets/theme-picker";
 import { createStore } from "./tui-test-helpers";
 
@@ -44,30 +44,32 @@ test("theme overlay selects UI themes", async () => {
   expect(state.overlay).toBe("none");
 });
 
-test("resume overlay selects saved sessions", async () => {
+test("resume overlay selects saved threads", async () => {
   const store = await createStore();
-  const sessions = [
+  const threads = [
     {
       id: store.id,
       leafId: store.leafId,
       cwd: store.cwd,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      preview: "hello",
       turnCount: 0,
       responseItemCount: 0,
     },
   ];
-  const rows = buildSessionRows(sessions, store.id, store.id);
+  const rows = buildThreadRows(threads, store.id, store.id);
   let state = createTuiState(store);
 
   expect(rows.some((row) => row.id === store.id && row.isCurrent)).toBe(true);
 
-  state = updateTuiState(state, { type: "openSessions", sessionId: store.id });
-  expect(state.overlay).toBe("sessions");
+  state = updateTuiState(state, { type: "openThreads", threadId: store.id });
+  expect(state.overlay).toBe("threads");
 
   state = updateTuiState(state, {
-    type: "syncSessions",
-    sessionIds: rows.map((row) => row.id),
+    type: "syncThreads",
+    threadIds: rows.map((row) => row.id),
     viewportHeight: 4,
   });
-  expect(state.selectedSessionId).toBe(store.id);
+  expect(state.selectedThreadId).toBe(store.id);
 });

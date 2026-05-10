@@ -2,7 +2,7 @@
 
 import { formatCliHelp, parseCliArgs } from "./cli";
 import { createDraftApp, loadApp } from "./app/controller";
-import { SessionStore } from "./session/store";
+import { PicoThreadStore } from "./thread/store";
 import { startOpenTui } from "./tui/opentui";
 
 async function main(): Promise<void> {
@@ -13,12 +13,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (options.command === "sessions") {
-    const sessions = await SessionStore.list(options.cwd);
-    for (const session of sessions) {
+  if (options.command === "threads") {
+    const threads = await PicoThreadStore.list(options.cwd);
+    for (const thread of threads) {
       console.log(
-        `${session.id} leaf=${session.leafId} turns=${session.turnCount} items=${session.responseItemCount} ${
-          session.label || ""
+        `${thread.id} leaf=${thread.leafId} turns=${thread.turnCount} items=${thread.responseItemCount} ${
+          thread.label || ""
         }`,
       );
     }
@@ -26,8 +26,8 @@ async function main(): Promise<void> {
   }
 
   try {
-    const app = options.resumeSessionId
-      ? await loadApp(options.cwd, options.resumeSessionId)
+    const app = options.resumeThreadId
+      ? await loadApp(options.cwd, options.resumeThreadId)
       : await createDraftApp(options.cwd);
     await startOpenTui(app);
   } catch (err) {

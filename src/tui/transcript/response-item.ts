@@ -1,4 +1,4 @@
-import type { ResponseItem } from "../../session/store";
+import type { ResponseItem } from "../../thread/store";
 import { responseItemText, shouldDisplayResponseItem } from "../response-items";
 import type { TranscriptRow, TranscriptRowKind } from "./model";
 

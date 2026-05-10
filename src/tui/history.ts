@@ -1,13 +1,13 @@
 import type {
   BranchEntry,
   ResponseItemEntry,
-  SessionEntry,
-  SessionStore,
+  PicoThreadEntry,
+  PicoThreadStore,
   TurnAbortedEntry,
   TurnCompletedEntry,
   TurnEntry,
   TurnFailedEntry,
-} from "../session/store";
+} from "../thread/store";
 import { responseItemAgentText } from "./response-items";
 
 export interface HistoryTurnRow {
@@ -37,7 +37,7 @@ const USER_MARKER_WIDTH = 2;
 const AGENT_SUMMARY_MAX_LENGTH = 36;
 
 export function buildHistoryTurnRows(
-  store: SessionStore,
+  store: PicoThreadStore,
   selectedEntryId = store.leafId,
 ): HistoryTurnRow[] {
   const entries = [...store.allEntries];
@@ -121,7 +121,7 @@ export function buildHistoryTurnRows(
 }
 
 export function historySelectionTargetId(
-  store: SessionStore,
+  store: PicoThreadStore,
   entryId = store.leafId,
 ): string | undefined {
   const rows = buildHistoryTurnRows(store, entryId);
@@ -158,12 +158,12 @@ function turnSummary(node: TurnNode): string {
   return `agent: ${truncate(text, AGENT_SUMMARY_MAX_LENGTH)}`;
 }
 
-function entryMap(entries: readonly SessionEntry[]): Map<string, SessionEntry> {
+function entryMap(entries: readonly PicoThreadEntry[]): Map<string, PicoThreadEntry> {
   return new Map(entries.map((entry) => [entry.id, entry]));
 }
 
 function nearestTurnAncestor(
-  byId: Map<string, SessionEntry>,
+  byId: Map<string, PicoThreadEntry>,
   entryId: string | null,
 ): string | undefined {
   const seen = new Set<string>();
@@ -183,7 +183,7 @@ function nearestTurnAncestor(
 }
 
 function branchParentTurnId(
-  byId: Map<string, SessionEntry>,
+  byId: Map<string, PicoThreadEntry>,
   entryId: string | null,
 ): string | undefined {
   const branch = nearestBranchAncestor(byId, entryId);
@@ -191,7 +191,7 @@ function branchParentTurnId(
 }
 
 function nearestBranchAncestor(
-  byId: Map<string, SessionEntry>,
+  byId: Map<string, PicoThreadEntry>,
   entryId: string | null,
 ): BranchEntry | undefined {
   const seen = new Set<string>();
@@ -211,7 +211,7 @@ function nearestBranchAncestor(
 }
 
 function turnIdForEntry(
-  byId: Map<string, SessionEntry>,
+  byId: Map<string, PicoThreadEntry>,
   entryId: string,
 ): string | undefined {
   const entry = byId.get(entryId);
@@ -222,7 +222,7 @@ function turnIdForEntry(
 }
 
 function hasTurnId(
-  entry: SessionEntry,
+  entry: PicoThreadEntry,
 ): entry is ResponseItemEntry | TurnCompletedEntry | TurnFailedEntry | TurnAbortedEntry {
   return "turnId" in entry;
 }

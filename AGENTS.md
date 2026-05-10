@@ -27,8 +27,9 @@ pico/
 │   │       ├── status.ts     # Real Codex status projection
 │   │       ├── events.ts     # Notification/event helpers
 │   │       └── types.ts      # Minimal protocol types used by Pico
-│   ├── session/
-│   │   └── store.ts          # Pico JSONL v1 tree persistence
+│   ├── thread/
+│   │   ├── store.ts          # Pico JSONL v1 thread tree persistence
+│   │   └── types.ts          # Pico thread protocol ADT
 │   ├── translate/
 │   │   └── converter.ts      # Future import/export adapters only
 │   └── tui/
@@ -62,15 +63,15 @@ pico/
 
 1. **Server is stateless.** Always `ephemeral: true` for threads. All persistence is client-side JSONL.
 2. **Branching via JSONL tree, not Codex fork.** `parentId` in JSONL entries defines the tree. Codex `thread/fork` is not used.
-3. **Pico JSONL v1 session format.** Session entries use Pico's own tree metadata and raw Codex `ResponseItem` payloads.
+3. **Pico JSONL v1 thread format.** Thread entries use Pico's own tree metadata and raw Codex `ResponseItem` payloads.
 4. **Codex app-server access goes through `src/codex/app-server`.** Do not parse JSON-RPC notifications or call app-server methods from TUI code. Add SDK methods/status projection there first, then consume semantic state from `app`/`tui`. Keep protocol types minimal: define only the app-server capabilities Pico currently uses.
-5. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`. Our SessionStore is self-contained.
+5. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`. Our PicoThreadStore is self-contained.
 6. **Raw item round-trip.** `experimentalRawEvents: true` + `rawResponseItem/completed` → store raw `responseItem` → `thread/inject_items`.
 
 ## Code Conventions
 
 - TypeScript with Bun-native APIs (`Bun.spawn`, `Bun.file`, `Bun.write`, `Bun.Glob`)
-- No classes unless state + behavior naturally couple (e.g. `CodexAppServerClient`, `CodexAppServerTransport`, `SessionStore`)
+- No classes unless state + behavior naturally couple (e.g. `CodexAppServerClient`, `CodexAppServerTransport`, `PicoThreadStore`)
 - Prefer `async`/`await` over callbacks
 - EventEmitter for notification streams (`CodexAppServerClient` extends EventEmitter)
 
@@ -81,14 +82,14 @@ Pico's OpenTUI code should be organized like Codex TUI surfaces, not as one larg
 - `src/tui/opentui.ts` is bootstrap only: create renderer, create layout, hand off to runtime.
 - `src/tui/opentui-runtime.ts` owns mutable OpenTUI runtime wiring: current app, pending approvals, streaming text, renderer events, and calls into `runTurn`.
 - `src/tui/state.ts` and `src/tui/update.ts` own UI state and Elm-style transitions. Do not mutate OpenTUI renderables there.
-- `src/tui/keybindings.ts` maps key sequences to runtime actions. It should not build UI strings or mutate JSONL/session state directly.
+- `src/tui/keybindings.ts` maps key sequences to runtime actions. It should not build UI strings or mutate JSONL/thread state directly.
 - `src/tui/widgets/layout.ts` composes top-level widgets.
 - `src/tui/widgets/composer.ts` owns composer renderables and composer status formatting.
 - `src/tui/widgets/footer.ts` owns footer mode derivation and footer text.
 - `src/tui/widgets/transcript-panel.ts` owns only the OpenTUI transcript panel renderables.
 - `src/tui/transcript/` owns transcript domain projection and rendering. Keep it split by layer:
   - `index.ts` is the public façade used by runtime/tests.
-  - `model.ts` maps Pico JSONL/session state into transcript rows.
+  - `model.ts` maps Pico JSONL/thread state into transcript rows.
   - `response-item.ts` maps raw Codex/OpenAI `ResponseItem` shapes into semantic transcript rows.
   - `cell.ts` maps rows into transcript cells and block types.
   - `renderer.ts` maps cells/blocks into plain and styled terminal lines.

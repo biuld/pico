@@ -16,13 +16,13 @@ export interface KeybindingRuntime {
   focusInput(): void;
   setComposerFocus(): void;
   showHistory(): void;
-  showSessions(): void;
+  showThreads(): void;
   showTheme(): void;
   showStatusLine(): void;
   showTranscript(): void;
   showShortcuts(): void;
   moveHistorySelection(delta: number): void;
-  moveSessionSelection(delta: number): void;
+  moveThreadSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
   moveStatusLineSelection(delta: number): void;
   restoreSelected(): void;
@@ -99,8 +99,8 @@ export function installOpenTuiKeybindings(
     if (state.overlay === "history") {
       return handleHistoryKey(sequence, runtime);
     }
-    if (state.overlay === "sessions") {
-      return handleSessionKey(sequence, runtime);
+    if (state.overlay === "threads") {
+      return handleThreadKey(sequence, runtime);
     }
     if (state.overlay === "theme") {
       return handleThemeKey(sequence, runtime);
@@ -234,13 +234,13 @@ function handleHistoryKey(sequence: string, runtime: KeybindingRuntime): boolean
   return true;
 }
 
-function handleSessionKey(sequence: string, runtime: KeybindingRuntime): boolean {
+function handleThreadKey(sequence: string, runtime: KeybindingRuntime): boolean {
   if (sequence === "\u001b[A" || sequence === "k" || sequence === "\u0010") {
-    runtime.moveSessionSelection(-1);
+    runtime.moveThreadSelection(-1);
     return true;
   }
   if (sequence === "\u001b[B" || sequence === "j" || sequence === "\u000e") {
-    runtime.moveSessionSelection(1);
+    runtime.moveThreadSelection(1);
     return true;
   }
   if (sequence === "\r") {

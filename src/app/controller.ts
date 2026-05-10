@@ -2,17 +2,17 @@ import { EventEmitter } from "events";
 import { CodexAppServerClient, normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
 import { loadPicoConfig, type PicoConfig } from "../config";
-import { SessionStore, type RawResponseItem, type TurnOverrides } from "../session/store";
+import { PicoThreadStore, type RawResponseItem, type TurnOverrides } from "../thread/store";
 
 export interface AppState {
-  store: SessionStore;
+  store: PicoThreadStore;
   codex: CodexAppServerClient;
   config: PicoConfig;
   cwd: string;
 }
 
 export interface DraftAppState {
-  store?: SessionStore;
+  store?: PicoThreadStore;
   codex: CodexAppServerClient;
   config: PicoConfig;
   cwd: string;
@@ -73,7 +73,7 @@ export class PicoController extends EventEmitter {
     this.state.codex.on("stderr", (text) => this.emit("codex:stderr", text));
   }
 
-  get store(): SessionStore {
+  get store(): PicoThreadStore {
     return this.state.store;
   }
 
@@ -89,15 +89,15 @@ export class PicoController extends EventEmitter {
     return new PicoController(await createApp(cwd));
   }
 
-  static async load(cwd: string, sessionId: string): Promise<PicoController> {
-    return new PicoController(await loadApp(cwd, sessionId));
+  static async load(cwd: string, threadId: string): Promise<PicoController> {
+    return new PicoController(await loadApp(cwd, threadId));
   }
 
-  async reload(cwd: string, sessionId: string): Promise<void> {
+  async reload(cwd: string, threadId: string): Promise<void> {
     await this.shutdown();
-    this.state = await loadApp(cwd, sessionId);
+    this.state = await loadApp(cwd, threadId);
     this.state.codex.on("stderr", (text) => this.emit("codex:stderr", text));
-    this.emit("session:loaded", { sessionId: this.store.id, leafId: this.store.leafId });
+    this.emit("thread:loaded", { threadId: this.store.id, leafId: this.store.leafId });
   }
 
   async runTurn(userInput: string, options: RunTurnOptions = {}): Promise<TurnResult> {
@@ -110,12 +110,12 @@ export class PicoController extends EventEmitter {
   async checkout(entryId: string): Promise<void> {
     this.store.checkout(entryId);
     const branch = await this.store.appendBranch(entryId);
-    this.emit("session:changed", { type: "branch", entry: branch, leafId: this.store.leafId });
+    this.emit("thread:changed", { type: "branch", entry: branch, leafId: this.store.leafId });
   }
 
   async label(entryId: string, label: string): Promise<void> {
     const entry = await this.store.appendLabel(entryId, label);
-    this.emit("session:changed", { type: "label", entry, leafId: this.store.leafId });
+    this.emit("thread:changed", { type: "label", entry, leafId: this.store.leafId });
   }
 
   async shutdown(): Promise<void> {
@@ -124,7 +124,7 @@ export class PicoController extends EventEmitter {
 }
 
 export async function createApp(cwd: string = process.cwd()): Promise<AppState> {
-  return ensureAppSession(await createDraftApp(cwd));
+  return ensureAppThread(await createDraftApp(cwd));
 }
 
 export async function createDraftApp(cwd: string = process.cwd()): Promise<DraftAppState> {
@@ -134,10 +134,10 @@ export async function createDraftApp(cwd: string = process.cwd()): Promise<Draft
   return { codex, config, cwd: appCwd };
 }
 
-export async function ensureAppSession(app: DraftAppState): Promise<AppState> {
+export async function ensureAppThread(app: DraftAppState): Promise<AppState> {
   if (app.store) return app as AppState;
   const { codexBinary: _codexBinary, ...configSnapshot } = app.config;
-  const store = await SessionStore.create(app.config.cwd || app.cwd, {
+  const store = await PicoThreadStore.create(app.config.cwd || app.cwd, {
     runtime: "codex app-server",
     storage: "pico-jsonl-v1",
     ...configSnapshot,
@@ -146,9 +146,9 @@ export async function ensureAppSession(app: DraftAppState): Promise<AppState> {
   return app as AppState;
 }
 
-export async function loadApp(cwd: string, sessionId: string): Promise<AppState> {
+export async function loadApp(cwd: string, threadId: string): Promise<AppState> {
   const config = await loadPicoConfig(cwd);
-  const store = await SessionStore.load(cwd, sessionId);
+  const store = await PicoThreadStore.load(cwd, threadId);
   const codex = await createCodexClient(config, store.cwd);
   return { store, codex, config, cwd: store.cwd };
 }
@@ -347,7 +347,7 @@ export async function runTurn(
         completed,
       };
       emit?.("turn:completed", { threadId, ...result } satisfies TurnCompletedEvent);
-      emit?.("session:changed", { type: "turn", leafId: store.leafId });
+      emit?.("thread:changed", { type: "turn", leafId: store.leafId });
       return result;
     } catch (err) {
       await pendingRawWrites.catch(() => {});
@@ -373,11 +373,14 @@ export function defaultServerRequestResult(request: JSONRPCRequest): unknown {
   return approvalResult(request.method, "decline");
 }
 
-export function approvalResult(method: string, decision: "accept" | "decline" | "session"): unknown {
+export function approvalResult(
+  method: string,
+  decision: "accept" | "decline" | "acceptForSession",
+): unknown {
   if (method === "item/permissions/requestApproval") {
     return { decision: decision === "decline" ? "deny" : "approve" };
   }
-  if (decision === "session") {
+  if (decision === "acceptForSession") {
     return { decision: "acceptForSession" };
   }
   return { decision: decision === "accept" ? "accept" : "decline" };

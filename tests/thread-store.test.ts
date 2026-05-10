@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SessionStore } from "../src/session/store";
+import { PicoThreadStore } from "../src/thread/store";
 
 let cwd: string;
 
@@ -12,8 +12,8 @@ beforeEach(async () => {
   cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
 });
 
-test("writes and loads Pico JSONL v1 sessions", async () => {
-  const store = await SessionStore.create(cwd, { model: "test-model" });
+test("writes and loads Pico JSONL v1 threads", async () => {
+  const store = await PicoThreadStore.create(cwd, { model: "test-model" });
   const turn = await store.appendTurn(store.leafId, "hello");
   const rawItem = {
     type: "message",
@@ -23,16 +23,17 @@ test("writes and loads Pico JSONL v1 sessions", async () => {
   const item = await store.appendResponseItem(turn.id, turn.id, rawItem);
   await store.appendTurnCompleted(item.id, turn.id, { ok: true });
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
 
   expect(loaded.id).toBe(store.id);
   expect(loaded.cwd).toBe(cwd);
   expect(loaded.config).toEqual({ model: "test-model" });
   expect(loaded.collectInjectItems()).toEqual([rawItem]);
+  expect(store.path).toContain("/.pico/threads/");
 });
 
 test("persists Pico JSONL entries with tree metadata and raw response items", async () => {
-  const store = await SessionStore.create(cwd, { model: "test-model" });
+  const store = await PicoThreadStore.create(cwd, { model: "test-model" });
   const turn = await store.appendTurn(store.leafId, "inspect repo", { model: "turn-model" });
   const rawItem = {
     type: "function_call_output",
@@ -51,7 +52,7 @@ test("persists Pico JSONL entries with tree metadata and raw response items", as
 
   expect(lines).toHaveLength(6);
   expect(lines[0]).toMatchObject({
-    type: "session",
+    type: "thread",
     version: 1,
     id: store.id,
     cwd,
@@ -94,7 +95,7 @@ test("persists Pico JSONL entries with tree metadata and raw response items", as
 });
 
 test("loads turn status from terminal entries instead of persisted turn status", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const turn = await store.appendTurn(store.leafId, "derive status");
   const item = await store.appendResponseItem(turn.id, turn.id, {
     type: "message",
@@ -106,13 +107,13 @@ test("loads turn status from terminal entries instead of persisted turn status",
   const lines = await readJsonl(store.path);
   expect(lines[1]).toMatchObject({ type: "turn", status: "started" });
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
   const loadedTurn = loaded.allEntries.find((entry) => entry.type === "turn");
   expect(loadedTurn).toMatchObject({ id: turn.id, status: "completed" });
 });
 
 test("rejects JSONL entries with missing parents", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const header = (await readJsonl(store.path))[0];
   await writeJsonl(store.path, [
     header,
@@ -128,14 +129,14 @@ test("rejects JSONL entries with missing parents", async () => {
     },
   ]);
 
-  await expect(SessionStore.load(cwd, store.id)).rejects.toThrow("Parent entry not found");
+  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Parent entry not found");
 });
 
-test("rejects JSONL with invalid session headers", async () => {
-  const store = await SessionStore.create(cwd);
+test("rejects JSONL with invalid thread headers", async () => {
+  const store = await PicoThreadStore.create(cwd);
   await writeJsonl(store.path, [
     {
-      type: "session",
+      type: "thread",
       version: 1,
       id: store.id,
       createdAt: new Date().toISOString(),
@@ -144,11 +145,11 @@ test("rejects JSONL with invalid session headers", async () => {
     },
   ]);
 
-  await expect(SessionStore.load(cwd, store.id)).rejects.toThrow("Invalid session header config");
+  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Invalid thread header config");
 });
 
 test("rejects JSONL response items and terminal entries for unknown turns", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const header = (await readJsonl(store.path))[0];
   await writeJsonl(store.path, [
     header,
@@ -172,11 +173,11 @@ test("rejects JSONL response items and terminal entries for unknown turns", asyn
     },
   ]);
 
-  await expect(SessionStore.load(cwd, store.id)).rejects.toThrow("Turn entry not found");
+  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Turn entry not found");
 });
 
 test("rejects JSONL turns with multiple terminal entries", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const header = (await readJsonl(store.path))[0];
   await writeJsonl(store.path, [
     header,
@@ -211,12 +212,12 @@ test("rejects JSONL turns with multiple terminal entries", async () => {
     },
   ]);
 
-  await expect(SessionStore.load(cwd, store.id)).rejects.toThrow("terminal entry");
+  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("terminal entry");
 });
 
-test("lists Pico sessions for the cwd", async () => {
-  const first = await SessionStore.create(cwd);
-  const second = await SessionStore.create(cwd);
+test("lists Pico threads for the cwd", async () => {
+  const first = await PicoThreadStore.create(cwd);
+  const second = await PicoThreadStore.create(cwd);
   const turn = await second.appendTurn(second.leafId, "hello");
   const item = await second.appendResponseItem(turn.id, turn.id, {
     type: "message",
@@ -225,19 +226,21 @@ test("lists Pico sessions for the cwd", async () => {
   });
   await second.appendTurnCompleted(item.id, turn.id);
 
-  const sessions = await SessionStore.list(cwd);
+  const threads = await PicoThreadStore.list(cwd);
 
-  expect(sessions.map((session) => session.id)).toContain(first.id);
-  expect(sessions.map((session) => session.id)).toContain(second.id);
-  expect(sessions.find((session) => session.id === second.id)).toMatchObject({
+  expect(threads.map((thread) => thread.id)).toContain(first.id);
+  expect(threads.map((thread) => thread.id)).toContain(second.id);
+  expect(threads.find((thread) => thread.id === second.id)).toMatchObject({
     leafId: second.leafId,
+    preview: "hello",
     turnCount: 1,
     responseItemCount: 1,
   });
+  expect(typeof threads.find((thread) => thread.id === second.id)?.updatedAt).toBe("string");
 });
 
 test("collectInjectItems only returns the selected branch path", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const firstTurn = await store.appendTurn(store.leafId, "root");
   const rootItem = await store.appendResponseItem(firstTurn.id, firstTurn.id, {
     id: "root-item",
@@ -275,7 +278,7 @@ test("collectInjectItems only returns the selected branch path", async () => {
 });
 
 test("loaded JSONL assembles injection items from the selected leaf path", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const rootTurn = await store.appendTurn(store.leafId, "root");
   const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
     id: "root-item",
@@ -300,7 +303,7 @@ test("loaded JSONL assembles injection items from the selected leaf path", async
   await store.appendTurnCompleted(rightItem.id, rightTurn.id);
   const rightLeaf = store.leafId;
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
 
   expect(loaded.collectInjectItems(leftLeaf).map((item) => item.id)).toEqual([
     "root-item",
@@ -317,7 +320,7 @@ test("loaded JSONL assembles injection items from the selected leaf path", async
 });
 
 test("response items round-trip by deep equality", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const turn = await store.appendTurn(store.leafId, "tools");
   const responseItem = {
     type: "function_call_output",
@@ -330,12 +333,12 @@ test("response items round-trip by deep equality", async () => {
   const item = await store.appendResponseItem(turn.id, turn.id, responseItem);
   await store.appendTurnCompleted(item.id, turn.id);
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
   expect(loaded.collectInjectItems()[0]).toEqual(responseItem);
 });
 
 test("labels do not move the leaf but branch entries do", async () => {
-  const store = await SessionStore.create(cwd);
+  const store = await PicoThreadStore.create(cwd);
   const turn = await store.appendTurn(store.leafId, "root");
   const item = await store.appendResponseItem(turn.id, turn.id, {
     id: "root-item",
@@ -351,7 +354,7 @@ test("labels do not move the leaf but branch entries do", async () => {
   const branchLeaf = store.leafId;
   expect(branchLeaf).not.toBe(completedLeaf);
 
-  const loaded = await SessionStore.load(cwd, store.id);
+  const loaded = await PicoThreadStore.load(cwd, store.id);
   expect(loaded.leafId).toBe(branchLeaf);
   expect(loaded.collectInjectItems()).toEqual([{ id: "root-item", type: "message" }]);
 });

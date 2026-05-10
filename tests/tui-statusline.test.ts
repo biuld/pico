@@ -25,7 +25,7 @@ import {
 } from "../src/tui/widgets/statusline-picker";
 import { createStore } from "./tui-test-helpers";
 
-test("bottom statusline renders an unsaved session before first submit", () => {
+test("bottom statusline renders an unsaved thread before first submit", () => {
   const state = createTuiState();
 
   expect(formatBottomStatusLine(undefined, state, "", 32)).toBe("");

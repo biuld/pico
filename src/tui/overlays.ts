@@ -7,7 +7,7 @@ import type { TuiState } from "./state";
 import type { TuiTheme } from "./theme";
 import { buildApprovalOverlayView } from "./widgets/approval-overlay";
 import { buildHistoryOverlayView } from "./widgets/history-picker";
-import { buildResumeOverlayView, type SessionRow } from "./widgets/resume-picker";
+import { buildResumeOverlayView, type ThreadRow } from "./widgets/resume-picker";
 import { buildShortcutOverlayView } from "./widgets/shortcut-overlay";
 import { buildSlashCommandOverlayView } from "./widgets/slash-command-popup";
 import { buildStatusLineOverlayView, type StatusLineRow } from "./widgets/statusline-picker";
@@ -25,12 +25,12 @@ export interface OverlayViewInput {
   liveLeafId?: string;
   slashCommands: readonly SlashCommandSpec[];
   historyRows: readonly HistoryTurnRow[];
-  sessionRows: readonly SessionRow[];
+  threadRows: readonly ThreadRow[];
   themeRows: readonly ThemeRow[];
   statusLineRows: readonly StatusLineRow[];
   statusLinePreview: string;
   historyViewportHeight: number;
-  sessionViewportHeight: number;
+  threadViewportHeight: number;
   rendererHeight: number;
   pendingApproval?: JSONRPCRequest;
 }
@@ -45,7 +45,7 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     liveLeafId,
     slashCommands,
     historyRows,
-    sessionRows,
+    threadRows,
     themeRows,
     statusLineRows,
     statusLinePreview,
@@ -80,11 +80,11 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
         input.historyViewportHeight,
         input.rendererHeight,
       );
-    case "sessions":
+    case "threads":
       return buildResumeOverlayView(
-        sessionRows,
+        threadRows,
         state,
-        input.sessionViewportHeight,
+        input.threadViewportHeight,
         input.rendererHeight,
       );
     case "theme":

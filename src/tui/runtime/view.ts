@@ -19,6 +19,7 @@ import { formatTransientStatusLine } from "../widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
 import { buildThreadRows } from "../widgets/resume-picker";
+import { buildStartupBannerState } from "../widgets/startup-banner";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
 import { buildThemeRows } from "../widgets/theme-picker";
 
@@ -77,6 +78,10 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     input.streamingText,
     input.liveLeafId,
   );
+  const startupBannerVisible = transcriptCells.length === 0 &&
+    !input.running &&
+    !input.pendingApproval &&
+    input.streamingText.length === 0;
   const statusText = formatComposerStatus({
     pendingApproval: input.pendingApproval,
     running: input.running,
@@ -101,6 +106,12 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     height: input.rendererHeight,
     theme,
     transcriptCells,
+    startupBanner: buildStartupBannerState({
+      visible: startupBannerVisible,
+      codex: codexStatus,
+      cwd: store?.cwd || input.app.cwd,
+      rendererWidth: input.rendererWidth,
+    }),
     composer: {
       transientStatus: formatTransientStatusLine(statusText),
       placeholder: formatComposerPlaceholder(state, input.placeholderFrame),

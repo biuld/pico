@@ -8,13 +8,14 @@ import {
   type StyledText,
 } from "@opentui/core";
 import { render as renderSolid } from "@opentui/solid";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { emptyOverlay, type OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import type { TranscriptCell } from "../transcript";
 import { COMPOSER_OVERLAY_INSET, ComposerView } from "./composer";
 import { OverlaySurface } from "./overlay";
+import { StartupBannerView, type StartupBannerState } from "./startup-banner";
 import {
   TranscriptPanelView,
   type TranscriptPanelHandle,
@@ -26,6 +27,7 @@ export interface OpenTuiLayoutUpdate {
   width?: number;
   height?: number;
   transcriptCells?: readonly TranscriptCell[];
+  startupBanner?: StartupBannerState;
   composer?: Partial<ComposerLayoutState>;
   overlay?: OverlayView;
 }
@@ -75,6 +77,14 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
   });
   const [transcriptState, setTranscriptState] = createStore<{ cells: TranscriptCell[] }>({
     cells: [],
+  });
+  const [startupBanner, setStartupBanner] = createSignal<StartupBannerState>({
+    visible: false,
+    width: 1,
+    title: "Pico",
+    subtitle: "powered by Codex",
+    model: "",
+    cwd: "",
   });
   const [overlay, setOverlay] = createSignal<OverlayView>(emptyOverlay());
   const [composer, setComposer] = createSignal<ComposerLayoutState>({
@@ -130,6 +140,10 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
       );
     }
 
+    if (next.startupBanner) {
+      setStartupBanner(next.startupBanner);
+    }
+
     if (next.composer) {
       setComposer((previous) => ({ ...previous, ...next.composer }));
     }
@@ -152,6 +166,12 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
       flexDirection="column"
       backgroundColor={activeTheme().colors.background}
     >
+      <Show when={startupBanner().visible}>
+        <StartupBannerView
+          banner={startupBanner()}
+          theme={activeTheme()}
+        />
+      </Show>
       <TranscriptPanelView
         cells={transcriptState.cells}
         theme={activeTheme()}

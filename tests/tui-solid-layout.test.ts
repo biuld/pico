@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { fg, StyledText, type BaseRenderable } from "@opentui/core";
 import { createTestRenderer } from "@opentui/core/testing";
 import { createOpenTuiLayout } from "../src/tui/widgets/layout";
+import { buildStartupBannerState } from "../src/tui/widgets/startup-banner";
 import { TUI_THEMES } from "../src/tui/theme";
 
 test("solid layout bridge updates composer text and input handlers", async () => {
@@ -126,6 +127,46 @@ test("solid transcript reconcile preserves stable cell and block renderables", a
   expect(mustFind(renderer.root, "pico-transcript-cell-turn-1-0")).toBe(stableCell);
   expect(mustFind(renderer.root, "pico-transcript-cell-live-1")).toBe(liveCell);
   expect(mustFind(renderer.root, "pico-transcript-block-live-0")).toBe(liveBlock);
+
+  renderer.destroy();
+});
+
+test("solid layout renders startup banner above an empty transcript", async () => {
+  const { renderer, renderOnce, captureCharFrame } = await createTestRenderer({
+    width: 88,
+    height: 18,
+  });
+  const layout = createOpenTuiLayout(renderer, TUI_THEMES[0]);
+
+  layout.update({
+    width: 88,
+    height: 18,
+    theme: TUI_THEMES[0],
+    startupBanner: buildStartupBannerState({
+      visible: true,
+      rendererWidth: 88,
+      cwd: "/Users/biu/Projects/pico",
+      home: "/Users/biu",
+      codex: {
+        connected: true,
+        userAgent: "codex-cli/0.130.0",
+        model: "gpt-5.5",
+        modelProvider: "openai",
+        modelReasoningEffort: "xhigh",
+        serviceTier: "fast",
+      },
+    }),
+  });
+  await renderOnce();
+
+  const frame = captureCharFrame();
+  expect(frame).toContain(">_  Pico");
+  expect(frame).toContain("powered by Codex v0.130.0");
+  expect(frame).toContain("gpt-5.5 xhigh");
+  expect(frame).toContain("fast");
+  expect(frame).toContain("/model to change");
+  expect(frame).toContain("~/Projects/pico");
+  expect(mustFind(renderer.root, "pico-startup-banner")).toBeDefined();
 
   renderer.destroy();
 });

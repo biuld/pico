@@ -24,6 +24,8 @@ export interface CodexStatusSnapshot {
   turnStatus?: string;
   model?: string;
   modelProvider?: string;
+  modelReasoningEffort?: string;
+  serviceTier?: string;
   tokenUsage?: string;
   rateLimits?: string;
   fiveHourLimit?: string;
@@ -58,11 +60,17 @@ export function updateCodexStatusFromConfig(
   const model = stringConfigValue(config.model);
   const modelProvider = stringConfigValue(config.modelProvider) ||
     stringConfigValue(config.model_provider);
+  const modelReasoningEffort = stringConfigValue(config.modelReasoningEffort) ||
+    stringConfigValue(config.model_reasoning_effort);
+  const serviceTier = stringConfigValue(config.serviceTier) ||
+    stringConfigValue(config.service_tier);
 
   return {
     ...status,
     model: model || status.model,
     modelProvider: modelProvider || status.modelProvider,
+    modelReasoningEffort: modelReasoningEffort || status.modelReasoningEffort,
+    serviceTier: serviceTier || status.serviceTier,
   };
 }
 
@@ -77,14 +85,17 @@ export function updateCodexStatusFromModelList(
   status: CodexStatusSnapshot,
   response: ModelListResponse,
 ): CodexStatusSnapshot {
-  if (status.model) return status;
-
-  const defaultModel = response.data.find((model) => model.isDefault) || response.data[0];
+  const selectedModel = status.model
+    ? response.data.find((model) => model.model === status.model || model.id === status.model)
+    : undefined;
+  const defaultModel = selectedModel || response.data.find((model) => model.isDefault) || response.data[0];
   if (!defaultModel?.model) return status;
 
   return {
     ...status,
-    model: defaultModel.model,
+    model: status.model || defaultModel.model,
+    modelReasoningEffort: status.modelReasoningEffort ||
+      stringConfigValue(defaultModel.defaultReasoningEffort),
   };
 }
 
@@ -99,6 +110,8 @@ export function updateCodexStatusFromThreadStart(
     threadStatus: normalizeCodexStatusValue(response.thread.status) || status.threadStatus,
     model: response.model,
     modelProvider: response.modelProvider,
+    modelReasoningEffort: stringConfigValue(response.reasoningEffort) || status.modelReasoningEffort,
+    serviceTier: stringConfigValue(response.serviceTier) || status.serviceTier,
   };
 }
 

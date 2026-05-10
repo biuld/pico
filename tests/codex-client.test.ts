@@ -72,7 +72,12 @@ test("projects startup config and default model into status before a turn starts
   let status = createCodexStatusSnapshot({ userAgent: "codex-test" });
 
   status = updateCodexStatusFromConfigRead(status, {
-    config: { model: null, model_provider: "openai" },
+    config: {
+      model: null,
+      model_provider: "openai",
+      model_reasoning_effort: "xhigh",
+      service_tier: "fast",
+    },
   });
   status = updateCodexStatusFromModelList(status, {
     data: [
@@ -83,6 +88,8 @@ test("projects startup config and default model into status before a turn starts
 
   expect(status.model).toBe("gpt-default");
   expect(status.modelProvider).toBe("openai");
+  expect(status.modelReasoningEffort).toBe("xhigh");
+  expect(status.serviceTier).toBe("fast");
 });
 
 test("pico config overrides app-server startup status", () => {
@@ -95,7 +102,14 @@ test("pico config overrides app-server startup status", () => {
     model: "pico-model",
     modelProvider: "pico-provider",
   });
+  status = updateCodexStatusFromModelList(status, {
+    data: [
+      { id: "pico-model", model: "pico-model", isDefault: false, defaultReasoningEffort: "high" },
+      { id: "other-model", model: "other-model", isDefault: true, defaultReasoningEffort: "low" },
+    ],
+  });
 
   expect(status.model).toBe("pico-model");
   expect(status.modelProvider).toBe("pico-provider");
+  expect(status.modelReasoningEffort).toBe("high");
 });

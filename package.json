@@ -3,15 +3,20 @@
   "version": "0.1.0",
   "type": "module",
   "description": "A terminal tool that rides on Codex's harness with autonomous persistence and branch management",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build ./src/index.ts --outdir dist --target bun --format esm",
     "compile": "bun build --compile ./src/index.ts --outfile pico",
     "test": "bun test",
     "typecheck": "bun run scripts/typecheck.ts",
-    "check": "bun run typecheck && bun test"
+    "check": "bun run typecheck && bun test",
+    "sync:codex-protocol": "bun run scripts/sync-codex-app-server-protocol.ts"
   },
   "dependencies": {
+    "@pico/codex-app-server-protocol": "workspace:*",
     "@opentui/core": "^0.2.6"
   },
   "devDependencies": {

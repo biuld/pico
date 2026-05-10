@@ -1,0 +1,15 @@
+{
+  "name": "@pico/codex-app-server-protocol",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vendored Codex app-server protocol TypeScript binding",
+  "exports": {
+    ".": "./src/index.ts",
+    "./v2": "./src/v2/index.ts",
+    "./serde_json": "./src/serde_json/JsonValue.ts"
+  },
+  "files": [
+    "src"
+  ]
+}

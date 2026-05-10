@@ -28,4 +28,12 @@ export {
   messageTurnId,
   type TurnCompletedParams,
 } from "./events";
+export type {
+  ServerNotification as CodexServerNotification,
+  ServerRequest as CodexServerRequest,
+  ResponseItem as CodexResponseItem,
+} from "@pico/codex-app-server-protocol";
+export type {
+  RawResponseItemCompletedNotification as CodexRawResponseItemCompletedNotification,
+} from "@pico/codex-app-server-protocol/v2";
 export type * from "./types";

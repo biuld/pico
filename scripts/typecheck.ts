@@ -1,4 +1,4 @@
-const roots = ["src", "tests"];
+const roots = ["src", "tests", "packages"];
 const files = (
   await Promise.all(
     roots.map(async (root) => {

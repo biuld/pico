@@ -1,108 +1,41 @@
 import { appendFile, mkdir, readdir } from "node:fs/promises";
 
-export type PicoConfigSnapshot = Record<string, unknown>;
-export type ResponseItem = Record<string, unknown>;
+import type {
+  BranchEntry,
+  ConfigChangeEntry,
+  LabelEntry,
+  PicoConfigSnapshot,
+  ResponseItem,
+  ResponseItemEntry,
+  SessionEntry,
+  SessionHeader,
+  SessionInfo,
+  TurnAbortedEntry,
+  TurnCompletedEntry,
+  TurnEntry,
+  TurnFailedEntry,
+  TurnOverrides,
+} from "./types";
 
-export interface SessionHeader {
-  type: "session";
-  version: 1;
-  id: string;
-  createdAt: string;
-  cwd: string;
-  config: PicoConfigSnapshot;
-}
-
-export interface BaseEntry {
-  id: string;
-  parentId: string | null;
-  timestamp: string;
-}
-
-export interface TurnEntry extends BaseEntry {
-  type: "turn";
-  userInput: string;
-  cwd: string;
-  overrides?: TurnOverrides;
-  status: "started" | "completed" | "failed" | "aborted";
-  startedAt: string;
-}
-
-export interface ResponseItemEntry extends BaseEntry {
-  type: "response_item";
-  turnId: string;
-  responseItem: ResponseItem;
-}
-
-export interface TurnCompletedEntry extends BaseEntry {
-  type: "turn_completed";
-  turnId: string;
-  status: "completed";
-  completedAt: string;
-  result?: unknown;
-}
-
-export interface TurnFailedEntry extends BaseEntry {
-  type: "turn_failed";
-  turnId: string;
-  status: "failed";
-  failedAt: string;
-  error: string;
-}
-
-export interface TurnAbortedEntry extends BaseEntry {
-  type: "turn_aborted";
-  turnId: string;
-  status: "aborted";
-  abortedAt: string;
-  reason?: string;
-}
-
-export interface LabelEntry extends BaseEntry {
-  type: "label";
-  targetId: string;
-  label: string;
-}
-
-export interface BranchEntry extends BaseEntry {
-  type: "branch";
-  targetId: string;
-  name?: string;
-}
-
-export interface ConfigChangeEntry extends BaseEntry {
-  type: "config_change";
-  config: PicoConfigSnapshot;
-}
-
-export type SessionEntry =
-  | TurnEntry
-  | ResponseItemEntry
-  | TurnCompletedEntry
-  | TurnFailedEntry
-  | TurnAbortedEntry
-  | LabelEntry
-  | BranchEntry
-  | ConfigChangeEntry;
-
-export interface TurnOverrides {
-  model?: string;
-  modelProvider?: string;
-  approvalPolicy?: string;
-  sandbox?: unknown;
-  cwd?: string;
-  personality?: string;
-  developerInstructions?: string;
-}
-
-export interface SessionInfo {
-  id: string;
-  leafId: string;
-  cwd: string;
-  createdAt: string;
-  turnCount: number;
-  responseItemCount: number;
-  label?: string;
-}
+export type {
+  BaseEntry,
+  BranchEntry,
+  CodexResponseItem,
+  ConfigChangeEntry,
+  LabelEntry,
+  PicoConfigSnapshot,
+  RawResponseItem,
+  ResponseItem,
+  ResponseItemEntry,
+  SessionEntry,
+  SessionHeader,
+  SessionInfo,
+  TurnAbortedEntry,
+  TurnCompletedEntry,
+  TurnEntry,
+  TurnFailedEntry,
+  TurnOverrides,
+} from "./types";
 
 const SESSIONS_DIR = ".pico/sessions";
 const CURRENT_VERSION = 1;

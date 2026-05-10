@@ -88,10 +88,12 @@ export class CodexAppServerClient extends EventEmitter {
     const initParams: InitializeParams = {
       clientInfo: {
         name: "pico",
+        title: null,
         version: "0.1.0",
       },
       capabilities: {
         experimentalApi: true,
+        requestAttestation: false,
       },
     };
 
@@ -172,7 +174,7 @@ export class CodexAppServerClient extends EventEmitter {
   ): Promise<TurnStartResponse> {
     const params: TurnStartParams = {
       threadId,
-      input: [{ type: "text", text }],
+      input: [{ type: "text", text, text_elements: [] }],
       ...overrides,
     };
     const response = await this.request<TurnStartResponse>("turn/start", params);

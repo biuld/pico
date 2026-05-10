@@ -1,8 +1,8 @@
 import { EventEmitter } from "events";
 import { CodexAppServerClient, normalizeCodexStatusValue } from "../codex/app-server";
-import type { JSONRPCRequest } from "../codex/app-server";
+import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
 import { loadPicoConfig, type PicoConfig } from "../config";
-import { SessionStore, type TurnOverrides } from "../session/store";
+import { SessionStore, type RawResponseItem, type TurnOverrides } from "../session/store";
 
 export interface AppState {
   store: SessionStore;
@@ -41,7 +41,7 @@ export interface AssistantDeltaEvent {
 export interface RawItemEvent {
   threadId: string;
   turnId: string;
-  item: Record<string, unknown>;
+  item: RawResponseItem;
   entryId?: string;
 }
 
@@ -235,11 +235,11 @@ export async function runTurn(
     } satisfies TurnStartedEvent);
 
     let rawItemCount = 0;
-    const bufferedRawItems: Record<string, unknown>[] = [];
+    const bufferedRawItems: RawResponseItem[] = [];
     let pendingRawWrites = Promise.resolve();
     let rawItemError: Error | undefined;
 
-    const queueRawItemWrite = (item: Record<string, unknown>) => {
+    const queueRawItemWrite = (item: RawResponseItem) => {
       pendingRawWrites = pendingRawWrites.then(async () => {
         const entry = await store.appendResponseItem(parentId, picoTurn.id, item);
         parentId = entry.id;
@@ -280,7 +280,9 @@ export async function runTurn(
     };
 
     const onRawItem = (params: unknown) => {
-      const value = params as Record<string, unknown> | undefined;
+      const value = params as
+        | (Partial<CodexRawResponseItemCompletedNotification> & Record<string, unknown>)
+        | undefined;
       const maybeThreadId = value?.threadId || value?.thread_id;
       const maybeTurnId = value?.turnId || value?.turn_id;
       if (maybeThreadId !== threadId) return;
@@ -292,10 +294,10 @@ export async function runTurn(
         return;
       }
       if (codexTurnId === picoTurn.id) {
-        bufferedRawItems.push(value.item as Record<string, unknown>);
+        bufferedRawItems.push(value.item as RawResponseItem);
         return;
       }
-      queueRawItemWrite(value.item as Record<string, unknown>);
+      queueRawItemWrite(value.item as RawResponseItem);
     };
 
     codex.on("item/agentMessage/delta", onDelta);

@@ -1,5 +1,35 @@
-// Codex app-server JSON-RPC protocol types.
-// Based on codex-rs app-server-protocol.
+import type {
+  InitializeParams,
+  InitializeResponse,
+  ServerNotification,
+  ServerRequest,
+} from "@pico/codex-app-server-protocol";
+import type { JsonValue } from "@pico/codex-app-server-protocol/serde_json";
+import type {
+  Config as ProtocolConfig,
+  ConfigReadParams,
+  ConfigReadResponse as ProtocolConfigReadResponse,
+  Model as ProtocolModel,
+  ModelListParams,
+  ModelListResponse as ProtocolModelListResponse,
+  TextElement as ProtocolTextElement,
+  Thread as ProtocolThread,
+  ThreadInjectItemsParams as ProtocolThreadInjectItemsParams,
+  ThreadStartParams as ProtocolThreadStartParams,
+  ThreadStartResponse as ProtocolThreadStartResponse,
+  TurnStartParams as ProtocolTurnStartParams,
+  TurnStartResponse as ProtocolTurnStartResponse,
+  UserInput as ProtocolUserInput,
+} from "@pico/codex-app-server-protocol/v2";
+
+export type {
+  ConfigReadParams,
+  InitializeParams,
+  InitializeResponse,
+  ModelListParams,
+  ServerNotification,
+  ServerRequest,
+};
 
 export type RequestId = number | string;
 
@@ -35,38 +65,16 @@ export type JSONRPCMessage =
   | { type: "error"; value: JSONRPCError }
   | { type: "notification"; value: JSONRPCNotification };
 
-export interface InitializeParams {
-  clientInfo: {
-    name: string;
-    title?: string;
-    version: string;
-  };
-  capabilities?: {
-    experimentalApi?: boolean;
-    requestAttestation?: boolean;
-    optOutNotificationMethods?: string[];
-  };
-}
-
-export interface InitializeResponse {
-  userAgent: string;
-  codexHome: string;
-  platformFamily: string;
-  platformOs: string;
-}
-
-export interface ConfigReadParams {
-  includeLayers: boolean;
-  cwd?: string | null;
-}
-
-export interface ConfigReadResponse {
+export type ConfigReadResponse = Omit<
+  Partial<ProtocolConfigReadResponse>,
+  "config" | "origins" | "layers"
+> & {
   config: CodexConfig;
   origins?: Record<string, unknown>;
   layers?: unknown[] | null;
-}
+};
 
-export interface CodexConfig {
+export type CodexConfig = Partial<ProtocolConfig> & {
   model?: string | null;
   modelProvider?: string | null;
   model_provider?: string | null;
@@ -76,85 +84,76 @@ export interface CodexConfig {
   sandboxMode?: unknown;
   sandbox_mode?: unknown;
   [key: string]: unknown;
-}
+};
 
-export interface ModelListParams {
-  cursor?: string | null;
-  limit?: number | null;
-  includeHidden?: boolean | null;
-}
-
-export interface ModelListResponse {
+export type ModelListResponse = Omit<ProtocolModelListResponse, "data" | "nextCursor"> & {
   data: CodexModel[];
   nextCursor?: string | null;
-}
+};
 
-export interface CodexModel {
+export type CodexModel = Partial<ProtocolModel> & {
   id: string;
   model: string;
   displayName?: string;
   hidden?: boolean;
   isDefault?: boolean;
   [key: string]: unknown;
-}
+};
 
-export interface ThreadStartParams {
-  model?: string;
-  modelProvider?: string;
-  cwd?: string;
-  ephemeral?: boolean;
-  experimentalRawEvents?: boolean;
-  approvalPolicy?: string;
-  sandbox?: string;
-  personality?: string;
-  baseInstructions?: string;
-  developerInstructions?: string;
-}
+export type ThreadStartParams = Omit<
+  Partial<ProtocolThreadStartParams>,
+  "approvalPolicy" | "sandbox" | "personality"
+> & {
+  approvalPolicy?: ProtocolThreadStartParams["approvalPolicy"] | string | null;
+  sandbox?: ProtocolThreadStartParams["sandbox"] | string | null;
+  personality?: ProtocolThreadStartParams["personality"] | string | null;
+  experimentalRawEvents?: boolean | null;
+};
 
-export interface ThreadStartResponse {
+export type ThreadStartResponse = Partial<Omit<ProtocolThreadStartResponse, "thread" | "cwd">> & {
   thread: ThreadInfo;
   model: string;
   modelProvider: string;
   cwd: string;
-}
+};
 
-export interface ThreadInfo {
+export type ThreadInfo = Partial<ProtocolThread> & {
   id: string;
   status?: unknown;
   [key: string]: unknown;
-}
+};
 
-export interface ThreadInjectItemsParams {
-  threadId: string;
-  items: unknown[];
-}
+export type ThreadInjectItemsParams = Omit<ProtocolThreadInjectItemsParams, "items"> & {
+  items: JsonValue[] | unknown[];
+};
 
-export interface TurnStartParams {
+export type TurnStartParams = Omit<
+  Partial<ProtocolTurnStartParams>,
+  "threadId" | "input" | "approvalPolicy" | "personality"
+> & {
   threadId: string;
   input: UserInputItem[];
-  model?: string;
+  approvalPolicy?: ProtocolTurnStartParams["approvalPolicy"] | string | null;
+  personality?: ProtocolTurnStartParams["personality"] | string | null;
+  model?: string | null;
   modelProvider?: string;
   cwd?: string;
-  approvalPolicy?: string;
   sandbox?: unknown;
-  personality?: string;
   developerInstructions?: string;
   outputSchema?: unknown;
   effort?: string;
   collaborationMode?: unknown;
-}
+};
 
-export interface UserInputItem {
+export type UserInputItem = Extract<ProtocolUserInput, { type: "text" }> | {
   type: "text";
   text: string;
+  text_elements?: TextElement[];
   textElements?: TextElement[];
-}
+};
 
-export interface TextElement {
-  byteRange: { start: number; end: number };
-  placeholder?: string;
-}
+export type TextElement = ProtocolTextElement;
 
-export interface TurnStartResponse {
+export type TurnStartResponse = Omit<ProtocolTurnStartResponse, "turn"> & {
   turn: { id: string; status?: unknown };
-}
+};

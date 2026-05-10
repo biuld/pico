@@ -1,0 +1,18 @@
+{
+  "name": "pico",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A terminal tool that rides on Codex's harness with autonomous persistence and branch management",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --outdir dist --target bun --format esm",
+    "compile": "bun build --compile ./src/index.ts --outfile pico",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.2.6"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

@@ -17,6 +17,7 @@ import { COMPOSER_OVERLAY_INSET, formatComposerStatus } from "../widgets/compose
 import { formatComposerPlaceholder } from "../widgets/composer-placeholder";
 import { formatTransientStatusLine } from "../widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
+import { buildLaunchpadRows, type LaunchpadQueuedMessage } from "../widgets/launchpad";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
 import { buildThreadRows } from "../widgets/resume-picker";
 import { buildStartupBannerState } from "../widgets/startup-banner";
@@ -32,6 +33,7 @@ export interface RuntimeViewInput {
   streamingText: string;
   liveLeafId?: string;
   pendingApproval?: JSONRPCRequest;
+  queuedMessages?: readonly LaunchpadQueuedMessage[];
   running: boolean;
   activityFrame?: number;
   activityElapsedMs?: number;
@@ -71,7 +73,11 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
   input.dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
 
+  const queuedMessages = input.queuedMessages || [];
+  input.dispatch({ type: "syncLaunchpad", total: queuedMessages.length });
+
   state = input.getState();
+  const launchpadRows = buildLaunchpadRows(queuedMessages, state.launchpadSelection);
   const codexStatus = input.app.codex.statusSnapshot;
   const transcriptCells = buildTranscriptCellsWithLive(
     input.app,
@@ -132,6 +138,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       slashCommands,
       historyRows,
       threadRows,
+      launchpadRows,
       themeRows,
       statusLineRows,
       statusLinePreview,

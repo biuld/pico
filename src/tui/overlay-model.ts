@@ -1,8 +1,10 @@
 import type { StyledText } from "@opentui/core";
 
+export type OverlayContent = string | StyledText;
+
 export interface OverlayRowView {
   id: string;
-  content: string | StyledText;
+  content: OverlayContent;
   height?: number;
   foregroundColor?: string;
   backgroundColor?: string;
@@ -13,7 +15,7 @@ export interface OverlayView {
   title: string;
   fullScreen: boolean;
   scrollY: number;
-  content: string | StyledText;
+  content: OverlayContent;
   rows?: readonly OverlayRowView[];
   rowScrollY?: number;
   footer?: string;

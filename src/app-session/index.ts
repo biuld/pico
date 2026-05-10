@@ -36,11 +36,18 @@ export interface PicoAppSessionSnapshot {
   streamingText: string;
   liveLeafId?: string;
   pendingApproval?: JSONRPCRequest;
+  queuedMessages: readonly QueuedMessage[];
 }
 
 interface PendingApproval {
   request: JSONRPCRequest;
   resolve: (result: unknown) => void;
+}
+
+export interface QueuedMessage {
+  id: string;
+  text: string;
+  createdAt: string;
 }
 
 export class PicoAppSession extends EventEmitter {
@@ -49,6 +56,8 @@ export class PicoAppSession extends EventEmitter {
   private running = false;
   private streamingText = "";
   private liveLeafId: string | undefined;
+  private queuedMessages: QueuedMessage[] = [];
+  private nextQueuedMessageId = 1;
   private detachCodexStatus: (() => void) | undefined;
 
   constructor(app: DraftAppState) {
@@ -84,6 +93,7 @@ export class PicoAppSession extends EventEmitter {
       streamingText: this.streamingText,
       liveLeafId: this.liveLeafId,
       pendingApproval: this.pendingApproval?.request,
+      queuedMessages: [...this.queuedMessages],
     };
   }
 
@@ -112,6 +122,7 @@ export class PicoAppSession extends EventEmitter {
   async restore(entryId: string) {
     const store = this.requireStore();
     const branch = await store.appendBranch(entryId);
+    this.clearQueuedMessages();
     this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_BRANCHED, branch);
     return branch;
   }
@@ -132,6 +143,7 @@ export class PicoAppSession extends EventEmitter {
     this.currentApp = await loadApp(cwd, threadId);
     this.streamingText = "";
     this.liveLeafId = undefined;
+    this.clearQueuedMessages();
     this.attachCodexStatus(this.currentApp);
     this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_LOADED, { threadId });
   }
@@ -148,6 +160,45 @@ export class PicoAppSession extends EventEmitter {
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_SUBMITTING);
 
     void this.runSubmittedTurn(userInput);
+  }
+
+  queueMessage(text: string): QueuedMessage | undefined {
+    const trimmed = text.trim();
+    if (!trimmed) return undefined;
+
+    const message: QueuedMessage = {
+      id: `queued-${this.nextQueuedMessageId++}`,
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    this.queuedMessages.push(message);
+    this.emitQueueChanged();
+    return message;
+  }
+
+  removeQueuedMessage(id: string): QueuedMessage | undefined {
+    const index = this.queuedMessages.findIndex((message) => message.id === id);
+    if (index < 0) return undefined;
+    const [message] = this.queuedMessages.splice(index, 1);
+    this.emitQueueChanged();
+    return message;
+  }
+
+  submitQueuedMessage(id?: string): boolean {
+    if (this.isBusy()) {
+      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_BUSY);
+      return false;
+    }
+
+    const index = id
+      ? this.queuedMessages.findIndex((message) => message.id === id)
+      : 0;
+    if (index < 0 || index >= this.queuedMessages.length) return false;
+
+    const [message] = this.queuedMessages.splice(index, 1);
+    this.emitQueueChanged();
+    this.submit(message.text);
+    return true;
   }
 
   resolveApproval(decision: PicoAppApprovalDecision): void {
@@ -202,6 +253,7 @@ export class PicoAppSession extends EventEmitter {
     } finally {
       this.running = false;
       this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FINISHED);
+      this.submitQueuedMessage();
     }
   }
 
@@ -259,6 +311,18 @@ export class PicoAppSession extends EventEmitter {
       turnId: leafId,
       error: error instanceof Error ? error : String(error),
     } satisfies TurnFailedEvent);
+  }
+
+  private emitQueueChanged(): void {
+    this.emitAppSession(PICO_APP_SESSION_EVENTS.QUEUE_CHANGED, {
+      queuedCount: this.queuedMessages.length,
+    });
+  }
+
+  private clearQueuedMessages(): void {
+    if (this.queuedMessages.length === 0) return;
+    this.queuedMessages = [];
+    this.emitQueueChanged();
   }
 
   private setApp(app: DraftAppState): void {

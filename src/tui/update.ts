@@ -1,6 +1,7 @@
 import { slashQuery } from "./commands";
 import {
   moveApprovalSelection,
+  moveLaunchpadSelection,
   moveSelection,
   moveThreadSelection,
   moveSlashSelection,
@@ -14,6 +15,7 @@ import {
   setOverlay,
   setTurnStatus,
   syncListScroll,
+  syncLaunchpadSelection,
   syncThreadScroll,
   syncSlashSelection,
   syncStatusLineSelection,
@@ -36,6 +38,7 @@ export type TuiMsg =
   | { type: "openStatusLine" }
   | { type: "openTranscript" }
   | { type: "openShortcuts" }
+  | { type: "openLaunchpad" }
   | { type: "showApproval" }
   | { type: "moveHistory"; entryIds: readonly string[]; delta: number; viewportHeight: number }
   | { type: "syncHistory"; entryIds: readonly string[]; viewportHeight: number }
@@ -47,6 +50,8 @@ export type TuiMsg =
   | { type: "syncTheme"; total: number }
   | { type: "moveStatusLine"; total: number; delta: number }
   | { type: "syncStatusLine"; total: number }
+  | { type: "moveLaunchpad"; total: number; delta: number }
+  | { type: "syncLaunchpad"; total: number }
   | { type: "toggleStatusLineItem"; item: StatusLineItemId }
   | { type: "moveApproval"; total: number; delta: number }
   | { type: "scrollTranscript"; delta: number }
@@ -87,6 +92,8 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return setOverlay(resetTranscriptScroll(state), "transcript");
     case "openShortcuts":
       return setOverlay(state, "shortcuts");
+    case "openLaunchpad":
+      return setOverlay(state, "launchpad");
     case "showApproval":
       return setOverlay(setTurnStatus(state, "approval"), "approval");
     case "moveHistory":
@@ -117,6 +124,10 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return moveStatusLineSelection(state, msg.total, msg.delta);
     case "syncStatusLine":
       return syncStatusLineSelection(state, msg.total);
+    case "moveLaunchpad":
+      return moveLaunchpadSelection(state, msg.total, msg.delta);
+    case "syncLaunchpad":
+      return syncLaunchpadSelection(state, msg.total);
     case "toggleStatusLineItem":
       return toggleStatusLineItem(state, msg.item);
     case "moveApproval":

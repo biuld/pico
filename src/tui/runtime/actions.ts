@@ -25,12 +25,17 @@ export interface RuntimeActions {
   showStatusLine(): void;
   showTranscript(): void;
   showShortcuts(): void;
+  showLaunchpad(): void;
   moveHistorySelection(delta: number): void;
   moveThreadSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
   moveStatusLineSelection(delta: number): void;
+  moveLaunchpadSelection(delta: number): void;
   selectTheme(): void;
   toggleStatusLineItem(): void;
+  queueDraft(text: string): void;
+  submitSelectedQueuedMessage(): void;
+  removeSelectedQueuedMessage(): void;
   restoreSelected(): Promise<void>;
   resumeSelected(): Promise<void>;
   handleLocalCommand(command: TuiInputCommand): Promise<boolean>;
@@ -140,6 +145,12 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     host.render();
   };
 
+  const showLaunchpad = () => {
+    host.dispatch({ type: "openLaunchpad" });
+    host.layout.blurInput();
+    host.render();
+  };
+
   const moveHistorySelection = (delta: number) => {
     const app = host.appSession.app;
     const state = host.getState();
@@ -185,6 +196,15 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     host.render();
   };
 
+  const moveLaunchpadSelection = (delta: number) => {
+    host.dispatch({
+      type: "moveLaunchpad",
+      total: host.appSession.snapshot.queuedMessages.length,
+      delta,
+    });
+    host.render();
+  };
+
   const selectTheme = () => {
     const theme = TUI_THEMES[host.getState().themeSelection] || TUI_THEMES[0];
     host.dispatch({ type: "themeSelected", themeName: theme.name });
@@ -197,6 +217,64 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     if (!item) return;
     host.dispatch({ type: "toggleStatusLineItem", item: item.id });
     void persistStatusLineItems(host.getState().statusLineItems);
+    host.render();
+  };
+
+  const queueDraft = (text: string) => {
+    const queued = host.appSession.queueMessage(text);
+    if (!queued) {
+      host.dispatch({
+        type: "setTurnStatus",
+        status: host.getState().turnStatus,
+        message: "nothing to queue",
+      });
+      host.render();
+      return;
+    }
+
+    setInputValue("");
+    host.dispatch({
+      type: "setTurnStatus",
+      status: host.getState().turnStatus,
+      message: `queued ${host.appSession.snapshot.queuedMessages.length}`,
+    });
+    host.dispatch({ type: "openLaunchpad" });
+    host.layout.blurInput();
+    host.render();
+  };
+
+  const selectedQueuedMessageId = () => {
+    const messages = host.appSession.snapshot.queuedMessages;
+    return messages[host.getState().launchpadSelection]?.id;
+  };
+
+  const submitSelectedQueuedMessage = () => {
+    const id = selectedQueuedMessageId();
+    if (!id) {
+      host.dispatch({
+        type: "setTurnStatus",
+        status: host.getState().turnStatus,
+        message: "launchpad empty",
+      });
+      host.render();
+      return;
+    }
+    if (host.appSession.submitQueuedMessage(id)) {
+      host.dispatch({ type: "closeOverlay" });
+      host.layout.focusInput();
+    }
+    host.render();
+  };
+
+  const removeSelectedQueuedMessage = () => {
+    const id = selectedQueuedMessageId();
+    if (!id) return;
+    host.appSession.removeQueuedMessage(id);
+    host.dispatch({
+      type: "setTurnStatus",
+      status: host.getState().turnStatus,
+      message: `queued ${host.appSession.snapshot.queuedMessages.length}`,
+    });
     host.render();
   };
 
@@ -276,6 +354,10 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       showStatusLine();
       return true;
     }
+    if (command.type === "launchpad") {
+      showLaunchpad();
+      return true;
+    }
     if (command.type === "status") {
       const app = host.appSession.app;
       host.dispatch({
@@ -338,12 +420,17 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     showStatusLine,
     showTranscript,
     showShortcuts,
+    showLaunchpad,
     moveHistorySelection,
     moveThreadSelection,
     moveThemeSelection,
     moveStatusLineSelection,
+    moveLaunchpadSelection,
     selectTheme,
     toggleStatusLineItem,
+    queueDraft,
+    submitSelectedQueuedMessage,
+    removeSelectedQueuedMessage,
     restoreSelected,
     resumeSelected,
     handleLocalCommand,

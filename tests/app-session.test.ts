@@ -121,3 +121,46 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
     },
   ]);
 });
+
+test("app session drains queued launchpad messages after a turn finishes", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const store = await PicoThreadStore.create(cwd);
+  const codex = new SessionCodex();
+  const appSession = new PicoAppSession({
+    cwd,
+    store,
+    codex,
+    config: {},
+  } as unknown as AppState);
+
+  const finished = new Promise<void>((resolve) => {
+    let count = 0;
+    appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => {
+      count += 1;
+      if (count === 2) resolve();
+    });
+  });
+  const queueCounts: number[] = [];
+  appSession.on(PICO_APP_SESSION_EVENTS.QUEUE_CHANGED, (event) => {
+    queueCounts.push(event.queuedCount);
+  });
+
+  appSession.submit("first");
+  expect(appSession.queueMessage(" second ")).toMatchObject({
+    id: "queued-1",
+    text: "second",
+  });
+  expect(appSession.snapshot.queuedMessages.map((message) => message.text)).toEqual(["second"]);
+
+  await finished;
+
+  expect(queueCounts).toEqual([1, 0]);
+  expect(appSession.snapshot.queuedMessages).toEqual([]);
+  expect(
+    store.allEntries
+      .filter((entry) => entry.type === "turn")
+      .map((entry) => entry.userInput),
+  ).toEqual(["first", "second"]);
+});

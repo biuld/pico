@@ -11,6 +11,7 @@ export type OverlayMode =
   | "statusline"
   | "transcript"
   | "shortcuts"
+  | "launchpad"
   | "approval";
 
 export type TurnStatus = "idle" | "running" | "approval" | "failed";
@@ -25,6 +26,7 @@ export interface TuiState {
   slashSelection: number;
   themeSelection: number;
   statusLineSelection: number;
+  launchpadSelection: number;
   statusLineItems: StatusLineItemId[];
   approvalSelection: number;
   themeName: ThemeName;
@@ -51,6 +53,7 @@ export function createTuiState(
     slashSelection: 0,
     themeSelection: 0,
     statusLineSelection: 0,
+    launchpadSelection: 0,
     statusLineItems: normalizeStatusLineItems(options.statusLineItems),
     approvalSelection: 0,
     themeName: DEFAULT_THEME_NAME,
@@ -124,6 +127,7 @@ export function setOverlay(state: TuiState, overlay: OverlayMode): TuiState {
     slashSelection: overlay === "slash" ? state.slashSelection : 0,
     themeSelection: overlay === "theme" ? state.themeSelection : 0,
     statusLineSelection: overlay === "statusline" ? state.statusLineSelection : 0,
+    launchpadSelection: overlay === "launchpad" ? state.launchpadSelection : 0,
     approvalSelection: overlay === "approval" ? state.approvalSelection : 0,
   };
 }
@@ -196,6 +200,19 @@ export function moveStatusLineSelection(state: TuiState, total: number, delta: n
 export function syncStatusLineSelection(state: TuiState, total: number): TuiState {
   if (total <= 0) return { ...state, statusLineSelection: 0 };
   return { ...state, statusLineSelection: clamp(state.statusLineSelection, 0, total - 1) };
+}
+
+export function moveLaunchpadSelection(state: TuiState, total: number, delta: number): TuiState {
+  if (total <= 0) return { ...state, launchpadSelection: 0 };
+  return {
+    ...state,
+    launchpadSelection: clamp(state.launchpadSelection + delta, 0, total - 1),
+  };
+}
+
+export function syncLaunchpadSelection(state: TuiState, total: number): TuiState {
+  if (total <= 0) return { ...state, launchpadSelection: 0 };
+  return { ...state, launchpadSelection: clamp(state.launchpadSelection, 0, total - 1) };
 }
 
 export function toggleStatusLineItem(state: TuiState, item: StatusLineItemId): TuiState {

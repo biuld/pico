@@ -21,14 +21,19 @@ export interface KeybindingRuntime {
   showStatusLine(): void;
   showTranscript(): void;
   showShortcuts(): void;
+  showLaunchpad(): void;
   moveHistorySelection(delta: number): void;
   moveThreadSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
   moveStatusLineSelection(delta: number): void;
+  moveLaunchpadSelection(delta: number): void;
   restoreSelected(): void;
   resumeSelected(): void;
   selectTheme(): void;
   toggleStatusLineItem(): void;
+  queueDraft(text: string): void;
+  submitSelectedQueuedMessage(): void;
+  removeSelectedQueuedMessage(): void;
   setInputValue(value: string): void;
   acceptSlashSelection(): void;
   resolveApproval(decision: ApprovalDecision): void;
@@ -114,6 +119,9 @@ export function installOpenTuiKeybindings(
     if (state.overlay === "shortcuts") {
       return handleShortcutKey(sequence, runtime);
     }
+    if (state.overlay === "launchpad") {
+      return handleLaunchpadKey(sequence, runtime);
+    }
 
     if (sequence === "\u0014") {
       runtime.showTranscript();
@@ -129,13 +137,10 @@ export function installOpenTuiKeybindings(
     }
     if (sequence === "\t") {
       if (runtime.isRunning() && runtime.getInputValue().trim().length > 0) {
-        runtime.dispatch({
-          type: "setTurnStatus",
-          status: state.turnStatus,
-          message: "queue is not implemented yet",
-        });
-        runtime.render();
+        runtime.queueDraft(runtime.getInputValue());
+        return true;
       }
+      if (runtime.getInputValue().trim().length === 0) runtime.showLaunchpad();
       return true;
     }
     return false;
@@ -338,6 +343,30 @@ function handleTranscriptKey(sequence: string, runtime: KeybindingRuntime): bool
 
 function handleShortcutKey(sequence: string, runtime: KeybindingRuntime): boolean {
   if (sequence === "\u001b" || sequence === "?") {
+    runtime.setComposerFocus();
+    return true;
+  }
+  return true;
+}
+
+function handleLaunchpadKey(sequence: string, runtime: KeybindingRuntime): boolean {
+  if (sequence === "\u001b[A" || sequence === "k" || sequence === "\u0010") {
+    runtime.moveLaunchpadSelection(-1);
+    return true;
+  }
+  if (sequence === "\u001b[B" || sequence === "j" || sequence === "\u000e") {
+    runtime.moveLaunchpadSelection(1);
+    return true;
+  }
+  if (sequence === "\r") {
+    runtime.submitSelectedQueuedMessage();
+    return true;
+  }
+  if (sequence.toLowerCase() === "d") {
+    runtime.removeSelectedQueuedMessage();
+    return true;
+  }
+  if (sequence === "\u001b") {
     runtime.setComposerFocus();
     return true;
   }

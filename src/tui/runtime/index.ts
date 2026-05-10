@@ -76,6 +76,7 @@ export function runOpenTuiRuntime(
       streamingText: snapshot.streamingText,
       liveLeafId: snapshot.liveLeafId,
       pendingApproval: snapshot.pendingApproval,
+      queuedMessages: snapshot.queuedMessages,
       running: snapshot.running,
       ...clocks.snapshot(),
       rendererWidth: renderer.width,
@@ -213,6 +214,14 @@ export function runOpenTuiRuntime(
     layout.focusInput();
     render();
   });
+  appSession.on(PICO_APP_SESSION_EVENTS.QUEUE_CHANGED, (event) => {
+    dispatch({
+      type: "setTurnStatus",
+      status: state.turnStatus,
+      message: event.queuedCount > 0 ? `queued ${event.queuedCount}` : "launchpad empty",
+    });
+    render();
+  });
 
   layout.setInputHandlers({
     onSubmit: () => {
@@ -241,14 +250,19 @@ export function runOpenTuiRuntime(
     showStatusLine: actions.showStatusLine,
     showTranscript: actions.showTranscript,
     showShortcuts: actions.showShortcuts,
+    showLaunchpad: actions.showLaunchpad,
     moveHistorySelection: actions.moveHistorySelection,
     moveThreadSelection: actions.moveThreadSelection,
     moveThemeSelection: actions.moveThemeSelection,
     moveStatusLineSelection: actions.moveStatusLineSelection,
+    moveLaunchpadSelection: actions.moveLaunchpadSelection,
     restoreSelected: () => void actions.restoreSelected(),
     resumeSelected: () => void actions.resumeSelected(),
     selectTheme: actions.selectTheme,
     toggleStatusLineItem: actions.toggleStatusLineItem,
+    queueDraft: actions.queueDraft,
+    submitSelectedQueuedMessage: actions.submitSelectedQueuedMessage,
+    removeSelectedQueuedMessage: actions.removeSelectedQueuedMessage,
     setInputValue: actions.setInputValue,
     acceptSlashSelection: () => void actions.acceptSlashSelection(),
     resolveApproval,

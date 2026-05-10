@@ -29,6 +29,7 @@ export const PICO_APP_SESSION_EVENTS = {
   TURN_FINISHED: "turn:finished",
   APPROVAL_REQUESTED: "approval:requested",
   APPROVAL_RESOLVED: "approval:resolved",
+  QUEUE_CHANGED: "queue:changed",
 } as const;
 
 export type PicoAppSessionEventName =
@@ -53,6 +54,7 @@ export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.TURN_FINISHED]: void;
   [PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED]: JSONRPCRequest;
   [PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED]: { running: boolean };
+  [PICO_APP_SESSION_EVENTS.QUEUE_CHANGED]: { queuedCount: number };
 }
 
 export type PicoAppSessionEventArgs<Name extends PicoAppSessionEventName> =

@@ -8,14 +8,12 @@ export type StatusLineItemId =
   | "model"
   | "provider"
   | "current-dir"
-  | "run-state"
   | "used-tokens"
   | "five-hour-limit"
   | "weekly-limit"
   | "thread-id";
 
 export const DEFAULT_STATUS_LINE_ITEMS: readonly StatusLineItemId[] = [
-  "run-state",
   "model",
   "provider",
   "used-tokens",
@@ -27,7 +25,6 @@ export const STATUS_LINE_ITEM_IDS: readonly StatusLineItemId[] = [
   "model",
   "provider",
   "current-dir",
-  "run-state",
   "used-tokens",
   "five-hour-limit",
   "weekly-limit",
@@ -39,7 +36,6 @@ export type StatusLineSegmentKind =
   | "provider"
   | "path"
   | "branch"
-  | "state"
   | "usage"
   | "limit"
   | "metadata"
@@ -176,8 +172,6 @@ function statusLineItemSegment(
       return codex.modelProvider ? { text: codex.modelProvider, kind: "provider", item } : undefined;
     case "current-dir":
       return store?.cwd ? { text: cwdBasename(store.cwd), kind: "path", item } : undefined;
-    case "run-state":
-      return { text: statusLineRunState(codex), kind: "state", item };
     case "used-tokens":
       return codex.tokenUsage ? { text: codex.tokenUsage, kind: "usage", item } : undefined;
     case "five-hour-limit":
@@ -207,8 +201,6 @@ function statusLineItemSegmentKind(item: StatusLineItemId): StatusLineSegmentKin
       return "provider";
     case "current-dir":
       return "path";
-    case "run-state":
-      return "state";
     case "used-tokens":
       return "usage";
     case "five-hour-limit":
@@ -253,16 +245,6 @@ export function statusLineSegmentsStyled(
 
 function shortId(id: string): string {
   return id.length > 8 ? id.slice(0, 8) : id;
-}
-
-function statusLineRunState(codex: CodexStatusSnapshot): string {
-  const state = codex.turnStatus || codex.threadStatus;
-  if (state === "running") return "Working";
-  if (state === "failed") return "Failed";
-  if (state === "aborted") return "Aborted";
-  if (state === "completed" || state === "idle") return "Ready";
-  if (state) return state.charAt(0).toUpperCase() + state.slice(1);
-  return codex.connected ? "Ready" : "Offline";
 }
 
 function cwdBasename(cwd: string): string {

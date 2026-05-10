@@ -21,12 +21,12 @@ test("persists project statusline items without dropping existing config", async
   );
 
   await updateProjectPicoConfig(cwd, {
-    statusLineItems: ["run-state", "model", "thread-id"],
+    statusLineItems: ["model", "provider", "thread-id"],
   });
 
   await expect(loadPicoConfig(cwd)).resolves.toEqual({
     model: "project-model",
-    statusLineItems: ["run-state", "model", "thread-id"],
+    statusLineItems: ["model", "provider", "thread-id"],
     cwd,
   });
 });

@@ -4,10 +4,19 @@ import type { TuiTheme } from "../theme";
 
 export interface OverlayWidget {
   root: BoxRenderable;
+  body: BoxRenderable;
   text: TextRenderable;
   footer: TextRenderable;
   applyTheme(theme: TuiTheme): void;
   applyView(view: OverlayView): void;
+}
+
+export interface OverlayFrame {
+  left: number;
+  top: number;
+  bottom: number | undefined;
+  width: number;
+  height: number;
 }
 
 export function createOverlayWidget(
@@ -26,6 +35,15 @@ export function createOverlayWidget(
     height: 1,
     border: true,
     borderColor: colors.border,
+    backgroundColor: "transparent",
+  });
+
+  const body = new BoxRenderable(renderer, {
+    id: "pico-overlay-body",
+    flexDirection: "column",
+    width: "100%",
+    height: "100%",
+    flexGrow: 1,
     paddingX: 1,
     paddingY: 0,
     backgroundColor: colors.overlay,
@@ -53,15 +71,18 @@ export function createOverlayWidget(
     truncate: true,
   });
 
-  root.add(text);
-  root.add(footer);
+  body.add(text);
+  body.add(footer);
+  root.add(body);
 
   return {
     root,
+    body,
     text,
     footer,
     applyTheme: (nextTheme) => {
-      root.backgroundColor = nextTheme.colors.overlay;
+      root.backgroundColor = "transparent";
+      body.backgroundColor = nextTheme.colors.overlay;
       root.borderColor = nextTheme.colors.border;
       text.fg = nextTheme.colors.text;
       footer.fg = nextTheme.colors.muted;
@@ -80,19 +101,45 @@ export function createOverlayWidget(
       }
 
       root.title = view.title;
-      if (view.fullScreen) {
-        root.left = 0;
-        root.top = 0;
-        root.bottom = undefined;
-        root.width = renderer.width;
-        root.height = renderer.height;
-      } else {
-        root.left = 2;
-        root.top = undefined;
-        root.bottom = bottomInset();
-        root.width = Math.max(20, renderer.width - 4);
-        root.height = Math.max(3, view.height);
-      }
+      const frame = overlayFrame(
+        renderer.width,
+        renderer.height,
+        bottomInset(),
+        view.fullScreen,
+      );
+      root.left = frame.left;
+      root.top = frame.top;
+      root.bottom = frame.bottom;
+      root.width = frame.width;
+      root.height = frame.height;
     },
+  };
+}
+
+export function overlayFrame(
+  rendererWidth: number,
+  rendererHeight: number,
+  bottomInset: number,
+  fullScreen: boolean,
+): OverlayFrame {
+  const width = Math.max(1, rendererWidth);
+  const height = Math.max(1, rendererHeight);
+
+  if (fullScreen) {
+    return {
+      left: 0,
+      top: 0,
+      bottom: undefined,
+      width,
+      height,
+    };
+  }
+
+  return {
+    left: 0,
+    top: 0,
+    bottom: undefined,
+    width,
+    height: Math.max(1, height - Math.max(0, bottomInset)),
   };
 }

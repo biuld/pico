@@ -1,5 +1,5 @@
 import { StyledText, bold, dim, fg } from "@opentui/core";
-import type { HistoryTurnRow } from "../history";
+import { historyUserMarker, type HistoryTurnRow } from "../history";
 import type { OverlayView } from "../overlay-model";
 import type { TuiState } from "../state";
 import type { TuiTheme } from "../theme";
@@ -35,12 +35,11 @@ function historyContent(rows: readonly HistoryTurnRow[], theme: TuiTheme): Style
   const strong = fg(theme.colors.textStrong);
 
   rows.forEach((row, index) => {
-    const selected = row.isSelected ? ">" : " ";
-    const active = row.isActive ? "*" : " ";
-    chunks.push(muted(`${selected}${active} ${row.userPrefix}`));
+    chunks.push(muted(row.userPrefix));
+    chunks.push(row.isSelected ? bold(strong(historyUserMarker(row))) : muted(historyUserMarker(row)));
     chunks.push(row.isSelected ? bold(strong(row.userText)) : strong(row.userText));
     chunks.push(muted("\n"));
-    chunks.push(muted(`   ${row.summaryPrefix}`));
+    chunks.push(muted(`${row.summaryPrefix}  `));
     chunks.push(dim(muted(row.agentSummary)));
     if (index < rows.length - 1) chunks.push(muted("\n"));
   });

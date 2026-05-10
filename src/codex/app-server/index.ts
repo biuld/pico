@@ -10,6 +10,7 @@ export {
 export {
   createCodexStatusSnapshot,
   formatCodexStatusText,
+  normalizeCodexStatusValue,
   updateCodexStatusFromConfig,
   updateCodexStatusFromConfigRead,
   updateCodexStatusFromError,

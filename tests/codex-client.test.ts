@@ -45,13 +45,13 @@ test("projects app-server status from SDK responses and notifications", () => {
   let status = createCodexStatusSnapshot({ userAgent: "codex-test" });
 
   status = updateCodexStatusFromThreadStart(status, {
-    thread: { id: "thread-1", status: "idle" },
+    thread: { id: "thread-1", status: { type: "idle" } },
     model: "gpt-test",
     modelProvider: "openai",
     cwd: "/tmp/project",
   });
   status = updateCodexStatusFromTurnStart(status, "thread-1", {
-    turn: { id: "turn-1", status: "running" },
+    turn: { id: "turn-1", status: "inProgress" },
   });
   status = updateCodexStatusFromNotification(status, {
     method: "thread/tokenUsage/updated",

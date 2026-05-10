@@ -36,15 +36,33 @@ export function formatTransientStatusLine(transientStatus = ""): string {
   return transientStatus ? `  ${transientStatus}` : "";
 }
 
-export function formatComposerPlaceholder(state: TuiState): string {
+const IDLE_COMPOSER_PLACEHOLDERS = [
+  "Ask Pico to do anything",
+  "? for shortcuts",
+  "/ for commands",
+  "Esc Esc for history",
+];
+
+const WORKING_COMPOSER_PLACEHOLDERS = [
+  "Draft the next message",
+  "Ctrl+T for transcript",
+  "Esc Esc for history",
+];
+
+export function formatComposerPlaceholder(state: TuiState, frame = 0): string {
   if (state.overlay !== "none") return "";
   if (state.inputValue.trim().length > 0) return "";
 
   if (state.turnStatus === "running") {
-    return "Ask Pico to do anything   ·   Ctrl+T transcript";
+    return rotatingPlaceholder(WORKING_COMPOSER_PLACEHOLDERS, frame);
   }
 
-  return "Ask Pico to do anything   ·   ? for shortcuts";
+  return rotatingPlaceholder(IDLE_COMPOSER_PLACEHOLDERS, frame);
+}
+
+function rotatingPlaceholder(values: readonly string[], frame: number): string {
+  const index = Math.abs(Math.floor(frame)) % values.length;
+  return values[index] || "";
 }
 
 export function formatBottomStatusLine(

@@ -18,6 +18,7 @@ import {
   COMPOSER_OVERLAY_INSET,
   formatComposerStatus,
 } from "../src/tui/widgets/composer";
+import { overlayFrame } from "../src/tui/widgets/overlay";
 import { buildSessionRows } from "../src/tui/widgets/resume-picker";
 import {
   buildStatusLineOverlayView,
@@ -80,15 +81,15 @@ test("bottom statusline renders an unsaved session before first submit", () => {
 
   expect(formatBottomStatusLine(undefined, state, "", 32)).toBe("");
   expect(formatTransientStatusLine("• waiting for model")).toBe("  • waiting for model");
-  expect(formatComposerPlaceholder(state)).toContain("Ask Pico to do anything");
-  expect(formatComposerPlaceholder(state)).toContain("? for shortcuts");
-  expect(formatComposerPlaceholder(setTurnStatus(state, "running"))).toContain("Ctrl+T transcript");
+  expect(formatComposerPlaceholder(state)).toBe("Ask Pico to do anything");
+  expect(formatComposerPlaceholder(state, 1)).toBe("? for shortcuts");
+  expect(formatComposerPlaceholder(setTurnStatus(state, "running"), 1)).toBe("Ctrl+T for transcript");
   expect(formatCodexStatusLine({
     state,
     codex: { connected: true, turnStatus: "running", model: "gpt-test" },
-    items: ["run-state", "model"],
+    items: ["model"],
     width: 48,
-  })).toContain("Working");
+  })).toContain("gpt-test");
   expect(formatCodexStatusLine({
     state,
     codex: { connected: true, model: "gpt-test" },
@@ -109,12 +110,10 @@ test("statusline uses themed segments per item type", () => {
       threadId: "thread-abcdef",
     },
     undefined,
-    ["run-state", "model", "provider", "used-tokens", "thread-id"],
+    ["model", "provider", "used-tokens", "thread-id"],
   );
 
   expect(segments.map((segment) => segment.kind)).toEqual([
-    "state",
-    "separator",
     "model",
     "separator",
     "provider",
@@ -135,15 +134,29 @@ test("statusline uses themed segments per item type", () => {
       turnStatus: "running",
       model: "gpt-test",
     },
-    items: ["run-state", "model"],
+    items: ["model"],
     width: 48,
   }, theme);
   expect(styled.chunks.map((chunk) => chunk.text).join("")).toContain("gpt-test");
-  expect(theme.colors.statusLine.model).not.toBe(theme.colors.statusLine.state);
+  expect(theme.colors.statusLine.model).not.toBe(theme.colors.statusLine.provider);
 });
 
 test("overlay anchors above the transient status line and composer", () => {
   expect(COMPOSER_OVERLAY_INSET).toBe(COMPOSER_HEIGHT);
+  expect(overlayFrame(100, 30, COMPOSER_OVERLAY_INSET, false)).toEqual({
+    left: 0,
+    top: 0,
+    bottom: undefined,
+    width: 100,
+    height: 30 - COMPOSER_OVERLAY_INSET,
+  });
+  expect(overlayFrame(100, 30, COMPOSER_OVERLAY_INSET, true)).toEqual({
+    left: 0,
+    top: 0,
+    bottom: undefined,
+    width: 100,
+    height: 30,
+  });
 });
 
 test("render helpers build transcript models from Pico JSONL entries", async () => {
@@ -166,10 +179,16 @@ test("render helpers build transcript models from Pico JSONL entries", async () 
   expect(formatTranscriptRow(transcript[1])).toBe("• Pico stores raw Codex items.");
   expect(formatStatusLine(store, state)).toContain("pico");
   expect(formatTransientStatusLine()).toBe("");
-  expect(formatComposerPlaceholder(state)).toContain("? for shortcuts");
+  expect(formatComposerPlaceholder(state, 1)).toContain("? for shortcuts");
   expect(formatBottomStatusLine(store, state, "", 48)).toBe("");
   expect(formatComposerStatus({ running: false, turnStatus: "idle" })).toBe("");
   expect(formatComposerStatus({ running: true, turnStatus: "running", statusMessage: "starting" })).toBe("• starting");
+  expect(formatComposerStatus({
+    running: true,
+    turnStatus: "running",
+    statusMessage: "waiting for model",
+    loadingFrame: 2,
+  })).toBe("• waiting for model.. ");
   expect(footerMode(state)).toBe("ComposerEmpty");
 });
 
@@ -391,8 +410,16 @@ test("transcript user rows fill their full line background from the active theme
   );
 
   const expectedBackground = parseColor(theme.colors.userMessageBackground);
-  expect(styled.chunks.map((chunk) => chunk.text).join("")).toBe("› hello     ");
-  expect(styled.chunks.every((chunk) => chunk.bg?.equals(expectedBackground))).toBe(true);
+  expect(styled.chunks.map((chunk) => chunk.text).join("")).toBe([
+    "            ",
+    "› hello     ",
+    "            ",
+  ].join("\n"));
+  expect(
+    styled.chunks
+      .filter((chunk) => chunk.text !== "\n")
+      .every((chunk) => chunk.bg?.equals(expectedBackground)),
+  ).toBe(true);
 });
 
 test("transcript renderer accepts block renderers for future formatted surfaces", () => {
@@ -453,12 +480,13 @@ test("history overlay groups each turn as a tree node with an agent summary", as
     userText: "Explain Pico history",
     agentSummary: "agent: Pico history is a turn tree.",
   });
-  expect(formatted).toContain("└── Explain Pico history");
+  expect(formatted).toContain("└── › Explain Pico history");
+  expect(formatted).toContain("      agent: Pico history is a turn tree.");
   expect(formatted).not.toContain("hidden instructions");
   expect(historySelectionTargetId(store)).toBe(store.leafId);
 });
 
-test("history tree branches by turn and selection moves only across turns", async () => {
+test("history keeps direct turn history as siblings and selection moves only across turns", async () => {
   const store = await createStore();
   const rootTurn = await store.appendTurn(store.leafId, "root prompt");
   const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
@@ -499,9 +527,9 @@ test("history tree branches by turn and selection moves only across turns", asyn
     "left prompt",
     "right prompt",
   ]);
-  expect(rows[0].userPrefix).toBe("└── ");
-  expect(rows[1].userPrefix).toBe("    ├── ");
-  expect(rows[2].userPrefix).toBe("    └── ");
+  expect(rows[0].userPrefix).toBe("├── ");
+  expect(rows[1].userPrefix).toBe("├── ");
+  expect(rows[2].userPrefix).toBe("└── ");
   expect(state.selectedEntryId).toBe(leftDone.id);
 });
 
@@ -579,7 +607,7 @@ test("filters slash commands for popup selection without tab completion", async 
 test("statusline command configures visible status line items", async () => {
   const store = await createStore();
   let state = createTuiState(store);
-  expect(state.statusLineItems).toContain("run-state");
+  expect(state.statusLineItems).toContain("model");
 
   state = updateTuiState(state, { type: "openStatusLine" });
   expect(state.overlay).toBe("statusline");
@@ -593,7 +621,7 @@ test("statusline command configures visible status line items", async () => {
   );
   expect(formatStatusLineRow(rows[0])).toContain("[x] Model");
   expect(formatStatusLineRow(rows[1])).toContain("openai");
-  expect(formatStatusLineRow(rows[4])).toContain("[used_tokens]");
+  expect(formatStatusLineRow(rows[3])).toContain("[used_tokens]");
   expect(formatConfiguredStatusPreviewText(
     { connected: true },
     store,

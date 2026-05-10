@@ -92,7 +92,11 @@ export function formatMainTranscriptStyled(
   liveStatus = "",
   liveLeafId?: string,
 ): StyledText {
-  const lines = renderTranscriptLines(transcriptCellsForApp(app, streamingText, liveStatus, liveLeafId), width)
+  const lines = renderTranscriptLines(
+    transcriptCellsForApp(app, streamingText, liveStatus, liveLeafId),
+    width,
+    { userMessagePaddingY: 1 },
+  )
     .slice(-Math.max(1, maxLines));
   return renderTranscriptLinesStyled(lines, theme);
 }

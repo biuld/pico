@@ -96,7 +96,7 @@ export function updateCodexStatusFromThreadStart(
     ...status,
     connected: true,
     threadId: response.thread.id,
-    threadStatus: response.thread.status,
+    threadStatus: normalizeCodexStatusValue(response.thread.status) || status.threadStatus,
     model: response.model,
     modelProvider: response.modelProvider,
   };
@@ -112,7 +112,7 @@ export function updateCodexStatusFromTurnStart(
     connected: true,
     threadId,
     turnId: response.turn.id,
-    turnStatus: response.turn.status || "running",
+    turnStatus: normalizeCodexStatusValue(response.turn.status) || "running",
     threadStatus: "running",
   };
 }
@@ -128,8 +128,8 @@ export function updateCodexStatusFromTurnCompleted(
     turnId: stringValue(objectParam(completed), "turnId", "turn_id") ||
       stringValue(objectParam(completed.turn), "id") ||
       status.turnId,
-    turnStatus: stringValue(objectParam(completed), "status") ||
-      stringValue(objectParam(completed.turn), "status") ||
+    turnStatus: statusValue(objectParam(completed), "status") ||
+      statusValue(objectParam(completed.turn), "status") ||
       "completed",
     threadStatus: "idle",
   };
@@ -158,7 +158,7 @@ export function updateCodexStatusFromNotification(
     next = {
       ...next,
       threadId: stringValue(params, "threadId", "thread_id") || threadField(params, "id"),
-      threadStatus: stringValue(params, "status") || threadField(params, "status"),
+      threadStatus: statusValue(params, "status") || threadStatusField(params),
       model: stringValue(params, "model") || next.model,
       modelProvider: stringValue(params, "modelProvider", "model_provider") || next.modelProvider,
     };
@@ -166,14 +166,14 @@ export function updateCodexStatusFromNotification(
     next = {
       ...next,
       threadId: stringValue(params, "threadId", "thread_id") || threadField(params, "id") || next.threadId,
-      threadStatus: stringValue(params, "status") || threadField(params, "status") || next.threadStatus,
+      threadStatus: statusValue(params, "status") || threadStatusField(params) || next.threadStatus,
     };
   } else if (notification.method === "turn/started") {
     next = {
       ...next,
       threadId: stringValue(params, "threadId", "thread_id") || next.threadId,
       turnId: stringValue(params, "turnId", "turn_id") || turnField(params, "id") || next.turnId,
-      turnStatus: stringValue(params, "status") || turnField(params, "status") || "running",
+      turnStatus: statusValue(params, "status") || turnStatusField(params) || "running",
     };
   } else if (notification.method === "turn/completed") {
     next = updateCodexStatusFromTurnCompleted(next, params as TurnCompletedParams);
@@ -218,7 +218,9 @@ export function formatCodexStatusText(
   const parts: string[] = [];
   if (localStatus) parts.push(localStatus);
 
-  const codexState = status.turnStatus || status.threadStatus || (status.connected ? "connected" : "offline");
+  const codexState = normalizeCodexStatusValue(status.turnStatus) ||
+    normalizeCodexStatusValue(status.threadStatus) ||
+    (status.connected ? "connected" : "offline");
   parts.push(`codex ${codexState}`);
   if (status.model) parts.push(`model ${status.model}`);
   if (status.rateLimits) parts.push(status.rateLimits);
@@ -228,12 +230,66 @@ export function formatCodexStatusText(
   return parts.filter(Boolean).join("   ");
 }
 
+export function normalizeCodexStatusValue(value: unknown): string | undefined {
+  if (typeof value === "string") return normalizeCodexStatusText(value);
+  if (typeof value !== "object" || value === null) return undefined;
+
+  const record = value as Record<string, unknown>;
+  for (const key of ["type", "status", "state"]) {
+    const normalized = normalizeCodexStatusValue(record[key]);
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
+function normalizeCodexStatusText(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const key = trimmed.replace(/[-_\s]/g, "").toLowerCase();
+  if (key === "inprogress" || key === "running" || key === "active" || key === "working") {
+    return "running";
+  }
+  if (
+    key === "completed" ||
+    key === "complete" ||
+    key === "success" ||
+    key === "succeeded" ||
+    key === "done"
+  ) {
+    return "completed";
+  }
+  if (key === "failed" || key === "failure" || key === "error") return "failed";
+  if (key === "aborted" || key === "abort" || key === "cancelled" || key === "canceled") {
+    return "aborted";
+  }
+  if (key === "idle" || key === "ready") return "idle";
+
+  return trimmed;
+}
+
+function statusValue(params: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const normalized = normalizeCodexStatusValue(params[key]);
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
 function threadField(params: Record<string, unknown>, key: string): string | undefined {
   return stringValue(objectParam(params.thread), key);
 }
 
 function turnField(params: Record<string, unknown>, key: string): string | undefined {
   return stringValue(objectParam(params.turn), key);
+}
+
+function threadStatusField(params: Record<string, unknown>): string | undefined {
+  return statusValue(objectParam(params.thread), "status");
+}
+
+function turnStatusField(params: Record<string, unknown>): string | undefined {
+  return statusValue(objectParam(params.turn), "status");
 }
 
 function isNoticeMethod(method: string): boolean {

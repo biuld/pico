@@ -1,4 +1,5 @@
 import type {
+  BranchEntry,
   ResponseItemEntry,
   SessionEntry,
   SessionStore,
@@ -32,6 +33,7 @@ interface TurnNode {
 }
 
 const ROOT = "__pico_history_root__";
+const USER_MARKER_WIDTH = 2;
 
 export function buildHistoryTurnRows(
   store: SessionStore,
@@ -45,7 +47,7 @@ export function buildHistoryTurnRows(
   for (const [index, entry] of entries.entries()) {
     if (entry.type !== "turn") continue;
 
-    const parentTurnId = nearestTurnAncestor(byId, entry.parentId);
+    const parentTurnId = branchParentTurnId(byId, entry.parentId);
     const parentKey = parentTurnId || ROOT;
     nodes.set(entry.id, {
       turn: entry,
@@ -127,12 +129,14 @@ export function historySelectionTargetId(
 }
 
 export function formatHistoryTurnRow(row: HistoryTurnRow): string {
-  const selected = row.isSelected ? ">" : " ";
-  const active = row.isActive ? "*" : " ";
   return [
-    `${selected}${active} ${row.userPrefix}${row.userText}`,
-    `   ${row.summaryPrefix}${row.agentSummary}`,
+    `${row.userPrefix}${historyUserMarker(row)}${row.userText}`,
+    `${row.summaryPrefix}${" ".repeat(USER_MARKER_WIDTH)}${row.agentSummary}`,
   ].join("\n");
+}
+
+export function historyUserMarker(row: Pick<HistoryTurnRow, "isSelected">): string {
+  return row.isSelected ? "› " : "  ";
 }
 
 function addResponseItem(nodes: Map<string, TurnNode>, entry: ResponseItemEntry): void {
@@ -171,6 +175,34 @@ function nearestTurnAncestor(
     const entry = byId.get(current);
     if (!entry) return undefined;
     if (entry.type === "turn") return entry.id;
+    current = entry.parentId;
+  }
+
+  return undefined;
+}
+
+function branchParentTurnId(
+  byId: Map<string, SessionEntry>,
+  entryId: string | null,
+): string | undefined {
+  const branch = nearestBranchAncestor(byId, entryId);
+  return branch ? nearestTurnAncestor(byId, branch.targetId) : undefined;
+}
+
+function nearestBranchAncestor(
+  byId: Map<string, SessionEntry>,
+  entryId: string | null,
+): BranchEntry | undefined {
+  const seen = new Set<string>();
+  let current = entryId;
+
+  while (current) {
+    if (seen.has(current)) return undefined;
+    seen.add(current);
+
+    const entry = byId.get(current);
+    if (!entry) return undefined;
+    if (entry.type === "branch") return entry;
     current = entry.parentId;
   }
 

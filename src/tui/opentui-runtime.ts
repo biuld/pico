@@ -61,6 +61,10 @@ export function runOpenTuiRuntime(
   let sessions: SessionInfo[] = [];
   let pendingApproval: PendingApproval | undefined;
   let running = false;
+  let loadingFrame = 1;
+  let loadingTimer: ReturnType<typeof setInterval> | undefined;
+  let placeholderFrame = 0;
+  let placeholderTimer: ReturnType<typeof setInterval> | undefined;
   let closing = false;
   let detachCodexStatus: (() => void) | undefined;
 
@@ -84,7 +88,67 @@ export function runOpenTuiRuntime(
     }
   };
 
+  const composerShouldAnimate = () => (
+    running &&
+    !pendingApproval &&
+    state.turnStatus === "running"
+  );
+
+  const stopLoadingTimer = () => {
+    if (!loadingTimer) return;
+    clearInterval(loadingTimer);
+    loadingTimer = undefined;
+    loadingFrame = 1;
+  };
+
+  const syncLoadingTimer = () => {
+    if (!composerShouldAnimate()) {
+      stopLoadingTimer();
+      return;
+    }
+    if (loadingTimer) return;
+
+    loadingTimer = setInterval(() => {
+      if (closing || !composerShouldAnimate()) {
+        stopLoadingTimer();
+        return;
+      }
+      loadingFrame = (loadingFrame + 1) % 4;
+      render();
+    }, 300);
+  };
+
+  const composerPlaceholderVisible = () => (
+    state.overlay === "none" &&
+    state.inputValue.trim().length === 0
+  );
+
+  const stopPlaceholderTimer = () => {
+    if (!placeholderTimer) return;
+    clearInterval(placeholderTimer);
+    placeholderTimer = undefined;
+  };
+
+  const syncPlaceholderTimer = () => {
+    if (!composerPlaceholderVisible()) {
+      stopPlaceholderTimer();
+      return;
+    }
+    if (placeholderTimer) return;
+
+    placeholderTimer = setInterval(() => {
+      if (closing || !composerPlaceholderVisible()) {
+        stopPlaceholderTimer();
+        return;
+      }
+      placeholderFrame += 1;
+      render();
+    }, 2600);
+  };
+
   const render = () => {
+    syncLoadingTimer();
+    syncPlaceholderTimer();
     const listHeight = listViewportHeight(renderer.height);
     const theme = getTheme(state.themeName);
     const slashCommands = filterSlashCommands(input.value);
@@ -126,6 +190,7 @@ export function runOpenTuiRuntime(
       running,
       turnStatus: state.turnStatus,
       statusMessage: state.statusMessage,
+      loadingFrame: composerShouldAnimate() ? loadingFrame : undefined,
     });
     const statusLineRows = buildStatusLineRows(
       state.statusLineItems,
@@ -138,7 +203,7 @@ export function runOpenTuiRuntime(
       state.statusLineItems,
     );
     layout.composer.setTransientStatus(formatTransientStatusLine(statusText));
-    layout.composer.setPlaceholder(formatComposerPlaceholder(state));
+    layout.composer.setPlaceholder(formatComposerPlaceholder(state, placeholderFrame));
     layout.composer.setStatusLine(formatCodexStatusLineStyled({
       store,
       state,
@@ -442,6 +507,8 @@ export function runOpenTuiRuntime(
     }
     detachCodexStatus?.();
     detachCodexStatus = undefined;
+    stopLoadingTimer();
+    stopPlaceholderTimer();
     await currentApp.codex.shutdown().catch(() => {});
     renderer.destroy();
   };
@@ -636,6 +703,8 @@ export function runOpenTuiRuntime(
   renderer.on(CliRenderEvents.DESTROY, () => {
     detachCodexStatus?.();
     detachCodexStatus = undefined;
+    stopLoadingTimer();
+    stopPlaceholderTimer();
     void currentApp.codex.shutdown().catch(() => {});
   });
 

@@ -20,7 +20,6 @@ export interface TuiTheme {
       provider: string;
       path: string;
       branch: string;
-      state: string;
       usage: string;
       limit: string;
       metadata: string;
@@ -53,7 +52,6 @@ export const TUI_THEMES: readonly TuiTheme[] = [
         provider: "#93c5fd",
         path: "#86efac",
         branch: "#f0abfc",
-        state: "#7dd3fc",
         usage: "#86efac",
         limit: "#f0abfc",
         metadata: "#9fb0bf",
@@ -84,7 +82,6 @@ export const TUI_THEMES: readonly TuiTheme[] = [
         provider: "#1d4ed8",
         path: "#15803d",
         branch: "#a21caf",
-        state: "#075985",
         usage: "#15803d",
         limit: "#a21caf",
         metadata: "#4f6f68",
@@ -115,7 +112,6 @@ export const TUI_THEMES: readonly TuiTheme[] = [
         provider: "#b8b8b8",
         path: "#e0e0e0",
         branch: "#c8c8c8",
-        state: "#ffffff",
         usage: "#e0e0e0",
         limit: "#c8c8c8",
         metadata: "#c0c0c0",

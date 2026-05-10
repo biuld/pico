@@ -141,12 +141,21 @@ export interface ComposerStatusInput {
   running: boolean;
   turnStatus: TuiState["turnStatus"];
   statusMessage?: string;
+  loadingFrame?: number;
 }
 
 export function formatComposerStatus(input: ComposerStatusInput): string {
   if (input.pendingApproval) return `• Action required: ${input.pendingApproval.method}`;
   if (input.turnStatus === "failed" && input.statusMessage) return `! ${input.statusMessage}`;
-  if (input.running) return `• ${input.statusMessage || "Working"}`;
+  if (input.running) {
+    return `• ${input.statusMessage || "Working"}${formatLoadingSuffix(input.loadingFrame)}`;
+  }
   if (input.statusMessage) return `• ${input.statusMessage}`;
   return "";
+}
+
+function formatLoadingSuffix(frame?: number): string {
+  if (frame === undefined) return "";
+  const dots = frame % 4;
+  return `${".".repeat(dots)}${" ".repeat(3 - dots)}`;
 }

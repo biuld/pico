@@ -3,8 +3,8 @@ export interface TurnCompletedParams {
   thread_id?: string;
   turnId?: string;
   turn_id?: string;
-  turn?: { id?: string; status?: string };
-  status?: string;
+  turn?: { id?: string; status?: unknown };
+  status?: unknown;
   error?: unknown;
   [key: string]: unknown;
 }

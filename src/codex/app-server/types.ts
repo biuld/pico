@@ -120,7 +120,7 @@ export interface ThreadStartResponse {
 
 export interface ThreadInfo {
   id: string;
-  status: string;
+  status?: unknown;
   [key: string]: unknown;
 }
 
@@ -156,5 +156,5 @@ export interface TextElement {
 }
 
 export interface TurnStartResponse {
-  turn: { id: string; status: string };
+  turn: { id: string; status?: unknown };
 }

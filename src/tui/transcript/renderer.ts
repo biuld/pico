@@ -45,6 +45,7 @@ export interface TranscriptBlockRenderer {
 
 export interface TranscriptRenderOptions {
   blockRenderers?: readonly TranscriptBlockRenderer[];
+  userMessagePaddingY?: number;
 }
 
 const DEFAULT_BLOCK_RENDERERS: readonly TranscriptBlockRenderer[] = [
@@ -74,7 +75,7 @@ export function renderTranscriptStyled(
   options: TranscriptRenderOptions = {},
 ): StyledText {
   return renderTranscriptLinesStyled(
-    renderTranscriptLines(cells, width, options),
+    renderTranscriptLines(cells, width, withStyledRenderOptions(options)),
     theme,
   );
 }
@@ -96,7 +97,7 @@ export function renderTranscriptCellStyled(
   options: TranscriptRenderOptions = {},
 ): StyledText {
   return renderTranscriptLinesStyled(
-    renderTranscriptCellLines(cell, width, options),
+    renderTranscriptCellLines(cell, width, withStyledRenderOptions(options)),
     theme,
   );
 }
@@ -137,25 +138,26 @@ export function renderTranscriptCellLines(
     renderTranscriptBlock(block, { cell, width: bodyWidth }, blockRenderers)
   ));
 
-  if (bodyLines.length === 0) {
-    return [{
+  const renderedLines = bodyLines.length === 0
+    ? [{
       cellId: cell.id,
       kind: cell.kind,
       status: cell.status,
       prefix,
       segments: [],
       width,
-    }];
-  }
+    }]
+    : bodyLines.map((segments, index) => ({
+      cellId: cell.id,
+      kind: cell.kind,
+      status: cell.status,
+      prefix: index === 0 ? prefix : subsequentPrefix,
+      segments,
+      width,
+    }));
 
-  return bodyLines.map((segments, index) => ({
-    cellId: cell.id,
-    kind: cell.kind,
-    status: cell.status,
-    prefix: index === 0 ? prefix : subsequentPrefix,
-    segments,
-    width,
-  }));
+  if (cell.kind !== "user") return renderedLines;
+  return withUserMessagePadding(renderedLines, cell, width, options.userMessagePaddingY ?? 0);
 }
 
 export function renderTranscriptLinesStyled(
@@ -252,6 +254,37 @@ function resolveBlockRenderers(
     ...DEFAULT_BLOCK_RENDERERS.filter((defaultRenderer) => (
       !customRenderers.some((customRenderer) => customRenderer.type === defaultRenderer.type)
     )),
+  ];
+}
+
+function withStyledRenderOptions(options: TranscriptRenderOptions): TranscriptRenderOptions {
+  return {
+    ...options,
+    userMessagePaddingY: options.userMessagePaddingY ?? 1,
+  };
+}
+
+function withUserMessagePadding(
+  lines: readonly TranscriptDisplayLine[],
+  cell: TranscriptCell,
+  width: number,
+  paddingY: number,
+): TranscriptDisplayLine[] {
+  if (paddingY <= 0) return [...lines];
+
+  const paddingLines = Array.from({ length: Math.floor(paddingY) }, (_, index) => ({
+    cellId: `${cell.id}:padding:${index}`,
+    kind: cell.kind,
+    status: cell.status,
+    prefix: "",
+    segments: [],
+    width,
+  }));
+
+  return [
+    ...paddingLines.map((line) => ({ ...line, cellId: `${line.cellId}:top` })),
+    ...lines,
+    ...paddingLines.map((line) => ({ ...line, cellId: `${line.cellId}:bottom` })),
   ];
 }
 

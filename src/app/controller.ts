@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { CodexAppServerClient } from "../codex/app-server";
+import { CodexAppServerClient, normalizeCodexStatusValue } from "../codex/app-server";
 import type { JSONRPCRequest } from "../codex/app-server";
 import { loadPicoConfig, type PicoConfig } from "../config";
 import { SessionStore, type TurnOverrides } from "../session/store";
@@ -229,7 +229,7 @@ export async function runTurn(
       threadId,
       turnId: picoTurn.id,
       userInput,
-      threadStatus: thread.thread.status,
+      threadStatus: normalizeCodexStatusValue(thread.thread.status),
       model: thread.model,
       modelProvider: thread.modelProvider,
     } satisfies TurnStartedEvent);
@@ -319,7 +319,7 @@ export async function runTurn(
         turnId: picoTurn.id,
         codexTurnId: turnId,
         userInput,
-        threadStatus: started.turn.status,
+        threadStatus: normalizeCodexStatusValue(started.turn.status),
         model: turnOverrides.model || thread.model,
         modelProvider: turnOverrides.modelProvider || thread.modelProvider,
       } satisfies TurnStartedEvent);

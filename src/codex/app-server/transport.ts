@@ -44,7 +44,7 @@ function errorFromJsonRpc(error: JSONRPCError["error"]): Error {
 }
 
 export class CodexAppServerTransport extends EventEmitter {
-  private proc: Subprocess | null = null;
+  private proc: Subprocess<"pipe", "pipe", "pipe"> | null = null;
   private requestId = 0;
   private pending = new Map<number | string, PendingRequest>();
   private buffer = "";
@@ -72,12 +72,13 @@ export class CodexAppServerTransport extends EventEmitter {
       stderr: "pipe",
     });
 
+    const proc = this.proc;
     const decoder = new TextDecoder();
-    this.readStdoutLoop(this.proc.stdout.getReader(), decoder).catch((err) => {
+    this.readStdoutLoop(proc.stdout.getReader(), decoder).catch((err) => {
       this.failAllPending(err instanceof Error ? err : new Error(String(err)));
     });
-    this.readStderrLoop(this.proc.stderr.getReader(), new TextDecoder()).catch(() => {});
-    this.proc.exited.then((code) => {
+    this.readStderrLoop(proc.stderr.getReader(), new TextDecoder()).catch(() => {});
+    proc.exited.then((code) => {
       const stderr = this.stderrBuffer.trim();
       const suffix = stderr ? `\nstderr:\n${stderr}` : "";
       this.failAllPending(new Error(`codex app-server exited with code ${code}${suffix}`));
@@ -86,7 +87,8 @@ export class CodexAppServerTransport extends EventEmitter {
   }
 
   async request<T>(method: string, params?: unknown): Promise<T> {
-    if (!this.proc) {
+    const proc = this.proc;
+    if (!proc) {
       throw new Error("Codex app-server transport is not started");
     }
 
@@ -105,29 +107,32 @@ export class CodexAppServerTransport extends EventEmitter {
         reject,
         timer,
       });
-      this.proc!.stdin.write(payload);
+      proc.stdin.write(payload);
     });
   }
 
   async notify(method: string, params?: unknown): Promise<void> {
-    if (!this.proc) {
+    const proc = this.proc;
+    if (!proc) {
       throw new Error("Codex app-server transport is not started");
     }
-    this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
+    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
   }
 
   resolveServerRequest(requestId: number | string, result: unknown): void {
-    if (!this.proc) {
+    const proc = this.proc;
+    if (!proc) {
       throw new Error("Codex app-server transport is not started");
     }
-    this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: requestId, result })}\n`);
+    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: requestId, result })}\n`);
   }
 
   rejectServerRequest(requestId: number | string, code: number, message: string): void {
-    if (!this.proc) {
+    const proc = this.proc;
+    if (!proc) {
       throw new Error("Codex app-server transport is not started");
     }
-    this.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: requestId, error: { code, message } })}\n`);
+    proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: requestId, error: { code, message } })}\n`);
   }
 
   async shutdown(): Promise<void> {

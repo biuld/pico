@@ -34,6 +34,7 @@ interface TurnNode {
 
 const ROOT = "__pico_history_root__";
 const USER_MARKER_WIDTH = 2;
+const AGENT_SUMMARY_MAX_LENGTH = 36;
 
 export function buildHistoryTurnRows(
   store: SessionStore,
@@ -154,7 +155,7 @@ function turnSummary(node: TurnNode): string {
 
   const text = node.agentParts.join(" ").replace(/\s+/g, " ").trim();
   if (!text) return "agent: no assistant summary";
-  return `agent: ${truncate(text, 112)}`;
+  return `agent: ${truncate(text, AGENT_SUMMARY_MAX_LENGTH)}`;
 }
 
 function entryMap(entries: readonly SessionEntry[]): Map<string, SessionEntry> {

@@ -163,8 +163,31 @@ function parseJsonl(content: string): unknown[] {
     .map((line) => JSON.parse(line));
 }
 
-function movesLeaf(entry: SessionEntry): boolean {
+function entryMovesLeaf(entry: SessionEntry): boolean {
   return entry.type !== "label";
+}
+
+function validateSessionHeader(raw: unknown, path: string): SessionHeader {
+  if (!isRecord(raw)) throw new Error(`Invalid session header in ${path}`);
+
+  const header = raw as unknown as SessionHeader;
+  if (header.type !== "session" || header.version !== CURRENT_VERSION) {
+    throw new Error(`Unsupported session header in ${path}`);
+  }
+  if (typeof header.id !== "string" || header.id.length === 0) {
+    throw new Error(`Invalid session header id in ${path}`);
+  }
+  if (typeof header.createdAt !== "string") {
+    throw new Error(`Invalid session header createdAt in ${path}`);
+  }
+  if (typeof header.cwd !== "string") {
+    throw new Error(`Invalid session header cwd in ${path}`);
+  }
+  if (!isRecord(header.config)) {
+    throw new Error(`Invalid session header config in ${path}`);
+  }
+
+  return header;
 }
 
 export class SessionStore {
@@ -236,15 +259,12 @@ export class SessionStore {
       throw new Error(`Empty session file: ${path}`);
     }
 
-    const header = lines[0] as SessionHeader;
-    if (header.type !== "session" || header.version !== CURRENT_VERSION) {
-      throw new Error(`Unsupported session header in ${path}`);
-    }
+    const header = validateSessionHeader(lines[0], path);
 
     const store = new SessionStore(header, path);
     for (const raw of lines.slice(1)) {
-      const entry = raw as SessionEntry;
-      store.addLoadedEntry(entry, movesLeaf(entry));
+      const entry = store.validateLoadedEntry(raw);
+      store.addLoadedEntry(entry, entryMovesLeaf(entry));
     }
     return store;
   }
@@ -280,7 +300,7 @@ export class SessionStore {
 
       for (const raw of lines.slice(1)) {
         const entry = raw as SessionEntry;
-        if (movesLeaf(entry)) leafId = entry.id;
+        if (entryMovesLeaf(entry)) leafId = entry.id;
         if (entry.type === "turn") turnCount++;
         if (entry.type === "response_item") responseItemCount++;
         if (entry.type === "label") label = entry.label;
@@ -319,7 +339,7 @@ export class SessionStore {
       status: "started",
       startedAt: timestamp,
     };
-    await this.appendEntry(entry, false);
+    await this.appendEntry(entry, true);
     return entry;
   }
 
@@ -329,6 +349,7 @@ export class SessionStore {
     responseItem: ResponseItem,
   ): Promise<ResponseItemEntry> {
     this.assertParent(parentId);
+    this.assertTurn(turnId);
     const entry: ResponseItemEntry = {
       type: "response_item",
       id: this.nextEntryId("item"),
@@ -347,6 +368,8 @@ export class SessionStore {
     result?: unknown,
   ): Promise<TurnCompletedEntry> {
     this.assertParent(parentId);
+    this.assertTurn(turnId);
+    this.assertTurnHasNoTerminalEntry(turnId);
     const timestamp = now();
     const entry: TurnCompletedEntry = {
       type: "turn_completed",
@@ -358,7 +381,6 @@ export class SessionStore {
       completedAt: timestamp,
       result,
     };
-    this.markTurnStatus(turnId, "completed");
     await this.appendEntry(entry, true);
     return entry;
   }
@@ -369,6 +391,8 @@ export class SessionStore {
     error: Error | string,
   ): Promise<TurnFailedEntry> {
     this.assertParent(parentId);
+    this.assertTurn(turnId);
+    this.assertTurnHasNoTerminalEntry(turnId);
     const timestamp = now();
     const entry: TurnFailedEntry = {
       type: "turn_failed",
@@ -380,7 +404,6 @@ export class SessionStore {
       failedAt: timestamp,
       error: error instanceof Error ? error.message : error,
     };
-    this.markTurnStatus(turnId, "failed");
     await this.appendEntry(entry, true);
     return entry;
   }
@@ -485,6 +508,7 @@ export class SessionStore {
     }
     this.entryIds.add(entry.id);
     this.entries.push(entry);
+    this.applyEntryDerivedState(entry);
     if (moveLeaf) this._leafId = entry.id;
   }
 
@@ -498,6 +522,116 @@ export class SessionStore {
     }
   }
 
+  private assertTurn(turnId: string): void {
+    if (!this.entries.some((entry) => entry.type === "turn" && entry.id === turnId)) {
+      throw new Error(`Turn entry not found: ${turnId}`);
+    }
+  }
+
+  private assertTurnHasNoTerminalEntry(turnId: string): void {
+    if (this.entries.some((entry) => isTerminalTurnEntry(entry) && entry.turnId === turnId)) {
+      throw new Error(`Turn already has a terminal entry: ${turnId}`);
+    }
+  }
+
+  private validateLoadedEntry(raw: unknown): SessionEntry {
+    if (!isRecord(raw)) throw new Error("Invalid session entry: expected object");
+
+    const type = raw.type;
+    if (typeof type !== "string") throw new Error("Invalid session entry: missing type");
+    const entry = raw as unknown as SessionEntry;
+
+    this.validateBaseEntry(entry);
+    this.assertParent(entry.parentId);
+
+    if (entry.type === "turn") {
+      if (typeof entry.userInput !== "string") throw new Error("Invalid turn entry: userInput");
+      if (typeof entry.cwd !== "string") throw new Error("Invalid turn entry: cwd");
+      if (!isTurnStatus(entry.status)) throw new Error("Invalid turn entry: status");
+      if (typeof entry.startedAt !== "string") throw new Error("Invalid turn entry: startedAt");
+      if (entry.overrides !== undefined && !isRecord(entry.overrides)) {
+        throw new Error("Invalid turn entry: overrides");
+      }
+      return entry;
+    }
+
+    if (entry.type === "response_item") {
+      if (typeof entry.turnId !== "string") throw new Error("Invalid response_item entry: turnId");
+      this.assertTurn(entry.turnId);
+      if (!isRecord(entry.responseItem)) throw new Error("Invalid response_item entry: responseItem");
+      return entry;
+    }
+
+    if (entry.type === "turn_completed") {
+      this.validateTerminalTurnEntry(entry, "completed");
+      if (typeof entry.completedAt !== "string") throw new Error("Invalid turn_completed entry: completedAt");
+      return entry;
+    }
+
+    if (entry.type === "turn_failed") {
+      this.validateTerminalTurnEntry(entry, "failed");
+      if (typeof entry.failedAt !== "string") throw new Error("Invalid turn_failed entry: failedAt");
+      if (typeof entry.error !== "string") throw new Error("Invalid turn_failed entry: error");
+      return entry;
+    }
+
+    if (entry.type === "turn_aborted") {
+      this.validateTerminalTurnEntry(entry, "aborted");
+      if (typeof entry.abortedAt !== "string") throw new Error("Invalid turn_aborted entry: abortedAt");
+      if (entry.reason !== undefined && typeof entry.reason !== "string") {
+        throw new Error("Invalid turn_aborted entry: reason");
+      }
+      return entry;
+    }
+
+    if (entry.type === "label") {
+      if (typeof entry.targetId !== "string" || !this.hasEntry(entry.targetId)) {
+        throw new Error(`Label target entry not found: ${entry.targetId}`);
+      }
+      if (typeof entry.label !== "string") throw new Error("Invalid label entry: label");
+      return entry;
+    }
+
+    if (entry.type === "branch") {
+      if (typeof entry.targetId !== "string" || !this.hasEntry(entry.targetId)) {
+        throw new Error(`Branch target entry not found: ${entry.targetId}`);
+      }
+      if (entry.name !== undefined && typeof entry.name !== "string") {
+        throw new Error("Invalid branch entry: name");
+      }
+      return entry;
+    }
+
+    if (entry.type === "config_change") {
+      if (!isRecord(entry.config)) throw new Error("Invalid config_change entry: config");
+      return entry;
+    }
+
+    throw new Error(`Unsupported session entry type: ${type}`);
+  }
+
+  private validateBaseEntry(entry: SessionEntry): void {
+    if (typeof entry.id !== "string" || entry.id.length === 0) {
+      throw new Error("Invalid session entry: id");
+    }
+    if (entry.parentId !== null && typeof entry.parentId !== "string") {
+      throw new Error("Invalid session entry: parentId");
+    }
+    if (typeof entry.timestamp !== "string") {
+      throw new Error("Invalid session entry: timestamp");
+    }
+  }
+
+  private validateTerminalTurnEntry(
+    entry: TurnCompletedEntry | TurnFailedEntry | TurnAbortedEntry,
+    status: TurnCompletedEntry["status"] | TurnFailedEntry["status"] | TurnAbortedEntry["status"],
+  ): void {
+    if (typeof entry.turnId !== "string") throw new Error(`Invalid ${entry.type} entry: turnId`);
+    this.assertTurn(entry.turnId);
+    this.assertTurnHasNoTerminalEntry(entry.turnId);
+    if (entry.status !== status) throw new Error(`Invalid ${entry.type} entry: status`);
+  }
+
   private nextEntryId(prefix: string): string {
     let id = "";
     do {
@@ -506,7 +640,17 @@ export class SessionStore {
     return id;
   }
 
-  private markTurnStatus(turnId: string, status: TurnEntry["status"]): void {
+  private applyEntryDerivedState(entry: SessionEntry): void {
+    if (entry.type === "turn_completed") {
+      this.setTurnStatus(entry.turnId, "completed");
+    } else if (entry.type === "turn_failed") {
+      this.setTurnStatus(entry.turnId, "failed");
+    } else if (entry.type === "turn_aborted") {
+      this.setTurnStatus(entry.turnId, "aborted");
+    }
+  }
+
+  private setTurnStatus(turnId: string, status: TurnEntry["status"]): void {
     const turn = this.entries.find(
       (entry): entry is TurnEntry => entry.type === "turn" && entry.id === turnId,
     );
@@ -516,4 +660,18 @@ export class SessionStore {
 
 function isMissingDirectory(err: unknown): boolean {
   return err instanceof Error && "code" in err && (err as { code?: string }).code === "ENOENT";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isTurnStatus(value: unknown): value is TurnEntry["status"] {
+  return value === "started" || value === "completed" || value === "failed" || value === "aborted";
+}
+
+function isTerminalTurnEntry(
+  entry: SessionEntry,
+): entry is TurnCompletedEntry | TurnFailedEntry | TurnAbortedEntry {
+  return entry.type === "turn_completed" || entry.type === "turn_failed" || entry.type === "turn_aborted";
 }

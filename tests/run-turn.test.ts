@@ -9,7 +9,7 @@ import {
   type AppState,
   type DraftAppState,
 } from "../src/app/controller";
-import { SessionStore } from "../src/session/store";
+import { SessionStore, type TurnEntry } from "../src/session/store";
 import type { JSONRPCRequest } from "../src/codex/app-server";
 
 class FakeCodex extends EventEmitter {
@@ -92,8 +92,10 @@ test("ensureAppSession creates Pico JSONL only when a turn needs persistence", a
   expect(await SessionStore.list(cwd)).toEqual([]);
 
   const activeApp = await ensureAppSession(app);
+  const draftStore = app.store;
+  if (!draftStore) throw new Error("ensureAppSession did not attach a store");
 
-  expect(activeApp.store).toBe(app.store);
+  expect(activeApp.store).toBe(draftStore);
   expect((await SessionStore.list(cwd)).map((session) => session.id)).toEqual([
     activeApp.store.id,
   ]);
@@ -106,11 +108,11 @@ test("runTurn injects branch history, filters raw items, and persists completion
 
   const store = await SessionStore.create(cwd);
   const previousTurn = await store.appendTurn(store.leafId, "previous");
-  const previousItem = await store.appendResponseItem(previousTurn.id, "previous-turn", {
+  const previousItem = await store.appendResponseItem(previousTurn.id, previousTurn.id, {
     id: "previous-item",
     type: "message",
   });
-  await store.appendTurnCompleted(previousItem.id, "previous-turn");
+  await store.appendTurnCompleted(previousItem.id, previousTurn.id);
 
   const codex = new FakeCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
@@ -122,9 +124,51 @@ test("runTurn injects branch history, filters raw items, and persists completion
     "previous-item",
     "kept-item",
   ]);
-  const turn = store.allEntries.find((entry) => entry.type === "turn" && entry.userInput === "next");
+  const turn = store.allEntries.find(
+    (entry): entry is TurnEntry => entry.type === "turn" && entry.userInput === "next",
+  );
   expect(turn?.status).toBe("completed");
   expect(store.allEntries.at(-1)?.type).toBe("turn_completed");
+});
+
+test("runTurn sends raw items assembled from loaded JSONL branch path", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+
+  const store = await SessionStore.create(cwd);
+  const rootTurn = await store.appendTurn(store.leafId, "root");
+  const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
+    id: "root-item",
+    type: "message",
+  });
+  const rootDone = await store.appendTurnCompleted(rootItem.id, rootTurn.id);
+
+  const leftTurn = await store.appendTurn(rootDone.id, "left");
+  const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
+    id: "left-item",
+    type: "message",
+  });
+  await store.appendTurnCompleted(leftItem.id, leftTurn.id);
+
+  await store.appendBranch(rootDone.id, "back to root");
+  const rightTurn = await store.appendTurn(store.leafId, "right");
+  const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
+    id: "right-item",
+    type: "message",
+  });
+  await store.appendTurnCompleted(rightItem.id, rightTurn.id);
+
+  const loaded = await SessionStore.load(cwd, store.id);
+  const codex = new FakeCodex();
+  const app = { store: loaded, codex, config: {} } as unknown as AppState;
+
+  await withQuietConsole(() => runTurn(app, "continue right branch"));
+
+  expect(codex.injectedItems).toEqual([
+    { id: "root-item", type: "message" },
+    { id: "right-item", type: "message" },
+  ]);
 });
 
 test("runTurn resolves approval server requests", async () => {

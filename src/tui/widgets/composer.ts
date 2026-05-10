@@ -79,7 +79,6 @@ export function createComposerWidget(
   const input = new InputRenderable(renderer, {
     id: "pico-input",
     flexGrow: 1,
-    height: 1,
     maxLength: 8000,
     placeholder: "Ask Pico to do anything",
     textColor: colors.text,

@@ -1,6 +1,7 @@
 import type { OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";
+import { selectableOverlayRow, selectedRowScrollY } from "./overlay-rows";
 
 export interface ThemeRow {
   name: string;
@@ -10,14 +11,25 @@ export interface ThemeRow {
   isSelected: boolean;
 }
 
-export function buildThemeOverlayView(rows: readonly ThemeRow[]): OverlayView {
+export function buildThemeOverlayView(
+  rows: readonly ThemeRow[],
+  theme: TuiTheme,
+  viewportHeight: number,
+  selectedIndex: number,
+): OverlayView {
   return {
     visible: true,
     title: "Theme",
-    height: Math.min(10, Math.max(6, rows.length + 4)),
     fullScreen: false,
     scrollY: 0,
-    content: rows.map(formatThemeRow).join("\n"),
+    content: rows.length > 0 ? "" : "No themes",
+    rows: rows.map((row, index) => selectableOverlayRow({
+      id: row.name,
+      content: formatThemeRow(row),
+      index,
+      isSelected: row.isSelected,
+    }, theme)),
+    rowScrollY: selectedRowScrollY(selectedIndex, viewportHeight),
     footer: OVERLAY_HINTS.theme,
   };
 }
@@ -37,7 +49,6 @@ export function buildThemeRows(
 }
 
 export function formatThemeRow(row: ThemeRow): string {
-  const selected = row.isSelected ? ">" : " ";
   const active = row.isActive ? "*" : " ";
-  return `${selected}${active} ${row.label}  ${row.description}`;
+  return `${active} ${row.label}  ${row.description}`;
 }

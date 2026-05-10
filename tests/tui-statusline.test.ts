@@ -123,7 +123,7 @@ test("statusline command configures visible status line items", async () => {
     store,
     ["model", "five-hour-limit", "thread-id"],
   )).toBe("[model] · [five_hour_limit] · [thread_id]");
-  const view = buildStatusLineOverlayView(rows, "openai · gpt-test");
+  const view = buildStatusLineOverlayView(rows, "openai · gpt-test", TUI_THEMES[0], 8, state.statusLineSelection);
   expect(view.footer).toBe(OVERLAY_HINTS.statusline);
 
   state = updateTuiState(state, { type: "moveStatusLine", total: rows.length, delta: 2 });

@@ -1,6 +1,8 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
 import type { OverlayView } from "../overlay-model";
+import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";
+import { selectableOverlayRow, selectedRowScrollY } from "./overlay-rows";
 
 export type ApprovalDecision = "accept" | "acceptForSession" | "decline";
 
@@ -15,15 +17,31 @@ export interface ApprovalOption {
 export function buildApprovalOverlayView(
   request: JSONRPCRequest,
   selectedIndex: number,
+  theme: TuiTheme,
+  viewportHeight: number,
 ): OverlayView {
   const options = buildApprovalOptions(request.method, selectedIndex);
   return {
     visible: true,
     title: "Approval",
-    height: Math.min(12, options.length + 6),
     fullScreen: false,
     scrollY: 0,
-    content: [`Request: ${request.method}`, "", ...options.map(formatApprovalOption)].join("\n"),
+    content: "",
+    rows: [
+      {
+        id: "approval-request",
+        content: `Request: ${request.method}`,
+        foregroundColor: theme.colors.muted,
+        backgroundColor: theme.colors.overlayRow,
+      },
+      ...options.map((option, index) => selectableOverlayRow({
+        id: option.decision,
+        content: formatApprovalOption(option),
+        index: index + 1,
+        isSelected: option.isSelected,
+      }, theme)),
+    ],
+    rowScrollY: selectedRowScrollY(selectedIndex + 1, viewportHeight),
     footer: OVERLAY_HINTS.approval,
   };
 }
@@ -70,6 +88,5 @@ export function buildApprovalOptions(method: string, selectedIndex: number): App
 }
 
 export function formatApprovalOption(option: ApprovalOption): string {
-  const selected = option.isSelected ? ">" : " ";
-  return `${selected} [${option.shortcut}] ${option.label}  ${option.description}`;
+  return `[${option.shortcut}] ${option.label}  ${option.description}`;
 }

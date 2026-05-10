@@ -29,6 +29,9 @@ import type {
   ModelListParams,
   ModelListResponse,
   ThreadInjectItemsParams,
+  ThreadListParams,
+  ThreadListResponse,
+  ThreadReadResponse,
   ThreadStartParams,
   ThreadStartResponse,
   TurnStartParams,
@@ -124,6 +127,14 @@ export class CodexAppServerClient extends EventEmitter {
 
   async listModels(params: ModelListParams = {}): Promise<ModelListResponse> {
     return this.request<ModelListResponse>("model/list", params);
+  }
+
+  async listThreads(params: ThreadListParams = {}): Promise<ThreadListResponse> {
+    return this.request<ThreadListResponse>("thread/list", params);
+  }
+
+  async readThread(threadId: string, includeTurns = true): Promise<ThreadReadResponse> {
+    return this.request<ThreadReadResponse>("thread/read", { threadId, includeTurns });
   }
 
   async refreshConfigStatus(options: RefreshConfigStatusOptions = {}): Promise<void> {

@@ -29,9 +29,9 @@ export interface OverlayViewInput {
   themeRows: readonly ThemeRow[];
   statusLineRows: readonly StatusLineRow[];
   statusLinePreview: string;
-  historyViewportHeight: number;
   threadViewportHeight: number;
-  rendererHeight: number;
+  pickerViewportHeight: number;
+  rendererWidth: number;
   pendingApproval?: JSONRPCRequest;
 }
 
@@ -60,7 +60,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
         app,
         state,
         streamingText,
-        input.rendererHeight,
         liveTranscriptStatus,
         liveLeafId,
       );
@@ -68,28 +67,48 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
       return buildShortcutOverlayView();
     case "approval":
       return pendingApproval
-        ? buildApprovalOverlayView(pendingApproval, state.approvalSelection)
+        ? buildApprovalOverlayView(
+            pendingApproval,
+            state.approvalSelection,
+            theme,
+            input.pickerViewportHeight,
+          )
         : emptyOverlay();
     case "slash":
-      return buildSlashCommandOverlayView(slashCommands, state.slashSelection);
+      return buildSlashCommandOverlayView(
+        slashCommands,
+        state.slashSelection,
+        theme,
+        input.pickerViewportHeight,
+      );
     case "history":
       return buildHistoryOverlayView(
         historyRows,
         state,
         theme,
-        input.historyViewportHeight,
-        input.rendererHeight,
       );
     case "threads":
       return buildResumeOverlayView(
         threadRows,
         state,
+        theme,
         input.threadViewportHeight,
-        input.rendererHeight,
+        input.rendererWidth,
       );
     case "theme":
-      return buildThemeOverlayView(themeRows);
+      return buildThemeOverlayView(
+        themeRows,
+        theme,
+        input.pickerViewportHeight,
+        state.themeSelection,
+      );
     case "statusline":
-      return buildStatusLineOverlayView(statusLineRows, statusLinePreview);
+      return buildStatusLineOverlayView(
+        statusLineRows,
+        statusLinePreview,
+        theme,
+        input.pickerViewportHeight,
+        state.statusLineSelection,
+      );
   }
 }

@@ -26,8 +26,9 @@ import { createTuiState, type TuiState } from "./state";
 import { getTheme, themeIndex, TUI_THEMES } from "./theme";
 import { updateTuiState, type TuiMsg } from "./update";
 import type { ApprovalDecision } from "./widgets/approval-overlay";
-import { formatComposerStatus } from "./widgets/composer";
+import { COMPOSER_OVERLAY_INSET, formatComposerStatus } from "./widgets/composer";
 import { formatComposerPlaceholder, formatTransientStatusLine } from "./widgets/footer";
+import { HISTORY_ROW_HEIGHT } from "./widgets/history-picker";
 import type { OpenTuiLayout } from "./widgets/layout";
 import { buildThreadRows } from "./widgets/resume-picker";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "./widgets/statusline-picker";
@@ -149,7 +150,8 @@ export function runOpenTuiRuntime(
   const render = () => {
     syncLoadingTimer();
     syncPlaceholderTimer();
-    const listHeight = listViewportHeight(renderer.height);
+    const pickerViewportHeight = overlayListViewportHeight(renderer.height);
+    const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
     const theme = getTheme(state.themeName);
     const slashCommands = filterSlashCommands(input.value);
     dispatch({ type: "syncSlash", total: slashCommands.length });
@@ -161,13 +163,13 @@ export function runOpenTuiRuntime(
     dispatch({
       type: "syncHistory",
       entryIds: historyRows.map((row) => row.id),
-      viewportHeight: listHeight,
+      viewportHeight: historyViewportHeight,
     });
     const threadRows = buildThreadRows(threads, state.selectedThreadId, store?.id);
     dispatch({
       type: "syncThreads",
       threadIds: threadRows.map((row) => row.id),
-      viewportHeight: listHeight,
+      viewportHeight: pickerViewportHeight,
     });
     dispatch({ type: "syncTheme", total: TUI_THEMES.length });
     const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
@@ -221,9 +223,9 @@ export function runOpenTuiRuntime(
         themeRows,
         statusLineRows,
         statusLinePreview,
-        historyViewportHeight: listHeight,
-        threadViewportHeight: listHeight,
-        rendererHeight: renderer.height,
+        threadViewportHeight: pickerViewportHeight,
+        pickerViewportHeight,
+        rendererWidth: renderer.width,
         pendingApproval: pendingApproval?.request,
       }),
     );
@@ -315,7 +317,7 @@ export function runOpenTuiRuntime(
       type: "moveHistory",
       entryIds: rows.map((row) => row.id),
       delta,
-      viewportHeight: listViewportHeight(renderer.height),
+      viewportHeight: Math.max(1, Math.floor(overlayListViewportHeight(renderer.height) / HISTORY_ROW_HEIGHT)),
     });
     render();
   };
@@ -326,7 +328,7 @@ export function runOpenTuiRuntime(
       type: "moveThread",
       threadIds: rows.map((row) => row.id),
       delta,
-      viewportHeight: listViewportHeight(renderer.height),
+      viewportHeight: overlayListViewportHeight(renderer.height),
     });
     render();
   };
@@ -716,8 +718,9 @@ function shortId(id: string): string {
   return id.length > 8 ? id.slice(0, 8) : id;
 }
 
-function listViewportHeight(rendererHeight: number): number {
-  return Math.max(1, Math.min(12, Math.max(6, rendererHeight - 8)) - 2);
+function overlayListViewportHeight(rendererHeight: number): number {
+  const overlayHeight = Math.max(1, rendererHeight - COMPOSER_OVERLAY_INSET);
+  return Math.max(1, overlayHeight - 3);
 }
 
 function rawItemHasOutputText(item: Record<string, unknown>): boolean {

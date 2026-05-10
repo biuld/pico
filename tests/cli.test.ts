@@ -17,6 +17,19 @@ test("parses thread listing and resume options", () => {
   });
 });
 
+test("parses Codex import options", () => {
+  expect(parseCliArgs(["import", "--cwd", "/work"], "/repo")).toEqual({
+    command: "import",
+    cwd: "/work",
+  });
+  expect(parseCliArgs(["import", "--all-cwd", "--dry-run"], "/repo")).toEqual({
+    command: "import",
+    cwd: "/repo",
+    importAllCwd: true,
+    importDryRun: true,
+  });
+});
+
 test("rejects unknown args and missing values", () => {
   expect(() => parseCliArgs(["--cwd"], "/repo")).toThrow("--cwd requires a value");
   expect(() => parseCliArgs(["--bad"], "/repo")).toThrow("Unknown argument");
@@ -25,4 +38,5 @@ test("rejects unknown args and missing values", () => {
 test("formats CLI help", () => {
   expect(formatCliHelp("pico")).toContain("Usage: pico");
   expect(formatCliHelp("pico")).toContain("--resume <id>");
+  expect(formatCliHelp("pico")).toContain("import [options]");
 });

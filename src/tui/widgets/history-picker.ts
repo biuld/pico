@@ -1,48 +1,38 @@
-import { StyledText, bold, dim, fg } from "@opentui/core";
 import { historyUserMarker, type HistoryTurnRow } from "../history";
 import type { OverlayView } from "../overlay-model";
 import type { TuiState } from "../state";
 import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";
+import { selectableOverlayRow } from "./overlay-rows";
+
+export const HISTORY_ROW_HEIGHT = 2;
 
 export function buildHistoryOverlayView(
   rows: readonly HistoryTurnRow[],
   state: TuiState,
   theme: TuiTheme,
-  viewportHeight: number,
-  rendererHeight: number,
 ): OverlayView {
   return {
     visible: true,
     title: "History",
-    height: Math.min(14, Math.max(8, rendererHeight - 8)),
     fullScreen: false,
     scrollY: 0,
-    content:
-      rows.length > 0
-        ? historyContent(
-            rows.slice(state.historyScroll, state.historyScroll + viewportHeight),
-            theme,
-          )
-        : "No turns yet",
+    content: rows.length > 0 ? "" : "No turns yet",
+    rows: rows.map((row, index) => selectableOverlayRow({
+      id: row.id,
+      content: historyRowText(row),
+      height: HISTORY_ROW_HEIGHT,
+      index,
+      isSelected: row.isSelected,
+    }, theme)),
+    rowScrollY: state.historyScroll * HISTORY_ROW_HEIGHT,
     footer: OVERLAY_HINTS.history,
   };
 }
 
-function historyContent(rows: readonly HistoryTurnRow[], theme: TuiTheme): StyledText {
-  const chunks: StyledText["chunks"] = [];
-  const muted = fg(theme.colors.muted);
-  const strong = fg(theme.colors.textStrong);
-
-  rows.forEach((row, index) => {
-    chunks.push(muted(row.userPrefix));
-    chunks.push(row.isSelected ? bold(strong(historyUserMarker(row))) : muted(historyUserMarker(row)));
-    chunks.push(row.isSelected ? bold(strong(row.userText)) : strong(row.userText));
-    chunks.push(muted("\n"));
-    chunks.push(muted(`${row.summaryPrefix}  `));
-    chunks.push(dim(muted(row.agentSummary)));
-    if (index < rows.length - 1) chunks.push(muted("\n"));
-  });
-
-  return new StyledText(chunks);
+function historyRowText(row: HistoryTurnRow): string {
+  return [
+    `${row.userPrefix}${historyUserMarker(row)}${row.userText}`,
+    `${row.summaryPrefix}  ${row.agentSummary}`,
+  ].join("\n");
 }

@@ -8,6 +8,9 @@ export interface TuiTheme {
     background: string;
     panel: string;
     overlay: string;
+    overlayRow: string;
+    overlayRowAlt: string;
+    overlayRowSelected: string;
     border: string;
     text: string;
     textStrong: string;
@@ -40,6 +43,9 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       background: "#0b0d0f",
       panel: "#0b0d0f",
       overlay: "#101418",
+      overlayRow: "#101418",
+      overlayRowAlt: "#151a20",
+      overlayRowSelected: "#1f2933",
       border: "#52606c",
       text: "#e5e9ee",
       textStrong: "#ffffff",
@@ -70,6 +76,9 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       background: "#f7f4ed",
       panel: "#f7f4ed",
       overlay: "#ebe5da",
+      overlayRow: "#ebe5da",
+      overlayRowAlt: "#e2d8c8",
+      overlayRowSelected: "#d6c8b8",
       border: "#8d7f6f",
       text: "#24201b",
       textStrong: "#111111",
@@ -100,6 +109,9 @@ export const TUI_THEMES: readonly TuiTheme[] = [
       background: "#050505",
       panel: "#050505",
       overlay: "#151515",
+      overlayRow: "#151515",
+      overlayRowAlt: "#1f1f1f",
+      overlayRowSelected: "#2a2a2a",
       border: "#808080",
       text: "#eeeeee",
       textStrong: "#ffffff",

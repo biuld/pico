@@ -136,8 +136,8 @@ export function formatHistoryTurnRow(row: HistoryTurnRow): string {
   ].join("\n");
 }
 
-export function historyUserMarker(row: Pick<HistoryTurnRow, "isSelected">): string {
-  return row.isSelected ? "› " : "  ";
+export function historyUserMarker(_row: Pick<HistoryTurnRow, "isSelected">): string {
+  return "  ";
 }
 
 function addResponseItem(nodes: Map<string, TurnNode>, entry: ResponseItemEntry): void {

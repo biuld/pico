@@ -15,6 +15,10 @@ import type {
   TextElement as ProtocolTextElement,
   Thread as ProtocolThread,
   ThreadInjectItemsParams as ProtocolThreadInjectItemsParams,
+  ThreadListParams as ProtocolThreadListParams,
+  ThreadListResponse as ProtocolThreadListResponse,
+  ThreadReadParams as ProtocolThreadReadParams,
+  ThreadReadResponse as ProtocolThreadReadResponse,
   ThreadStartParams as ProtocolThreadStartParams,
   ThreadStartResponse as ProtocolThreadStartResponse,
   TurnStartParams as ProtocolTurnStartParams,
@@ -121,6 +125,36 @@ export type ThreadInfo = Partial<ProtocolThread> & {
   id: string;
   status?: unknown;
   [key: string]: unknown;
+};
+
+export type CodexPersistentThread = Partial<ProtocolThread> & {
+  id: string;
+  cwd?: string;
+  path?: string | null;
+  createdAt?: number;
+  updatedAt?: number;
+  preview?: string;
+  name?: string | null;
+  modelProvider?: string;
+  source?: unknown;
+  threadSource?: unknown;
+  forkedFromId?: string | null;
+  ephemeral?: boolean;
+  [key: string]: unknown;
+};
+
+export type ThreadListParams = Partial<ProtocolThreadListParams>;
+
+export type ThreadListResponse = Omit<Partial<ProtocolThreadListResponse>, "data"> & {
+  data: CodexPersistentThread[];
+  nextCursor?: string | null;
+  backwardsCursor?: string | null;
+};
+
+export type ThreadReadParams = ProtocolThreadReadParams;
+
+export type ThreadReadResponse = Omit<ProtocolThreadReadResponse, "thread"> & {
+  thread: CodexPersistentThread;
 };
 
 export type ThreadInjectItemsParams = Omit<ProtocolThreadInjectItemsParams, "items"> & {

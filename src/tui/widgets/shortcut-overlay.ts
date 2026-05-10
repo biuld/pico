@@ -5,7 +5,6 @@ export function buildShortcutOverlayView(): OverlayView {
   return {
     visible: true,
     title: "Shortcuts",
-    height: 13,
     fullScreen: false,
     scrollY: 0,
     content: shortcutOverlayText(),

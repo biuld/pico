@@ -1,6 +1,8 @@
 import type { OverlayView } from "../overlay-model";
 import { statusLineItemPlaceholder, type StatusLineItemId } from "../statusline";
+import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";
+import { selectableOverlayRow, selectedRowScrollY } from "./overlay-rows";
 
 export interface StatusLineItemSpec {
   id: StatusLineItemId;
@@ -27,19 +29,38 @@ export const STATUS_LINE_ITEMS: readonly StatusLineItemSpec[] = [
 export function buildStatusLineOverlayView(
   rows: readonly StatusLineRow[],
   preview: string,
+  theme: TuiTheme,
+  viewportHeight: number,
+  selectedIndex: number,
 ): OverlayView {
   const previewText = preview || "(empty)";
+  const optionRows = rows.map((row, index) => selectableOverlayRow({
+    id: row.id,
+    content: formatStatusLineRow(row),
+    index,
+    isSelected: row.isSelected,
+  }, theme));
   return {
     visible: true,
     title: "Statusline",
-    height: Math.min(16, Math.max(9, rows.length + 6)),
     fullScreen: false,
     scrollY: 0,
-    content: [
-      ...rows.map(formatStatusLineRow),
-      "",
-      `Preview  ${previewText}`,
-    ].join("\n"),
+    content: "",
+    rows: [
+      ...optionRows,
+      {
+        id: "statusline-preview-gap",
+        content: "",
+        backgroundColor: theme.colors.overlayRow,
+      },
+      {
+        id: "statusline-preview",
+        content: `Preview  ${previewText}`,
+        foregroundColor: theme.colors.muted,
+        backgroundColor: theme.colors.overlayRow,
+      },
+    ],
+    rowScrollY: selectedRowScrollY(selectedIndex, viewportHeight),
     footer: OVERLAY_HINTS.statusline,
   };
 }
@@ -59,8 +80,7 @@ export function buildStatusLineRows(
 }
 
 export function formatStatusLineRow(row: StatusLineRow): string {
-  const selected = row.isSelected ? ">" : " ";
   const checked = row.isEnabled ? "x" : " ";
   const value = `  ${row.currentValue || statusLineItemPlaceholder(row.id)}`;
-  return `${selected} [${checked}] ${row.label.padEnd(12)} ${row.description}${value}`;
+  return `[${checked}] ${row.label.padEnd(12)} ${row.description}${value}`;
 }

@@ -202,6 +202,41 @@ test("runTurn resolves approval server requests", async () => {
   expect(codex.resolvedRequests).toEqual([{ id: 99, result: { decision: "approve" } }]);
 });
 
+test("runTurn persists interrupted completions as aborted turns", async () => {
+  class InterruptedCodex extends FakeCodex {
+    async startTurn() {
+      setTimeout(() => {
+        this.emit("turn/completed", {
+          threadId: "thread-1",
+          turnId: "turn-interrupted",
+          status: "interrupted",
+          error: { message: "interrupted by user" },
+        });
+      }, 0);
+      return { turn: { id: "turn-interrupted", status: "inProgress" } };
+    }
+  }
+
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const store = await PicoThreadStore.create(cwd);
+  const codex = new InterruptedCodex();
+  const app = { store, codex, config: {} } as unknown as AppState;
+
+  const result = await withQuietConsole(() => runTurn(app, "interrupt me"));
+
+  expect(result.status).toBe("aborted");
+  const turn = store.allEntries.find(
+    (entry): entry is TurnEntry => entry.type === "turn" && entry.userInput === "interrupt me",
+  );
+  expect(turn?.status).toBe("aborted");
+  expect(store.allEntries.at(-1)).toMatchObject({
+    type: "turn_aborted",
+    reason: "interrupted by user",
+  });
+});
+
 async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
   const originalLog = console.log;
   const originalWrite = process.stdout.write;

@@ -34,6 +34,7 @@ export interface KeybindingRuntime {
   queueDraft(text: string): void;
   submitSelectedQueuedMessage(): void;
   removeSelectedQueuedMessage(): void;
+  interruptTurn(): void;
   setInputValue(value: string): void;
   acceptSlashSelection(): void;
   resolveApproval(decision: ApprovalDecision): void;
@@ -45,6 +46,10 @@ export function installOpenTuiKeybindings(
 ): void {
   renderer.addInputHandler((sequence) => {
     if (sequence === "\u0003") {
+      if (runtime.isRunning()) {
+        runtime.interruptTurn();
+        return true;
+      }
       runtime.dispatch({
         type: "setTurnStatus",
         status: runtime.getState().turnStatus,
@@ -168,6 +173,11 @@ function handleCtrlD(runtime: KeybindingRuntime): void {
 }
 
 function handleComposerEsc(runtime: KeybindingRuntime): void {
+  if (runtime.isRunning()) {
+    runtime.interruptTurn();
+    return;
+  }
+
   const now = Date.now();
   if (now - lastComposerEscAt <= 700) {
     lastComposerEscAt = 0;

@@ -36,6 +36,7 @@ export interface RuntimeActions {
   queueDraft(text: string): void;
   submitSelectedQueuedMessage(): void;
   removeSelectedQueuedMessage(): void;
+  interruptTurn(): void;
   restoreSelected(): Promise<void>;
   resumeSelected(): Promise<void>;
   handleLocalCommand(command: TuiInputCommand): Promise<boolean>;
@@ -278,6 +279,38 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     host.render();
   };
 
+  const interruptTurn = () => {
+    void host.appSession.interruptTurn();
+    host.dispatch({
+      type: "setTurnStatus",
+      status: "running",
+      message: "interrupting",
+    });
+    host.render();
+  };
+
+  const resetDraft = async (reason: "new" | "clear") => {
+    if (busyGuard()) return;
+
+    const didReset = reason === "new"
+      ? await host.appSession.newDraft()
+      : await host.appSession.clearDraft();
+    if (!didReset) return;
+
+    const nextApp = host.appSession.app;
+    host.setState(createTuiState(undefined, {
+      statusLineItems: nextApp.config.statusLineItems,
+    }));
+    setInputValue("");
+    host.dispatch({
+      type: "setTurnStatus",
+      status: "idle",
+      message: reason === "new" ? "new draft" : "cleared",
+    });
+    host.layout.focusInput();
+    host.render();
+  };
+
   const restoreSelected = async () => {
     if (busyGuard()) return;
 
@@ -342,6 +375,14 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
   const handleLocalCommand = async (command: TuiInputCommand): Promise<boolean> => {
     if (command.type === "empty") return true;
     if (command.type === "submit") return false;
+    if (command.type === "new") {
+      await resetDraft("new");
+      return true;
+    }
+    if (command.type === "clear") {
+      await resetDraft("clear");
+      return true;
+    }
     if (command.type === "resume") {
       await showThreads();
       return true;
@@ -431,6 +472,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     queueDraft,
     submitSelectedQueuedMessage,
     removeSelectedQueuedMessage,
+    interruptTurn,
     restoreSelected,
     resumeSelected,
     handleLocalCommand,

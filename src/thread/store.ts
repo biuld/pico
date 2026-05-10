@@ -21,6 +21,7 @@ import type {
   PicoThreadEntry,
   PicoThreadHeader,
   PicoThreadInfo,
+  TurnAbortedEntry,
   TurnCompletedEntry,
   TurnEntry,
   TurnFailedEntry,
@@ -242,6 +243,29 @@ export class PicoThreadStore {
       status: "failed",
       failedAt: timestamp,
       error: error instanceof Error ? error.message : error,
+    };
+    await this.appendEntry(entry, true);
+    return entry;
+  }
+
+  async appendTurnAborted(
+    parentId: string,
+    turnId: string,
+    reason?: string,
+  ): Promise<TurnAbortedEntry> {
+    this.assertParent(parentId);
+    this.assertTurn(turnId);
+    this.assertTurnHasNoTerminalEntry(turnId);
+    const timestamp = now();
+    const entry: TurnAbortedEntry = {
+      type: "turn_aborted",
+      id: this.nextEntryId("abort"),
+      parentId,
+      timestamp,
+      turnId,
+      status: "aborted",
+      abortedAt: timestamp,
+      reason,
     };
     await this.appendEntry(entry, true);
     return entry;

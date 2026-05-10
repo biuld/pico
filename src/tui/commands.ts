@@ -1,6 +1,8 @@
 export type TuiInputCommand =
   | { type: "empty" }
   | { type: "submit"; text: string }
+  | { type: "new" }
+  | { type: "clear" }
   | { type: "resume" }
   | { type: "theme" }
   | { type: "statusline" }
@@ -17,6 +19,8 @@ export interface SlashCommandSpec {
 }
 
 export const SLASH_COMMANDS: readonly SlashCommandSpec[] = [
+  { name: "new", description: "start a fresh draft" },
+  { name: "clear", description: "clear the current draft" },
   { name: "resume", description: "resume a saved thread" },
   { name: "theme", description: "choose a color theme" },
   { name: "statusline", description: "configure status line items" },
@@ -35,6 +39,8 @@ export function parseTuiInput(input: string): TuiInputCommand {
   const [command, ...rest] = trimmed.slice(1).split(/\s+/);
   const body = rest.join(" ").trim();
 
+  if (command === "new") return { type: "new" };
+  if (command === "clear") return { type: "clear" };
   if (command === "resume") return { type: "resume" };
   if (command === "theme") return { type: "theme" };
   if (command === "statusline") return { type: "statusline" };

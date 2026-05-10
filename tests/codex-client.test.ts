@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
   classifyJsonRpcMessage,
+  CodexAppServerClient,
   createCodexStatusSnapshot,
   formatCodexStatusText,
   updateCodexStatusFromConfig,
@@ -20,6 +21,21 @@ test("classifies server requests before notifications", () => {
   };
 
   expect(classifyJsonRpcMessage(message).type).toBe("request");
+});
+
+test("interruptTurn requests the matching app-server method", async () => {
+  const client = new CodexAppServerClient();
+  const calls: { method: string; params?: unknown }[] = [];
+  client.request = async <T>(method: string, params?: unknown): Promise<T> => {
+    calls.push({ method, params });
+    return {} as T;
+  };
+
+  await client.interruptTurn("thread-1", "turn-1");
+
+  expect(calls).toEqual([
+    { method: "turn/interrupt", params: { threadId: "thread-1", turnId: "turn-1" } },
+  ]);
 });
 
 test("classifies JSON-RPC responses and errors", () => {

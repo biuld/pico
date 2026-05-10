@@ -21,6 +21,8 @@ import type {
   ThreadReadResponse as ProtocolThreadReadResponse,
   ThreadStartParams as ProtocolThreadStartParams,
   ThreadStartResponse as ProtocolThreadStartResponse,
+  TurnInterruptParams as ProtocolTurnInterruptParams,
+  TurnInterruptResponse as ProtocolTurnInterruptResponse,
   TurnStartParams as ProtocolTurnStartParams,
   TurnStartResponse as ProtocolTurnStartResponse,
   UserInput as ProtocolUserInput,
@@ -191,3 +193,7 @@ export type TextElement = ProtocolTextElement;
 export type TurnStartResponse = Omit<ProtocolTurnStartResponse, "turn"> & {
   turn: { id: string; status?: unknown };
 };
+
+export type TurnInterruptParams = ProtocolTurnInterruptParams;
+
+export type TurnInterruptResponse = ProtocolTurnInterruptResponse;

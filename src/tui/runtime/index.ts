@@ -2,6 +2,7 @@ import { CliRenderEvents, type CliRenderer, type KeyEvent } from "@opentui/core"
 import type {
   DraftAppState,
   RawItemEvent,
+  TurnAbortedEvent,
   TurnCompletedEvent,
   TurnFailedEvent,
 } from "../../app/controller";
@@ -171,6 +172,23 @@ export function runOpenTuiRuntime(
     dispatch({ type: "setTurnStatus", status: "running", message: "waiting for model" });
     render();
   });
+  appSession.on(PICO_APP_SESSION_EVENTS.TURN_INTERRUPT_REQUESTED, (event) => {
+    dispatch({
+      type: "setTurnStatus",
+      status: "running",
+      message: event.pending ? "interrupt pending" : "interrupting",
+    });
+    render();
+  });
+  appSession.on(PICO_APP_SESSION_EVENTS.TURN_INTERRUPT_FAILED, (event) => {
+    const message = event.error instanceof Error ? event.error.message : String(event.error);
+    dispatch({
+      type: "setTurnStatus",
+      status: state.turnStatus,
+      message: `interrupt failed: ${message}`,
+    });
+    render();
+  });
   appSession.on(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, render);
   appSession.on(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, (event: RawItemEvent) => {
     dispatch({
@@ -188,6 +206,12 @@ export function runOpenTuiRuntime(
       status: "idle",
       message: `stored ${event.rawItemCount} raw item(s)`,
     });
+    render();
+  });
+  appSession.on(PICO_APP_SESSION_EVENTS.TURN_ABORTED, (event: TurnAbortedEvent) => {
+    clocks.finishActivity();
+    dispatch({ type: "selectEntry", entryId: event.leafId });
+    dispatch({ type: "setTurnStatus", status: "idle", message: event.reason || "interrupted" });
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_FAILED, (event: TurnFailedEvent) => {
@@ -263,6 +287,7 @@ export function runOpenTuiRuntime(
     queueDraft: actions.queueDraft,
     submitSelectedQueuedMessage: actions.submitSelectedQueuedMessage,
     removeSelectedQueuedMessage: actions.removeSelectedQueuedMessage,
+    interruptTurn: actions.interruptTurn,
     setInputValue: actions.setInputValue,
     acceptSlashSelection: () => void actions.acceptSlashSelection(),
     resolveApproval,

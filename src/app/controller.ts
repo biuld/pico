@@ -21,6 +21,7 @@ export interface DraftAppState {
 export interface TurnResult {
   turnId: string;
   codexTurnId: string;
+  status: "completed" | "aborted";
   rawItemCount: number;
   leafId: string;
   completed: unknown;
@@ -57,6 +58,13 @@ export interface TurnStartedEvent {
 
 export interface TurnCompletedEvent extends TurnResult {
   threadId: string;
+  status: "completed";
+}
+
+export interface TurnAbortedEvent extends TurnResult {
+  threadId: string;
+  status: "aborted";
+  reason: string;
 }
 
 export interface TurnFailedEvent {
@@ -304,6 +312,8 @@ export async function runTurn(
     codex.on("serverRequest", onServerRequest);
     codex.on("rawResponseItem/completed", onRawItem);
 
+    let terminalEntryWritten = false;
+
     try {
       const started = await codex.startTurn(threadId, userInput, {
         model: turnOverrides.model,
@@ -335,23 +345,55 @@ export async function runTurn(
       await pendingRawWrites;
       if (rawItemError) throw rawItemError;
 
+      const terminalStatus = turnCompletionStatus(completed);
+      if (terminalStatus === "interrupted" || terminalStatus === "aborted") {
+        const reason = turnAbortedReason(completed);
+        await store.appendTurnAborted(parentId, picoTurn.id, reason);
+        terminalEntryWritten = true;
+        const result = {
+          turnId: picoTurn.id,
+          codexTurnId: turnId,
+          status: "aborted",
+          rawItemCount,
+          leafId: store.leafId,
+          completed,
+        } satisfies TurnResult;
+        emit?.("turn:aborted", {
+          threadId,
+          ...result,
+          reason,
+        } satisfies TurnAbortedEvent);
+        emit?.("thread:changed", { type: "turn", leafId: store.leafId });
+        return result;
+      }
+      if (terminalStatus === "failed") {
+        const error = turnFailureError(completed);
+        await store.appendTurnFailed(parentId, picoTurn.id, error);
+        terminalEntryWritten = true;
+        throw error;
+      }
+
       await store.appendTurnCompleted(parentId, picoTurn.id, {
         codexTurnId: turnId,
         completed,
       });
-      const result: TurnResult = {
+      terminalEntryWritten = true;
+      const result = {
         turnId: picoTurn.id,
         codexTurnId: turnId,
+        status: "completed",
         rawItemCount,
         leafId: store.leafId,
         completed,
-      };
+      } satisfies TurnResult;
       emit?.("turn:completed", { threadId, ...result } satisfies TurnCompletedEvent);
       emit?.("thread:changed", { type: "turn", leafId: store.leafId });
       return result;
     } catch (err) {
       await pendingRawWrites.catch(() => {});
-      await store.appendTurnFailed(parentId, picoTurn.id, err instanceof Error ? err : String(err));
+      if (!terminalEntryWritten) {
+        await store.appendTurnFailed(parentId, picoTurn.id, err instanceof Error ? err : String(err));
+      }
       throw err;
     } finally {
       codex.off("item/agentMessage/delta", onDelta);
@@ -384,4 +426,39 @@ export function approvalResult(
     return { decision: "acceptForSession" };
   }
   return { decision: decision === "accept" ? "accept" : "decline" };
+}
+
+function turnCompletionStatus(completed: unknown): string | undefined {
+  const value = objectValue(completed);
+  const turn = objectValue(value.turn);
+  return normalizeCodexStatusValue(turn.status) || normalizeCodexStatusValue(value.status);
+}
+
+function turnAbortedReason(completed: unknown): string {
+  const message = turnErrorMessage(completed);
+  return message || "Turn interrupted";
+}
+
+function turnFailureError(completed: unknown): Error {
+  const message = turnErrorMessage(completed) || "Turn failed";
+  return new Error(message);
+}
+
+function turnErrorMessage(completed: unknown): string | undefined {
+  const value = objectValue(completed);
+  const turn = objectValue(value.turn);
+  const error = maybeObjectValue(turn.error) || maybeObjectValue(value.error) || {};
+  return stringValue(error.message) || stringValue(error.additionalDetails);
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function maybeObjectValue(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

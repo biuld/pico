@@ -34,6 +34,8 @@ import type {
   ThreadReadResponse,
   ThreadStartParams,
   ThreadStartResponse,
+  TurnInterruptParams,
+  TurnInterruptResponse,
   TurnStartParams,
   TurnStartResponse,
 } from "./types";
@@ -192,6 +194,11 @@ export class CodexAppServerClient extends EventEmitter {
     this.status = updateCodexStatusFromTurnStart(this.status, threadId, response);
     this.emit("status", this.statusSnapshot);
     return response;
+  }
+
+  async interruptTurn(threadId: string, turnId: string): Promise<TurnInterruptResponse> {
+    const params: TurnInterruptParams = { threadId, turnId };
+    return this.request<TurnInterruptResponse>("turn/interrupt", params);
   }
 
   waitForTurnCompleted(threadId: string, turnId: string): Promise<TurnCompletedParams> {

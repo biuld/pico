@@ -12,6 +12,7 @@ export {
   type DraftAppState,
   type RawItemEvent,
   type RunTurnOptions,
+  type TurnAbortedEvent,
   type TurnCompletedEvent,
   type TurnFailedEvent,
   type TurnResult,

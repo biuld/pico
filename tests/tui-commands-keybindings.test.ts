@@ -53,6 +53,7 @@ test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () =
     queueDraft: () => {},
     submitSelectedQueuedMessage: () => {},
     removeSelectedQueuedMessage: () => {},
+    interruptTurn: () => {},
     setInputValue: () => {},
     acceptSlashSelection: () => {},
     resolveApproval: () => {},
@@ -119,6 +120,7 @@ test("tab queues a running draft into the launchpad", () => {
     },
     submitSelectedQueuedMessage: () => {},
     removeSelectedQueuedMessage: () => {},
+    interruptTurn: () => {},
     setInputValue: (value) => {
       inputValue = value;
     },
@@ -181,6 +183,7 @@ test("launchpad overlay keys can launch and remove queued messages", () => {
     removeSelectedQueuedMessage: () => {
       removed += 1;
     },
+    interruptTurn: () => {},
     setInputValue: () => {},
     acceptSlashSelection: () => {},
     resolveApproval: () => {},
@@ -196,8 +199,67 @@ test("launchpad overlay keys can launch and remove queued messages", () => {
   expect(state.overlay).toBe("none");
 });
 
+test("ctrl+c and esc interrupt a running turn", () => {
+  const handlers: Array<(sequence: string) => boolean> = [];
+  const renderer = {
+    addInputHandler: (handler: (sequence: string) => boolean) => {
+      handlers.push(handler);
+    },
+  } as unknown as CliRenderer;
+
+  let state = createTuiState();
+  let interruptCount = 0;
+  const runtime: KeybindingRuntime = {
+    getState: () => state,
+    getInputValue: () => "",
+    hasPendingApproval: () => false,
+    pendingApprovalMethod: () => undefined,
+    isRunning: () => true,
+    dispatch: (msg) => {
+      state = updateTuiState(state, msg);
+    },
+    render: () => {},
+    close: () => {},
+    focusInput: () => {},
+    setComposerFocus: () => {},
+    showHistory: () => {},
+    showThreads: () => {},
+    showTheme: () => {},
+    showStatusLine: () => {},
+    showTranscript: () => {},
+    showShortcuts: () => {},
+    showLaunchpad: () => {},
+    moveHistorySelection: () => {},
+    moveThreadSelection: () => {},
+    moveThemeSelection: () => {},
+    moveStatusLineSelection: () => {},
+    moveLaunchpadSelection: () => {},
+    restoreSelected: () => {},
+    resumeSelected: () => {},
+    selectTheme: () => {},
+    toggleStatusLineItem: () => {},
+    queueDraft: () => {},
+    submitSelectedQueuedMessage: () => {},
+    removeSelectedQueuedMessage: () => {},
+    interruptTurn: () => {
+      interruptCount += 1;
+    },
+    setInputValue: () => {},
+    acceptSlashSelection: () => {},
+    resolveApproval: () => {},
+  };
+
+  installOpenTuiKeybindings(renderer, runtime);
+
+  expect(handlers[0]("\u0003")).toBe(true);
+  expect(handlers[1]("\u001b")).toBe(true);
+  expect(interruptCount).toBe(2);
+});
+
 test("parses local TUI slash commands", () => {
   expect(parseTuiInput("hello")).toEqual({ type: "submit", text: "hello" });
+  expect(parseTuiInput("/new")).toEqual({ type: "new" });
+  expect(parseTuiInput("/clear")).toEqual({ type: "clear" });
   expect(parseTuiInput("/resume")).toEqual({ type: "resume" });
   expect(parseTuiInput("/theme")).toEqual({ type: "theme" });
   expect(parseTuiInput("/statusline")).toEqual({ type: "statusline" });
@@ -221,6 +283,8 @@ test("filters slash commands for popup selection without tab completion", async 
 
   expect(filterSlashCommands("hello")).toEqual([]);
   expect(filterSlashCommands("/").map((command) => command.name)).toEqual([
+    "new",
+    "clear",
     "resume",
     "theme",
     "statusline",
@@ -231,6 +295,7 @@ test("filters slash commands for popup selection without tab completion", async 
     "exit",
   ]);
   expect(filterSlashCommands("/l").map((command) => command.name)).toEqual(["launchpad"]);
+  expect(filterSlashCommands("/c").map((command) => command.name)).toEqual(["clear"]);
   expect(filterSlashCommands("/r").map((command) => command.name)).toEqual(["resume", "rename"]);
   expect(filterSlashCommands("/s").map((command) => command.name)).toEqual(["statusline", "status"]);
   expect(filterSlashCommands("/rename name")).toEqual([]);
@@ -238,7 +303,7 @@ test("filters slash commands for popup selection without tab completion", async 
   state = updateTuiState(state, { type: "inputChanged", value: "/" });
   expect(state.overlay).toBe("slash");
 
-  state = updateTuiState(state, { type: "moveSlash", total: 8, delta: 1 });
+  state = updateTuiState(state, { type: "moveSlash", total: 10, delta: 1 });
   expect(state.slashSelection).toBe(1);
 
   state = updateTuiState(state, { type: "inputChanged", value: "/rename name" });

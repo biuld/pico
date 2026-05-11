@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { startMockCodexClient } from "../../support/codex-app-server/mock-codex-app-server";
+import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
   startupSteps,

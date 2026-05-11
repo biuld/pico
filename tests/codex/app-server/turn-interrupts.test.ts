@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { AppState } from "../../../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../../src/app-session";
 import { PicoThreadStore } from "../../../src/thread/store";
-import { startMockCodexClient } from "../../support/codex-app-server/mock-codex-app-server";
+import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
   onceSessionEvent,

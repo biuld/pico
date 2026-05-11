@@ -10,6 +10,7 @@
     "dev": "bun run src/index.ts",
     "build": "bun run scripts/build.ts",
     "compile": "bun run scripts/build.ts --compile",
+    "mock": "bun run tools/codex-app-server/start-manual-mock-pico.ts",
     "test": "bun test",
     "typecheck": "bun run scripts/typecheck.ts",
     "check": "bun run typecheck && bun test",

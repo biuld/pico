@@ -59,11 +59,14 @@ pico/
 ├── tests/
 │   ├── codex/
 │   │   └── app-server/        # Scripted stdio app-server protocol integration tests
-│   └── support/
-│       └── codex-app-server/  # Mock app-server scenario helpers
 └── tools/
     └── codex-app-server/
-        └── mock-codex-app-server.ts # Executable scripted stdio app-server mock
+        ├── mock-codex-app-server.ts        # Executable scripted stdio app-server mock
+        ├── manual-mock-codex-app-server.ts # Interactive stdio app-server mock with JSONL control inbox
+        ├── manual-mock-control.ts          # CLI for appending manual mock control commands
+        ├── playbook.ts                     # Randomized manual mock response choreography
+        ├── start-manual-mock-pico.ts       # Launch Pico with the manual mock without editing config
+        └── test-client.ts                  # Test launcher utilities that point at these mock executables
 ```
 
 ## Key Design Rules
@@ -121,9 +124,10 @@ bun test --watch      # watch mode
 ```
 
 - Scripted Codex app-server protocol tests live in `tests/codex/app-server/`.
-- Shared mock-server test helpers live in `tests/support/codex-app-server/`.
+- App-server test launcher utilities live in `tools/codex-app-server/test-client.ts` and must point at the executable mocks in `tools/codex-app-server/`; do not keep mock-server helpers under `tests/`.
 - Organize app-server protocol test files by behavior, not by mock implementation. Prefer names like `turn-streaming.test.ts`, `approval-requests.test.ts`, or `startup-and-thread-start.test.ts` over one large mock-server test file.
 - Do not add a new `CodexAppServerClient` method, `runTurn` app-server interaction, or app-server notification/server-request handling without a matching scripted mock test.
+- Use `bun run mock` for manual/local operation. It launches Pico with `tools/codex-app-server/manual-mock-codex-app-server.ts` without editing `.pico/config.json`. The mock writes a JSONL control inbox path to `.pico/manual-mock-codex-app-server.json` and auto-runs `tools/codex-app-server/playbook.ts` unless `PICO_MANUAL_MOCK_PLAYBOOK=0`; playbook replies must first issue `item/permissions/requestApproval` before emitting deltas or raw items. Keep deterministic CI tests on the scripted mock unless the behavior is specifically about manual control.
 
 ## Key References
 

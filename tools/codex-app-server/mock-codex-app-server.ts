@@ -82,31 +82,35 @@ let serverRequestId = 1;
 
 const logger = createLogger(logPath);
 
-try {
-  if (!scenarioPath) {
-    throw new Error("PICO_MOCK_SCENARIO is required");
+await main();
+
+async function main(): Promise<void> {
+  try {
+    if (!scenarioPath) {
+      throw new Error("PICO_MOCK_SCENARIO is required");
+    }
+
+    logger({ type: "start", argv: Bun.argv.slice(2), scenarioPath });
+    const scenario = await readScenario(scenarioPath);
+    const inbox = new MessageInbox();
+    inbox.start();
+
+    for (let index = 0; index < scenario.steps.length; index += 1) {
+      await runStep(scenario.steps[index], index, inbox);
+    }
+
+    await sleep(0);
+    inbox.assertNoQueuedMessages("scenario complete");
+    logger({ type: "complete", steps: scenario.steps.length });
+    await sleep(0);
+    process.exit(0);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger({ type: "failure", message });
+    console.error(`[mock-codex-app-server] ${message}`);
+    await sleep(0);
+    process.exit(1);
   }
-
-  logger({ type: "start", argv: Bun.argv.slice(2), scenarioPath });
-  const scenario = await readScenario(scenarioPath);
-  const inbox = new MessageInbox();
-  inbox.start();
-
-  for (let index = 0; index < scenario.steps.length; index += 1) {
-    await runStep(scenario.steps[index], index, inbox);
-  }
-
-  await sleep(0);
-  inbox.assertNoQueuedMessages("scenario complete");
-  logger({ type: "complete", steps: scenario.steps.length });
-  await sleep(0);
-  process.exit(0);
-} catch (err) {
-  const message = err instanceof Error ? err.message : String(err);
-  logger({ type: "failure", message });
-  console.error(`[mock-codex-app-server] ${message}`);
-  await sleep(0);
-  process.exit(1);
 }
 
 async function readScenario(path: string): Promise<Scenario> {

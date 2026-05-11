@@ -5,7 +5,7 @@ import {
   PicoAppSession,
   type PicoAppSessionEventName,
 } from "../../../src/app-session";
-import type { MockCodexScenarioStep } from "../../support/codex-app-server/mock-codex-app-server";
+import type { MockCodexScenarioStep } from "../../../tools/codex-app-server/test-client";
 
 export function startupSteps(): MockCodexScenarioStep[] {
   return [

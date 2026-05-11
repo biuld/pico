@@ -56,7 +56,14 @@ pico/
 │           ├── statusline-picker.ts
 │           ├── transcript-pager.ts
 │           └── shortcut-overlay.ts
-└── tests/
+├── tests/
+│   ├── codex/
+│   │   └── app-server/        # Scripted stdio app-server protocol integration tests
+│   └── support/
+│       └── codex-app-server/  # Mock app-server scenario helpers
+└── tools/
+    └── codex-app-server/
+        └── mock-codex-app-server.ts # Executable scripted stdio app-server mock
 ```
 
 ## Key Design Rules
@@ -67,6 +74,7 @@ pico/
 4. **Codex app-server access goes through `src/codex/app-server`.** Do not parse JSON-RPC notifications or call app-server methods from TUI code. Add SDK methods/status projection there first, then consume semantic state from `app`/`tui`. Keep protocol types minimal: define only the app-server capabilities Pico currently uses.
 5. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`. Our PicoThreadStore is self-contained.
 6. **Raw item round-trip.** `experimentalRawEvents: true` + `rawResponseItem/completed` → store raw `responseItem` → `thread/inject_items`.
+7. **Every app-server call has protocol coverage.** When adding a new Codex app-server request, notification handler, or server-request response path, add or update a scripted mock scenario test under `tests/codex/app-server/` using `tools/codex-app-server/mock-codex-app-server.ts`. The test must assert the JSON-RPC method and the meaningful params Pico sends or handles.
 
 ## Code Conventions
 
@@ -111,6 +119,11 @@ Main-screen UX should stay Codex-like: single transcript flow, no permanent dash
 bun test              # run all tests
 bun test --watch      # watch mode
 ```
+
+- Scripted Codex app-server protocol tests live in `tests/codex/app-server/`.
+- Shared mock-server test helpers live in `tests/support/codex-app-server/`.
+- Organize app-server protocol test files by behavior, not by mock implementation. Prefer names like `turn-streaming.test.ts`, `approval-requests.test.ts`, or `startup-and-thread-start.test.ts` over one large mock-server test file.
+- Do not add a new `CodexAppServerClient` method, `runTurn` app-server interaction, or app-server notification/server-request handling without a matching scripted mock test.
 
 ## Key References
 

@@ -127,7 +127,7 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
   ]);
 });
 
-test("app session drains queued launchpad messages after a turn finishes", async () => {
+test("app session drains queued follow-up messages after a turn finishes", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
@@ -157,17 +157,41 @@ test("app session drains queued launchpad messages after a turn finishes", async
     id: "queued-1",
     text: "second",
   });
-  expect(appSession.snapshot.queuedMessages.map((message) => message.text)).toEqual(["second"]);
+  expect(appSession.queueMessage(" third ")).toMatchObject({
+    id: "queued-2",
+    text: "third",
+  });
+  expect(appSession.snapshot.queuedMessages.map((message) => message.text)).toEqual(["third"]);
 
   await finished;
 
-  expect(queueCounts).toEqual([1, 0]);
+  expect(queueCounts).toEqual([1, 1, 0]);
   expect(appSession.snapshot.queuedMessages).toEqual([]);
   expect(
     store.allEntries
       .filter((entry) => entry.type === "turn")
       .map((entry) => entry.userInput),
-  ).toEqual(["first", "second"]);
+  ).toEqual(["first", "third"]);
+});
+
+test("app session can restore the single queued follow-up message", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const store = await PicoThreadStore.create(cwd);
+  const codex = new SessionCodex();
+  const appSession = new PicoAppSession({
+    cwd,
+    store,
+    codex,
+    config: {},
+  } as unknown as AppState);
+
+  appSession.queueMessage("queued");
+
+  expect(appSession.takeQueuedMessage()).toMatchObject({ text: "queued" });
+  expect(appSession.snapshot.queuedMessages).toEqual([]);
+  expect(appSession.takeQueuedMessage()).toBeUndefined();
 });
 
 test("app session interrupts the active codex turn", async () => {
@@ -224,6 +248,84 @@ test("app session interrupts the active codex turn", async () => {
   ]);
   expect(appSession.snapshot.running).toBe(false);
   expect(store.allEntries.at(-1)).toMatchObject({ type: "turn_aborted" });
+});
+
+test("app session sends the queued follow-up after interrupting the active turn", async () => {
+  class InterruptThenCompleteCodex extends SessionCodex {
+    turnCount = 0;
+
+    async startTurn() {
+      this.turnCount += 1;
+      const turnId = `codex-turn-${this.turnCount}`;
+      if (this.turnCount > 1) {
+        setTimeout(() => {
+          this.emit("rawResponseItem/completed", {
+            threadId: "thread-1",
+            turnId,
+            item: {
+              id: `assistant-output-${this.turnCount}`,
+              type: "message",
+              role: "assistant",
+              content: [{ type: "output_text", text: "queued done" }],
+            },
+          });
+          this.emit("turn/completed", {
+            threadId: "thread-1",
+            turnId,
+            status: "completed",
+          });
+        }, 0);
+      }
+      return { turn: { id: turnId, status: "inProgress" } };
+    }
+
+    async interruptTurn(threadId: string, turnId: string) {
+      setTimeout(() => {
+        this.emit("turn/completed", {
+          threadId,
+          turnId,
+          status: "interrupted",
+          error: { message: "interrupted" },
+        });
+      }, 0);
+    }
+  }
+
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const store = await PicoThreadStore.create(cwd);
+  const codex = new InterruptThenCompleteCodex();
+  const appSession = new PicoAppSession({
+    cwd,
+    store,
+    codex,
+    config: {},
+  } as unknown as AppState);
+
+  const codexStarted = new Promise<void>((resolve) => {
+    appSession.on(PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED, () => resolve());
+  });
+  const finished = new Promise<void>((resolve) => {
+    let count = 0;
+    appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => {
+      count += 1;
+      if (count === 2) resolve();
+    });
+  });
+
+  appSession.submit("first");
+  appSession.queueMessage("queued");
+  await codexStarted;
+  expect(await appSession.interruptTurn()).toBe(true);
+  await finished;
+
+  expect(appSession.snapshot.queuedMessages).toEqual([]);
+  expect(
+    store.allEntries
+      .filter((entry) => entry.type === "turn")
+      .map((entry) => entry.userInput),
+  ).toEqual(["first", "queued"]);
 });
 
 test("new draft resets Pico-local session state without creating a store", async () => {

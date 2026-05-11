@@ -212,31 +212,28 @@ export class PicoAppSession extends EventEmitter {
       text: trimmed,
       createdAt: new Date().toISOString(),
     };
-    this.queuedMessages.push(message);
+    this.queuedMessages = [message];
     this.emitQueueChanged();
     return message;
   }
 
-  removeQueuedMessage(id: string): QueuedMessage | undefined {
-    const index = this.queuedMessages.findIndex((message) => message.id === id);
-    if (index < 0) return undefined;
-    const [message] = this.queuedMessages.splice(index, 1);
+  takeQueuedMessage(): QueuedMessage | undefined {
+    const [message] = this.queuedMessages.splice(0, 1);
+    if (!message) return undefined;
     this.emitQueueChanged();
     return message;
   }
 
-  submitQueuedMessage(id?: string): boolean {
+  private submitNextQueuedMessage(): boolean {
     if (this.isBusy()) {
       this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_BUSY);
       return false;
     }
 
-    const index = id
-      ? this.queuedMessages.findIndex((message) => message.id === id)
-      : 0;
-    if (index < 0 || index >= this.queuedMessages.length) return false;
+    if (this.queuedMessages.length === 0) return false;
 
-    const [message] = this.queuedMessages.splice(index, 1);
+    const [message] = this.queuedMessages.splice(0, 1);
+    if (!message) return false;
     this.emitQueueChanged();
     this.submit(message.text);
     return true;
@@ -296,7 +293,7 @@ export class PicoAppSession extends EventEmitter {
       this.running = false;
       this.clearActiveCodexTurn();
       this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FINISHED);
-      this.submitQueuedMessage();
+      this.submitNextQueuedMessage();
     }
   }
 

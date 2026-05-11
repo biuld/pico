@@ -13,7 +13,8 @@ import { createStore, reconcile } from "solid-js/store";
 import { emptyOverlay, type OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import type { TranscriptCell } from "../transcript";
-import { COMPOSER_OVERLAY_INSET, ComposerView } from "./composer";
+import { composerOverlayInset, ComposerView } from "./composer";
+import { emptyPendingInputPreview, type PendingInputPreviewState } from "./pending-input-preview";
 import { OverlaySurface } from "./overlay";
 import { StartupBannerView, type StartupBannerState } from "./startup-banner";
 import {
@@ -37,6 +38,7 @@ export interface ComposerLayoutState {
   placeholder: string;
   statusLine: string | StyledText;
   inputValue: string;
+  pendingInputPreview: PendingInputPreviewState;
 }
 
 export interface OpenTuiInputHandlers {
@@ -92,6 +94,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
     placeholder: "Ask Pico to do anything",
     statusLine: "",
     inputValue: "",
+    pendingInputPreview: emptyPendingInputPreview(),
   });
   const [syntaxStyle, setSyntaxStyle] = createSignal(createTranscriptSyntaxStyle(theme));
 
@@ -186,6 +189,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
         placeholder={composer().placeholder}
         statusLine={composer().statusLine}
         inputValue={composer().inputValue}
+        pendingInputPreview={composer().pendingInputPreview}
         onInput={handleInput}
         onSubmit={handleSubmit}
         onInputRef={(nextInput) => {
@@ -197,7 +201,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
         theme={activeTheme()}
         rendererWidth={size().width}
         rendererHeight={size().height}
-        bottomInset={COMPOSER_OVERLAY_INSET}
+        bottomInset={composerOverlayInset(composer().pendingInputPreview.height)}
       />
     </box>
   ), renderer);

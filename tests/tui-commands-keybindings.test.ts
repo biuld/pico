@@ -40,19 +40,16 @@ test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () =
     showStatusLine: () => {},
     showTranscript: () => {},
     showShortcuts: () => {},
-    showLaunchpad: () => {},
     moveHistorySelection: () => {},
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    moveLaunchpadSelection: () => {},
     restoreSelected: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
     queueDraft: () => {},
-    submitSelectedQueuedMessage: () => {},
-    removeSelectedQueuedMessage: () => {},
+    recallQueuedDraft: () => {},
     interruptTurn: () => {},
     setInputValue: () => {},
     acceptSlashSelection: () => {},
@@ -74,7 +71,7 @@ test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () =
   expect(renderCount).toBeGreaterThan(1);
 });
 
-test("tab queues a running draft into the launchpad", () => {
+test("tab queues a running draft", () => {
   const handlers: Array<(sequence: string) => boolean> = [];
   const renderer = {
     addInputHandler: (handler: (sequence: string) => boolean) => {
@@ -104,12 +101,10 @@ test("tab queues a running draft into the launchpad", () => {
     showStatusLine: () => {},
     showTranscript: () => {},
     showShortcuts: () => {},
-    showLaunchpad: () => {},
     moveHistorySelection: () => {},
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    moveLaunchpadSelection: () => {},
     restoreSelected: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
@@ -118,8 +113,7 @@ test("tab queues a running draft into the launchpad", () => {
       queuedText = text;
       inputValue = "";
     },
-    submitSelectedQueuedMessage: () => {},
-    removeSelectedQueuedMessage: () => {},
+    recallQueuedDraft: () => {},
     interruptTurn: () => {},
     setInputValue: (value) => {
       inputValue = value;
@@ -134,7 +128,7 @@ test("tab queues a running draft into the launchpad", () => {
   expect(queuedText).toBe("next prompt");
 });
 
-test("launchpad overlay keys can launch and remove queued messages", () => {
+test("option up restores the queued draft into the composer", () => {
   const handlers: Array<(sequence: string) => boolean> = [];
   const renderer = {
     addInputHandler: (handler: (sequence: string) => boolean) => {
@@ -142,46 +136,38 @@ test("launchpad overlay keys can launch and remove queued messages", () => {
     },
   } as unknown as CliRenderer;
 
-  let state = updateTuiState(createTuiState(), { type: "openLaunchpad" });
-  let launched = 0;
-  let removed = 0;
+  let state = createTuiState();
+  let recallCount = 0;
   const runtime: KeybindingRuntime = {
     getState: () => state,
     getInputValue: () => "",
     hasPendingApproval: () => false,
     pendingApprovalMethod: () => undefined,
-    isRunning: () => false,
+    isRunning: () => true,
     dispatch: (msg) => {
       state = updateTuiState(state, msg);
     },
     render: () => {},
     close: () => {},
     focusInput: () => {},
-    setComposerFocus: () => {
-      state = updateTuiState(state, { type: "closeOverlay" });
-    },
+    setComposerFocus: () => {},
     showHistory: () => {},
     showThreads: () => {},
     showTheme: () => {},
     showStatusLine: () => {},
     showTranscript: () => {},
     showShortcuts: () => {},
-    showLaunchpad: () => {},
     moveHistorySelection: () => {},
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    moveLaunchpadSelection: () => {},
     restoreSelected: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
     queueDraft: () => {},
-    submitSelectedQueuedMessage: () => {
-      launched += 1;
-    },
-    removeSelectedQueuedMessage: () => {
-      removed += 1;
+    recallQueuedDraft: () => {
+      recallCount += 1;
     },
     interruptTurn: () => {},
     setInputValue: () => {},
@@ -191,12 +177,69 @@ test("launchpad overlay keys can launch and remove queued messages", () => {
 
   installOpenTuiKeybindings(renderer, runtime);
 
-  expect(handlers[1]("\r")).toBe(true);
-  expect(handlers[1]("d")).toBe(true);
-  expect(handlers[1]("\u001b")).toBe(true);
-  expect(launched).toBe(1);
-  expect(removed).toBe(1);
-  expect(state.overlay).toBe("none");
+  expect(handlers[1]("\u001b[1;3A")).toBe(true);
+  expect(recallCount).toBe(1);
+});
+
+test("tab does not submit an empty composer", () => {
+  const handlers: Array<(sequence: string) => boolean> = [];
+  const renderer = {
+    addInputHandler: (handler: (sequence: string) => boolean) => {
+      handlers.push(handler);
+    },
+  } as unknown as CliRenderer;
+
+  let state = createTuiState();
+  let inputValue = "";
+  let submitCount = 0;
+  const runtime: KeybindingRuntime = {
+    getState: () => state,
+    getInputValue: () => inputValue,
+    hasPendingApproval: () => false,
+    pendingApprovalMethod: () => undefined,
+    isRunning: () => false,
+    dispatch: (msg) => {
+      state = updateTuiState(state, msg);
+    },
+    render: () => {},
+    close: () => {},
+    focusInput: () => {},
+    setComposerFocus: () => {},
+    showHistory: () => {},
+    showThreads: () => {},
+    showTheme: () => {},
+    showStatusLine: () => {},
+    showTranscript: () => {},
+    showShortcuts: () => {},
+    moveHistorySelection: () => {},
+    moveThreadSelection: () => {},
+    moveThemeSelection: () => {},
+    moveStatusLineSelection: () => {},
+    restoreSelected: () => {},
+    resumeSelected: () => {},
+    selectTheme: () => {},
+    toggleStatusLineItem: () => {},
+    queueDraft: () => {},
+    recallQueuedDraft: () => {},
+    submitInput: () => {
+      submitCount += 1;
+    },
+    interruptTurn: () => {},
+    setInputValue: (value) => {
+      inputValue = value;
+    },
+    acceptSlashSelection: () => {},
+    resolveApproval: () => {},
+  };
+
+  installOpenTuiKeybindings(renderer, runtime);
+
+  expect(handlers[1]("\t")).toBe(true);
+  expect(submitCount).toBe(0);
+
+  inputValue = "send this";
+  expect(handlers[1]("\t")).toBe(true);
+  expect(submitCount).toBe(1);
 });
 
 test("ctrl+c and esc interrupt a running turn", () => {
@@ -228,19 +271,16 @@ test("ctrl+c and esc interrupt a running turn", () => {
     showStatusLine: () => {},
     showTranscript: () => {},
     showShortcuts: () => {},
-    showLaunchpad: () => {},
     moveHistorySelection: () => {},
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    moveLaunchpadSelection: () => {},
     restoreSelected: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
     queueDraft: () => {},
-    submitSelectedQueuedMessage: () => {},
-    removeSelectedQueuedMessage: () => {},
+    recallQueuedDraft: () => {},
     interruptTurn: () => {
       interruptCount += 1;
     },
@@ -263,7 +303,6 @@ test("parses local TUI slash commands", () => {
   expect(parseTuiInput("/resume")).toEqual({ type: "resume" });
   expect(parseTuiInput("/theme")).toEqual({ type: "theme" });
   expect(parseTuiInput("/statusline")).toEqual({ type: "statusline" });
-  expect(parseTuiInput("/launchpad")).toEqual({ type: "launchpad" });
   expect(parseTuiInput("/rename first turn")).toEqual({ type: "rename", label: "first turn" });
   expect(parseTuiInput("/rename")).toEqual({ type: "unknown", message: "/rename requires a name" });
   expect(parseTuiInput("/status")).toEqual({ type: "status" });
@@ -288,13 +327,12 @@ test("filters slash commands for popup selection without tab completion", async 
     "resume",
     "theme",
     "statusline",
-    "launchpad",
     "rename",
     "status",
     "quit",
     "exit",
   ]);
-  expect(filterSlashCommands("/l").map((command) => command.name)).toEqual(["launchpad"]);
+  expect(filterSlashCommands("/l").map((command) => command.name)).toEqual([]);
   expect(filterSlashCommands("/c").map((command) => command.name)).toEqual(["clear"]);
   expect(filterSlashCommands("/r").map((command) => command.name)).toEqual(["resume", "rename"]);
   expect(filterSlashCommands("/s").map((command) => command.name)).toEqual(["statusline", "status"]);
@@ -303,7 +341,7 @@ test("filters slash commands for popup selection without tab completion", async 
   state = updateTuiState(state, { type: "inputChanged", value: "/" });
   expect(state.overlay).toBe("slash");
 
-  state = updateTuiState(state, { type: "moveSlash", total: 10, delta: 1 });
+  state = updateTuiState(state, { type: "moveSlash", total: 9, delta: 1 });
   expect(state.slashSelection).toBe(1);
 
   state = updateTuiState(state, { type: "inputChanged", value: "/rename name" });

@@ -13,12 +13,15 @@ import {
 import { getTheme, TUI_THEMES } from "../theme";
 import { buildTranscriptCellsWithLive } from "../transcript";
 import type { TuiMsg } from "../update";
-import { COMPOSER_OVERLAY_INSET, formatComposerStatus } from "../widgets/composer";
+import { composerOverlayInset, formatComposerStatus } from "../widgets/composer";
 import { formatComposerPlaceholder } from "../widgets/composer-placeholder";
 import { formatTransientStatusLine } from "../widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
-import { buildLaunchpadRows, type LaunchpadQueuedMessage } from "../widgets/launchpad";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
+import {
+  buildPendingInputPreview,
+  type PendingInputPreviewMessage,
+} from "../widgets/pending-input-preview";
 import { buildThreadRows } from "../widgets/resume-picker";
 import { buildStartupBannerState } from "../widgets/startup-banner";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
@@ -33,7 +36,7 @@ export interface RuntimeViewInput {
   streamingText: string;
   liveLeafId?: string;
   pendingApproval?: JSONRPCRequest;
-  queuedMessages?: readonly LaunchpadQueuedMessage[];
+  queuedMessages?: readonly PendingInputPreviewMessage[];
   running: boolean;
   activityFrame?: number;
   activityElapsedMs?: number;
@@ -43,7 +46,12 @@ export interface RuntimeViewInput {
 }
 
 export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayoutUpdate {
-  const pickerViewportHeight = overlayListViewportHeight(input.rendererHeight);
+  const pendingInputPreview = buildPendingInputPreview(
+    input.queuedMessages?.[0],
+    Math.max(1, input.rendererWidth - 4),
+  );
+  const bottomInset = composerOverlayInset(pendingInputPreview.height);
+  const pickerViewportHeight = overlayListViewportHeight(input.rendererHeight, bottomInset);
   const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
   let state = input.getState();
   const theme = getTheme(state.themeName);
@@ -73,11 +81,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
   input.dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
 
-  const queuedMessages = input.queuedMessages || [];
-  input.dispatch({ type: "syncLaunchpad", total: queuedMessages.length });
-
   state = input.getState();
-  const launchpadRows = buildLaunchpadRows(queuedMessages, state.launchpadSelection);
   const codexStatus = input.app.codex.statusSnapshot;
   const transcriptCells = buildTranscriptCellsWithLive(
     input.app,
@@ -128,6 +132,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
         items: state.statusLineItems,
         width: Math.max(1, input.rendererWidth - 4),
       }, theme),
+      pendingInputPreview,
     },
     overlay: buildOverlayView({
       app: input.app,
@@ -138,7 +143,6 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       slashCommands,
       historyRows,
       threadRows,
-      launchpadRows,
       themeRows,
       statusLineRows,
       statusLinePreview,
@@ -150,7 +154,10 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   };
 }
 
-export function overlayListViewportHeight(rendererHeight: number): number {
-  const overlayHeight = Math.max(1, rendererHeight - COMPOSER_OVERLAY_INSET);
+export function overlayListViewportHeight(
+  rendererHeight: number,
+  bottomInset = composerOverlayInset(),
+): number {
+  const overlayHeight = Math.max(1, rendererHeight - bottomInset);
   return Math.max(1, overlayHeight - 3);
 }

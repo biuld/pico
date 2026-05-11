@@ -21,19 +21,17 @@ export interface KeybindingRuntime {
   showStatusLine(): void;
   showTranscript(): void;
   showShortcuts(): void;
-  showLaunchpad(): void;
   moveHistorySelection(delta: number): void;
   moveThreadSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
   moveStatusLineSelection(delta: number): void;
-  moveLaunchpadSelection(delta: number): void;
   restoreSelected(): void;
   resumeSelected(): void;
   selectTheme(): void;
   toggleStatusLineItem(): void;
   queueDraft(text: string): void;
-  submitSelectedQueuedMessage(): void;
-  removeSelectedQueuedMessage(): void;
+  recallQueuedDraft(): void;
+  submitInput?(): void;
   interruptTurn(): void;
   setInputValue(value: string): void;
   acceptSlashSelection(): void;
@@ -124,10 +122,6 @@ export function installOpenTuiKeybindings(
     if (state.overlay === "shortcuts") {
       return handleShortcutKey(sequence, runtime);
     }
-    if (state.overlay === "launchpad") {
-      return handleLaunchpadKey(sequence, runtime);
-    }
-
     if (sequence === "\u0014") {
       runtime.showTranscript();
       return true;
@@ -136,16 +130,24 @@ export function installOpenTuiKeybindings(
       runtime.showShortcuts();
       return true;
     }
+    if (isOptionUp(sequence)) {
+      runtime.recallQueuedDraft();
+      return true;
+    }
     if (sequence === "\u001b") {
       handleComposerEsc(runtime);
       return true;
     }
     if (sequence === "\t") {
-      if (runtime.isRunning() && runtime.getInputValue().trim().length > 0) {
-        runtime.queueDraft(runtime.getInputValue());
+      const inputValue = runtime.getInputValue();
+      if (runtime.isRunning()) {
+        if (inputValue.trim().length > 0) runtime.queueDraft(inputValue);
         return true;
       }
-      if (runtime.getInputValue().trim().length === 0) runtime.showLaunchpad();
+
+      if (inputValue.trim().length > 0 && runtime.submitInput) {
+        runtime.submitInput();
+      }
       return true;
     }
     return false;
@@ -154,6 +156,12 @@ export function installOpenTuiKeybindings(
 
 let lastComposerEscAt = 0;
 let lastCtrlDAt = 0;
+
+function isOptionUp(sequence: string): boolean {
+  return sequence === "\u001b[1;3A" ||
+    sequence === "\u001b[1;9A" ||
+    sequence === "\u001b\u001b[A";
+}
 
 function handleCtrlD(runtime: KeybindingRuntime): void {
   const now = Date.now();
@@ -353,30 +361,6 @@ function handleTranscriptKey(sequence: string, runtime: KeybindingRuntime): bool
 
 function handleShortcutKey(sequence: string, runtime: KeybindingRuntime): boolean {
   if (sequence === "\u001b" || sequence === "?") {
-    runtime.setComposerFocus();
-    return true;
-  }
-  return true;
-}
-
-function handleLaunchpadKey(sequence: string, runtime: KeybindingRuntime): boolean {
-  if (sequence === "\u001b[A" || sequence === "k" || sequence === "\u0010") {
-    runtime.moveLaunchpadSelection(-1);
-    return true;
-  }
-  if (sequence === "\u001b[B" || sequence === "j" || sequence === "\u000e") {
-    runtime.moveLaunchpadSelection(1);
-    return true;
-  }
-  if (sequence === "\r") {
-    runtime.submitSelectedQueuedMessage();
-    return true;
-  }
-  if (sequence.toLowerCase() === "d") {
-    runtime.removeSelectedQueuedMessage();
-    return true;
-  }
-  if (sequence === "\u001b") {
     runtime.setComposerFocus();
     return true;
   }

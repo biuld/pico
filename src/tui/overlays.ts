@@ -7,7 +7,6 @@ import type { TuiState } from "./state";
 import type { TuiTheme } from "./theme";
 import { buildApprovalOverlayView } from "./widgets/approval-overlay";
 import { buildHistoryOverlayView } from "./widgets/history-picker";
-import { buildLaunchpadOverlayView, type LaunchpadRow } from "./widgets/launchpad";
 import { buildResumeOverlayView, type ThreadRow } from "./widgets/resume-picker";
 import { buildShortcutOverlayView } from "./widgets/shortcut-overlay";
 import { buildSlashCommandOverlayView } from "./widgets/slash-command-popup";
@@ -26,7 +25,6 @@ export interface OverlayViewInput {
   slashCommands: readonly SlashCommandSpec[];
   historyRows: readonly HistoryTurnRow[];
   threadRows: readonly ThreadRow[];
-  launchpadRows?: readonly LaunchpadRow[];
   themeRows: readonly ThemeRow[];
   statusLineRows: readonly StatusLineRow[];
   statusLinePreview: string;
@@ -46,7 +44,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     slashCommands,
     historyRows,
     threadRows,
-    launchpadRows = [],
     themeRows,
     statusLineRows,
     statusLinePreview,
@@ -65,14 +62,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
       );
     case "shortcuts":
       return buildShortcutOverlayView();
-    case "launchpad":
-      return buildLaunchpadOverlayView(
-        launchpadRows,
-        state.launchpadSelection,
-        theme,
-        input.pickerViewportHeight,
-        input.rendererWidth,
-      );
     case "approval":
       return pendingApproval
         ? buildApprovalOverlayView(

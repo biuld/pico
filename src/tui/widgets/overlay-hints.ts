@@ -7,5 +7,4 @@ export const OVERLAY_HINTS = {
   transcript: "pgup/pgdn scroll   j/k move   g/G jump   esc close",
   approval: "enter choose   up/down move   esc cancel",
   shortcuts: "esc close",
-  launchpad: "enter launch   d remove   up/down move   esc close",
 } as const;

@@ -8,7 +8,6 @@ import type {
 } from "../../app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../app-session";
 import type { PicoThreadInfo } from "../../thread/store";
-import { parseTuiInput } from "../commands";
 import { installOpenTuiKeybindings } from "../keybindings";
 import { createTuiState, type TuiState } from "../state";
 import { updateTuiState, type TuiMsg } from "../update";
@@ -18,6 +17,7 @@ import type { OpenTuiLayout } from "../widgets/layout";
 import { createRuntimeActions } from "./actions";
 import { createRuntimeClocks } from "./clocks";
 import { copyRendererSelection } from "./clipboard";
+import { submitRuntimeInput } from "./submit";
 import { buildRuntimeLayoutUpdate } from "./view";
 
 export function runOpenTuiRuntime(
@@ -63,6 +63,11 @@ export function runOpenTuiRuntime(
     event.preventDefault();
     event.stopPropagation();
     void copySelection(true);
+  };
+
+  const terminalFocusHandler = () => {
+    if (closing || state.overlay !== "none") return;
+    layout.focusInput();
   };
 
   render = () => {
@@ -117,28 +122,21 @@ export function runOpenTuiRuntime(
   };
 
   const submitInput = async () => {
-    if (state.overlay === "slash") {
-      await actions.acceptSlashSelection();
-      return;
-    }
-    if (state.overlay !== "none") return;
-
-    const command = parseTuiInput(layout.getInputValue());
-    const handledLocally = await actions.handleLocalCommand(command);
-    if (handledLocally) {
-      actions.setInputValue("");
-      return;
-    }
-
-    if (command.type !== "submit") return;
-    if (appSession.isBusy()) {
-      dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "turn is running" });
-      render();
-      return;
-    }
-
-    actions.setInputValue("");
-    appSession.submit(command.text);
+    await submitRuntimeInput({
+      getOverlay: () => state.overlay,
+      getInputValue: () => layout.getInputValue(),
+      acceptSlashSelection: () => actions.acceptSlashSelection(),
+      handleLocalCommand: (command) => actions.handleLocalCommand(command),
+      clearInput: () => actions.setInputValue(""),
+      isBusy: () => appSession.isBusy(),
+      isRunning: () => appSession.snapshot.running,
+      queueDraft: actions.queueDraft,
+      submit: (text) => appSession.submit(text),
+      setBusyStatus: () => {
+        dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "turn is running" });
+        render();
+      },
+    });
   };
 
   appSession.on(PICO_APP_SESSION_EVENTS.CODEX_STATUS, () => {
@@ -242,7 +240,7 @@ export function runOpenTuiRuntime(
     dispatch({
       type: "setTurnStatus",
       status: state.turnStatus,
-      message: event.queuedCount > 0 ? `queued ${event.queuedCount}` : "launchpad empty",
+      message: event.queuedCount > 0 ? `queued ${event.queuedCount}` : "queue empty",
     });
     render();
   });
@@ -274,19 +272,17 @@ export function runOpenTuiRuntime(
     showStatusLine: actions.showStatusLine,
     showTranscript: actions.showTranscript,
     showShortcuts: actions.showShortcuts,
-    showLaunchpad: actions.showLaunchpad,
     moveHistorySelection: actions.moveHistorySelection,
     moveThreadSelection: actions.moveThreadSelection,
     moveThemeSelection: actions.moveThemeSelection,
     moveStatusLineSelection: actions.moveStatusLineSelection,
-    moveLaunchpadSelection: actions.moveLaunchpadSelection,
     restoreSelected: () => void actions.restoreSelected(),
     resumeSelected: () => void actions.resumeSelected(),
     selectTheme: actions.selectTheme,
     toggleStatusLineItem: actions.toggleStatusLineItem,
     queueDraft: actions.queueDraft,
-    submitSelectedQueuedMessage: actions.submitSelectedQueuedMessage,
-    removeSelectedQueuedMessage: actions.removeSelectedQueuedMessage,
+    recallQueuedDraft: actions.recallQueuedDraft,
+    submitInput: () => void submitInput(),
     interruptTurn: actions.interruptTurn,
     setInputValue: actions.setInputValue,
     acceptSlashSelection: () => void actions.acceptSlashSelection(),
@@ -294,11 +290,13 @@ export function runOpenTuiRuntime(
   });
 
   renderer.on(CliRenderEvents.RESIZE, render);
+  renderer.on(CliRenderEvents.FOCUS, terminalFocusHandler);
   renderer.on(CliRenderEvents.SELECTION, () => {
     void copySelection(false);
   });
   renderer.keyInput.on("keypress", copyKeyHandler);
   renderer.on(CliRenderEvents.DESTROY, () => {
+    renderer.off(CliRenderEvents.FOCUS, terminalFocusHandler);
     renderer.keyInput.off("keypress", copyKeyHandler);
     clocks.dispose();
     appSession.dispose();

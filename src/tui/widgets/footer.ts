@@ -14,7 +14,6 @@ export type FooterMode =
   | "StatusLinePicker"
   | "TranscriptPager"
   | "ShortcutOverlay"
-  | "Launchpad"
   | "Failed";
 
 export function footerMode(state: TuiState): FooterMode {
@@ -26,7 +25,6 @@ export function footerMode(state: TuiState): FooterMode {
   if (state.overlay === "statusline") return "StatusLinePicker";
   if (state.overlay === "transcript") return "TranscriptPager";
   if (state.overlay === "shortcuts") return "ShortcutOverlay";
-  if (state.overlay === "launchpad") return "Launchpad";
   if (state.turnStatus === "failed") return "Failed";
   if (state.turnStatus === "running") {
     return state.inputValue.trim().length > 0 ? "WorkingWithDraft" : "Working";

@@ -2,6 +2,11 @@
 import type { InputRenderable, StyledText } from "@opentui/core";
 import type { TuiTheme } from "../theme";
 export { formatActivityStatus as formatComposerStatus } from "./activity-indicator";
+import {
+  emptyPendingInputPreview,
+  PendingInputPreviewView,
+  type PendingInputPreviewState,
+} from "./pending-input-preview";
 import { SolidText } from "./solid-text";
 
 export const COMPOSER_TRANSIENT_STATUS_HEIGHT = 1;
@@ -11,24 +16,31 @@ export const COMPOSER_HEIGHT =
   COMPOSER_TRANSIENT_STATUS_HEIGHT + COMPOSER_ROW_HEIGHT + COMPOSER_STATUS_LINE_HEIGHT;
 export const COMPOSER_OVERLAY_INSET = COMPOSER_HEIGHT;
 
+export function composerOverlayInset(pendingInputPreviewHeight = 0): number {
+  return COMPOSER_HEIGHT + Math.max(0, pendingInputPreviewHeight);
+}
+
 export interface ComposerViewProps {
   theme: TuiTheme;
   transientStatus: string;
   placeholder: string;
   statusLine: string | StyledText;
   inputValue: string;
+  pendingInputPreview?: PendingInputPreviewState;
   onInput(value: string): void;
   onSubmit(): void;
   onInputRef(input: InputRenderable): void;
 }
 
 export function ComposerView(props: ComposerViewProps) {
+  const pendingInputPreview = () => props.pendingInputPreview || emptyPendingInputPreview();
+
   return (
     <box
       id="pico-bottom-pane"
       flexDirection="column"
       width="100%"
-      height={COMPOSER_HEIGHT}
+      height={composerOverlayInset(pendingInputPreview().height)}
       border={false}
       paddingX={2}
       paddingY={0}
@@ -42,6 +54,10 @@ export function ComposerView(props: ComposerViewProps) {
         fg={props.theme.colors.muted}
         wrapMode="none"
         truncate={true}
+      />
+      <PendingInputPreviewView
+        preview={pendingInputPreview()}
+        theme={props.theme}
       />
       <box
         id="pico-composer-row"

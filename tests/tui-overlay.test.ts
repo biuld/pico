@@ -7,14 +7,8 @@ import { buildApprovalOverlayView } from "../src/tui/widgets/approval-overlay";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";
 import { buildHistoryOverlayView } from "../src/tui/widgets/history-picker";
-import {
-  buildLaunchpadOverlayView,
-  buildLaunchpadRows,
-  buildLaunchpadViewModel,
-  formatLaunchpadRow,
-} from "../src/tui/widgets/launchpad";
-import { buildOverlayView } from "../src/tui/overlays";
 import { overlayFrame } from "../src/tui/widgets/overlay";
+import { buildPendingInputPreview } from "../src/tui/widgets/pending-input-preview";
 import {
   buildResumeOverlayView,
   buildThreadRows,
@@ -40,6 +34,24 @@ test("overlay anchors above the transient status line and composer", () => {
     bottom: undefined,
     width: 100,
     height: 30,
+  });
+});
+
+test("pending input preview renders queued follow-up inputs without overlay chrome", () => {
+  const preview = buildPendingInputPreview({
+    text: "first queued prompt with enough words to force truncation in narrow terminals",
+  }, 32);
+
+  expect(preview.visible).toBe(true);
+  expect(preview.lines[0]).toBe("• Queued follow-up input");
+  expect(preview.lines.some((line) => line.includes("first queued prompt"))).toBe(true);
+  expect(preview.lines.at(-1)).toBe("  Esc interrupt + send now · Option+Up edit");
+  expect(preview.height).toBe(preview.lines.length);
+
+  expect(buildPendingInputPreview(undefined, 32)).toEqual({
+    visible: false,
+    lines: [],
+    height: 0,
   });
 });
 
@@ -151,77 +163,6 @@ test("resume overlay applies renderer width to rows", () => {
   expect(String(row?.content).length).toBeLessThanOrEqual(76);
 });
 
-test("launchpad overlay renders queued messages as bounded rows", () => {
-  const theme = TUI_THEMES[0];
-  const rows = buildLaunchpadRows(
-    [
-      {
-        id: "queued-1",
-        text: "first queued prompt with enough words to force truncation in narrow terminals",
-        createdAt: "2026-05-10T12:18:18.000Z",
-      },
-      {
-        id: "queued-2",
-        text: "second",
-        createdAt: "2026-05-10T12:19:20.000Z",
-      },
-    ],
-    1,
-  );
-
-  expect(rows[1].isSelected).toBe(true);
-  const model = buildLaunchpadViewModel(rows, 1);
-  expect(model.selectedIndex).toBe(1);
-  expect(model.emptyText).toBe("No queued messages");
-  expect(model.hint).toContain("enter launch");
-  expect(formatLaunchpadRow(rows[0], 40)).toHaveLength(40);
-  expect(formatLaunchpadRow(rows[1], 40)).not.toStartWith("*");
-
-  const view = buildLaunchpadOverlayView(rows, 1, theme, 8, 44);
-  expect(view.title).toBe("Launchpad");
-  expect(view.rows).toHaveLength(2);
-  expect(view.rows?.[1]?.backgroundColor).toBe(theme.colors.overlayRowSelected);
-  expect(String(view.rows?.[0]?.content).length).toBeLessThanOrEqual(40);
-  expect(view.footer).toContain("d remove");
-
-  const empty = buildLaunchpadOverlayView([], 0, theme, 8, 44);
-  expect(empty.content).toBe("No queued messages");
-});
-
-test("overlay router supports launchpad overlay mode", () => {
-  const theme = TUI_THEMES[0];
-  const state = updateTuiState(
-    updateTuiState(createTuiState(), { type: "openLaunchpad" }),
-    { type: "moveLaunchpad", total: 2, delta: 1 },
-  );
-  const launchpadRows = buildLaunchpadRows([
-    { id: "queued-1", text: "first queued message", createdAt: "2026-05-10T12:18:18.000Z" },
-    { id: "queued-2", text: "second queued message", createdAt: "2026-05-10T12:19:20.000Z" },
-  ], state.launchpadSelection);
-
-  const view = buildOverlayView({
-    app: {} as never,
-    state,
-    theme,
-    streamingText: "",
-    slashCommands: [],
-    historyRows: [],
-    threadRows: [],
-    launchpadRows,
-    themeRows: [],
-    statusLineRows: [],
-    statusLinePreview: "",
-    threadViewportHeight: 8,
-    pickerViewportHeight: 8,
-    rendererWidth: 80,
-  });
-
-  expect(state.overlay).toBe("launchpad");
-  expect(state.launchpadSelection).toBe(1);
-  expect(view.title).toBe("Launchpad");
-  expect(view.rows?.[1]?.backgroundColor).toBe(theme.colors.overlayRowSelected);
-});
-
 test("resume overlay uses themed alternating row backgrounds", () => {
   const state = createTuiState();
   const rows = Array.from({ length: 5 }, (_, index) => ({
@@ -295,9 +236,6 @@ test("navigable picker overlays render row views without textual selection marke
     buildHistoryOverlayView(historyRows, state, theme),
     buildThemeOverlayView(themeRows, theme, 8, 1),
     buildStatusLineOverlayView(statusRows, "preview", theme, 8, 1),
-    buildLaunchpadOverlayView(buildLaunchpadRows([
-      { id: "queued-1", text: "next prompt", createdAt: "2026-05-10T12:18:18.000Z" },
-    ], 0), 0, theme, 8, 80),
     approvalView,
   ];
 

@@ -126,26 +126,24 @@ let lastComposerEscAt = 0;
 let lastCtrlDAt = 0;
 
 function handleApprovalKey(sequence: string, runtime: KeybindingRuntime): boolean {
-  if (sequence === "\u001b") {
-    runtime.resolveApproval("decline");
-    return true;
-  }
-
-  const inputEmpty = runtime.getInputValue().trim().length === 0;
-  if (!inputEmpty) return false;
-
   const state = runtime.getState();
   const options = buildApprovalOptions(
     runtime.pendingApprovalMethod() || "",
     state.approvalSelection,
   );
+  const lower = sequence.toLowerCase();
 
-  if (sequence === "\u001b[A" || sequence === "\u0010") {
+  if (sequence === "\u001b") {
+    runtime.resolveApproval("decline");
+    return true;
+  }
+
+  if (sequence === "\u001b[A" || lower === "k" || sequence === "\u0010") {
     runtime.dispatch({ type: "moveApproval", total: options.length, delta: -1 });
     runtime.render();
     return true;
   }
-  if (sequence === "\u001b[B" || sequence === "\u000e") {
+  if (sequence === "\u001b[B" || lower === "j" || sequence === "\u000e") {
     runtime.dispatch({ type: "moveApproval", total: options.length, delta: 1 });
     runtime.render();
     return true;
@@ -154,7 +152,13 @@ function handleApprovalKey(sequence: string, runtime: KeybindingRuntime): boolea
     runtime.resolveApproval(options[state.approvalSelection]?.decision || "decline");
     return true;
   }
-  return false;
+  if (lower === "a" || lower === "s" || lower === "d") {
+    const option = options.find((item) => item.shortcut === lower);
+    if (option) runtime.resolveApproval(option.decision);
+    return true;
+  }
+
+  return true;
 }
 
 function isOptionUp(sequence: string): boolean {

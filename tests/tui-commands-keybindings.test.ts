@@ -181,7 +181,7 @@ test("option up restores the queued draft into the composer", () => {
   expect(recallCount).toBe(1);
 });
 
-test("approval controls do not consume composer text", () => {
+test("approval controls own focus and consume composer input", () => {
   const handlers: Array<(sequence: string) => boolean> = [];
   const renderer = {
     addInputHandler: (handler: (sequence: string) => boolean) => {
@@ -234,12 +234,12 @@ test("approval controls do not consume composer text", () => {
   installOpenTuiKeybindings(renderer, runtime);
 
   expect(state.overlay).toBe("none");
-  expect(handlers[0]("s")).toBe(false);
+  expect(handlers[0]("s")).toBe(true);
   expect(resolvedDecision).toBe("");
 
   inputValue = "src/tui/runtime/index.ts";
-  expect(handlers[0]("\r")).toBe(false);
-  expect(resolvedDecision).toBe("");
+  expect(handlers[0]("\r")).toBe(true);
+  expect(resolvedDecision).toBe("accept");
 });
 
 test("approval controls handle empty-composer navigation and decisions", () => {

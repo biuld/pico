@@ -18,6 +18,7 @@ export interface ApprovalPanelState {
   visible: boolean;
   lines: readonly string[];
   height: number;
+  selectedLineIndex: number;
 }
 
 const APPROVAL_PANEL_HINT = "  Enter choose · Esc deny · Up/Down move · type to queue";
@@ -27,6 +28,7 @@ export function emptyApprovalPanel(): ApprovalPanelState {
     visible: false,
     lines: [],
     height: 0,
+    selectedLineIndex: -1,
   };
 }
 
@@ -37,10 +39,11 @@ export function buildApprovalPanel(
 ): ApprovalPanelState {
   if (!request) return emptyApprovalPanel();
 
+  const detailLines = approvalDetailLines(request, Math.max(12, width - 4));
   const lines = [
-    ...approvalDetailLines(request, Math.max(12, width - 4)),
+    ...detailLines,
     ...buildApprovalOptions(request.method, selectedIndex).map((option) =>
-      `${option.isSelected ? "›" : " "} ${formatApprovalOption(option)}`
+      `  ${formatApprovalOption(option)}`
     ),
     APPROVAL_PANEL_HINT,
   ];
@@ -49,6 +52,7 @@ export function buildApprovalPanel(
     visible: true,
     lines,
     height: lines.length,
+    selectedLineIndex: detailLines.length + selectedIndex,
   };
 }
 
@@ -59,7 +63,7 @@ export function ApprovalPanelView(props: {
   return (
     <box
       id="pico-approval-panel"
-      flexDirection="column"
+      flexDirection="row"
       width="100%"
       height={props.panel.height}
       visible={props.panel.visible}
@@ -67,19 +71,37 @@ export function ApprovalPanelView(props: {
       paddingY={0}
       backgroundColor={props.theme.colors.background}
     >
-      <For each={props.panel.lines}>
-        {(line, index) => (
-          <SolidText
-            id={`pico-approval-panel-line-${index()}`}
-            width="100%"
-            height={1}
-            content={line}
-            fg={approvalLineColor(line, index(), props.theme)}
-            wrapMode="none"
-            truncate={true}
-          />
-        )}
-      </For>
+      <box
+        id="pico-approval-panel-gutter"
+        width={1}
+        height="100%"
+        backgroundColor={props.theme.colors.status}
+      />
+      <box
+        id="pico-approval-panel-lines"
+        flexDirection="column"
+        flexGrow={1}
+        height="100%"
+        backgroundColor={props.theme.colors.background}
+      >
+        <For each={props.panel.lines}>
+          {(line, index) => {
+            const isSelected = () => index() === props.panel.selectedLineIndex;
+            return (
+              <SolidText
+                id={`pico-approval-panel-line-${index()}`}
+                width="100%"
+                height={1}
+                content={line}
+                fg={approvalLineColor(index(), isSelected(), props.theme)}
+                bg={isSelected() ? props.theme.colors.overlayRowSelected : undefined}
+                wrapMode="none"
+                truncate={true}
+              />
+            );
+          }}
+        </For>
+      </box>
     </box>
   );
 }
@@ -129,8 +151,8 @@ export function formatApprovalOption(option: ApprovalOption): string {
   return option.description ? `${option.label}  ${option.description}` : option.label;
 }
 
-function approvalLineColor(line: string, index: number, theme: TuiTheme): string {
-  if (line.startsWith("›")) return theme.colors.textStrong;
+function approvalLineColor(index: number, isSelected: boolean, theme: TuiTheme): string {
+  if (isSelected) return theme.colors.textStrong;
   if (index === 0) return theme.colors.muted;
   return theme.colors.placeholder;
 }
@@ -142,8 +164,8 @@ function approvalDetailLines(request: JSONRPCRequest, width: number): string[] {
   const reason = stringValue(params, "reason");
   const cwd = stringValue(params, "cwd");
 
+  if (reason) lines.push(`  ${truncateInline(reason, width)}`);
   if (command) lines.push(`  command: ${truncateInline(command, width)}`);
-  if (reason) lines.push(`  reason: ${truncateInline(reason, width)}`);
   if (cwd) lines.push(`  cwd: ${truncateInline(cwd, width)}`);
 
   return lines.slice(0, 3);

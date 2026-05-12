@@ -66,7 +66,7 @@ export function runOpenTuiRuntime(
   };
 
   const terminalFocusHandler = () => {
-    if (closing || state.overlay !== "none") return;
+    if (closing || state.overlay !== "none" || appSession.snapshot.pendingApproval) return;
     layout.focusInput();
   };
 
@@ -222,12 +222,14 @@ export function runOpenTuiRuntime(
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => {
     clocks.finishActivity();
-    if (!closing && state.overlay === "none") layout.focusInput();
+    if (!closing && state.overlay === "none" && !appSession.snapshot.pendingApproval) {
+      layout.focusInput();
+    }
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED, () => {
     dispatch({ type: "showApproval" });
-    layout.focusInput();
+    layout.blurInput();
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, (event) => {

@@ -43,12 +43,13 @@ pico/
 │       ├── keybindings.ts    # Key dispatch only
 │       ├── app.ts            # Compatibility exports
 │       └── widgets/           # Codex-style UI surfaces
-│           ├── layout.ts
-│           ├── composer.ts
+│           ├── layout.tsx
+│           ├── composer.tsx
 │           ├── footer.ts
 │           ├── transcript-panel.ts
-│           ├── overlay.ts
-│           ├── approval-overlay.ts
+│           ├── overlay.tsx
+│           ├── approval-panel.tsx
+│           ├── pending-input-preview.tsx
 │           ├── slash-command-popup.ts
 │           ├── history-picker.ts
 │           ├── resume-picker.ts
@@ -94,10 +95,22 @@ Pico's OpenTUI code should be organized like Codex TUI surfaces, not as one larg
 - `src/tui/opentui-runtime.ts` owns mutable OpenTUI runtime wiring: current app, pending approvals, streaming text, renderer events, and calls into `runTurn`.
 - `src/tui/state.ts` and `src/tui/update.ts` own UI state and Elm-style transitions. Do not mutate OpenTUI renderables there.
 - `src/tui/keybindings.ts` maps key sequences to runtime actions. It should not build UI strings or mutate JSONL/thread state directly.
-- `src/tui/widgets/layout.ts` composes top-level widgets.
-- `src/tui/widgets/composer.ts` owns composer renderables and composer status formatting.
+- `src/tui/widgets/layout.tsx` composes top-level widgets.
+- `src/tui/widgets/composer.tsx` owns composer renderables and composer status formatting.
 - `src/tui/widgets/footer.ts` owns footer mode derivation and footer text.
 - `src/tui/widgets/transcript-panel.ts` owns only the OpenTUI transcript panel renderables.
+- Main-screen layout has four conceptual bands, ordered top to bottom:
+  - **Transcript panel**: the single scrollable conversation flow. It owns transcript cells and scrolling only.
+  - **Action panel**: transient, task-scoped UI that belongs to the current run, such as approval prompts, queued input previews, and other focused action requests. Action panel surfaces may leave the composer visible, but if they require a decision they must own focus and prevent composer input until resolved.
+  - **Composer**: the `›` input row only. It owns user draft text and submit behavior. Do not embed focused action workflows inside the composer input.
+  - **Footer/status line**: compact status metadata and transient messages only. It must not become a control surface.
+- Do not collapse action panels into generic overlays. Approval prompts are action panels, not overlay pickers: they are tied to the active turn, should not expose raw app-server method names, and must route keys to the approval action while active.
+- Generic overlays remain for global or navigational picker surfaces: slash commands, history, resume, theme, statusline setup, transcript pager, shortcuts. They are routed through `src/tui/overlays.ts` and rendered by `OverlaySurface`.
+- Focus ownership is explicit:
+  - Composer focus means typed text edits the draft.
+  - Action panel focus means typed text is consumed by the action surface and must not queue or edit a draft.
+  - Overlay focus means keys are routed to the active overlay until it closes.
+  Runtime code must blur/focus the OpenTUI input to match the owning surface.
 - `src/tui/transcript/` owns transcript domain projection and rendering. Keep it split by layer:
   - `index.ts` is the public façade used by runtime/tests.
   - `model.ts` maps Pico JSONL/thread state into transcript rows.
@@ -105,8 +118,8 @@ Pico's OpenTUI code should be organized like Codex TUI surfaces, not as one larg
   - `cell.ts` maps rows into transcript cells and block types.
   - `renderer.ts` maps cells/blocks into plain and styled terminal lines.
   - `wrap.ts` owns width-aware wrapping helpers.
-- `src/tui/widgets/overlay.ts` owns the generic overlay container renderable.
-- Overlay-specific surfaces belong in their own widget modules, e.g. `approval-overlay.ts`, `slash-command-popup.ts`, `history-picker.ts`, `resume-picker.ts`, `theme-picker.ts`, `statusline-picker.ts`, `transcript-pager.ts`, and `shortcut-overlay.ts`.
+- `src/tui/widgets/overlay.tsx` owns the generic overlay container renderable.
+- Overlay-specific surfaces belong in their own widget modules, e.g. `slash-command-popup.ts`, `history-picker.ts`, `resume-picker.ts`, `theme-picker.ts`, `statusline-picker.ts`, `transcript-pager.ts`, and `shortcut-overlay.ts`.
 - `src/tui/overlays.ts` is only a router from `state.overlay` to the matching overlay widget view. Do not put surface-specific rendering logic there.
 - `src/tui/render.ts` is a temporary compatibility/shared export file. Do not add new surface-specific UI logic to it; add that logic to the owning widget module instead.
 

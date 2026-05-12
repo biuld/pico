@@ -10,8 +10,7 @@ export type OverlayMode =
   | "theme"
   | "statusline"
   | "transcript"
-  | "shortcuts"
-  | "approval";
+  | "shortcuts";
 
 export type TurnStatus = "idle" | "running" | "approval" | "failed";
 
@@ -124,7 +123,6 @@ export function setOverlay(state: TuiState, overlay: OverlayMode): TuiState {
     slashSelection: overlay === "slash" ? state.slashSelection : 0,
     themeSelection: overlay === "theme" ? state.themeSelection : 0,
     statusLineSelection: overlay === "statusline" ? state.statusLineSelection : 0,
-    approvalSelection: overlay === "approval" ? state.approvalSelection : 0,
   };
 }
 

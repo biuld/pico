@@ -3,7 +3,7 @@ import { createTuiState } from "../src/tui/state";
 import { TUI_THEMES } from "../src/tui/theme";
 import { updateTuiState } from "../src/tui/update";
 import { SLASH_COMMANDS } from "../src/tui/commands";
-import { buildApprovalOverlayView } from "../src/tui/widgets/approval-overlay";
+import { buildApprovalPanel } from "../src/tui/widgets/approval-panel";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";
 import { buildHistoryOverlayView } from "../src/tui/widgets/history-picker";
@@ -53,6 +53,29 @@ test("pending input preview renders queued follow-up inputs without overlay chro
     lines: [],
     height: 0,
   });
+});
+
+test("approval panel renders in the composer pane without overlay chrome", () => {
+  const panel = buildApprovalPanel({
+    id: 1,
+    method: "item/permissions/requestApproval",
+    params: { reason: "needs workspace access" },
+  }, 1, 72);
+
+  expect(panel.visible).toBe(true);
+  expect(panel.lines[0]).toBe("  reason: needs workspace access");
+  expect(panel.lines).toContain("  reason: needs workspace access");
+  expect(panel.lines).toContain("  Yes, grant permissions");
+  expect(panel.lines).toContain("› No, deny request");
+  expect(panel.lines.at(-1)).toBe("  Enter choose · Esc deny · Up/Down move · type to queue");
+  expect(panel.height).toBe(panel.lines.length);
+
+  const withoutDetails = buildApprovalPanel({
+    id: 2,
+    method: "item/permissions/requestApproval",
+  }, 0, 72);
+  expect(withoutDetails.lines[0]).toBe("› Yes, grant permissions");
+  expect(withoutDetails.lines.join("\n")).not.toContain("item/permissions/requestApproval");
 });
 
 test("theme overlay selects UI themes", async () => {
@@ -224,19 +247,12 @@ test("navigable picker overlays render row views without textual selection marke
       status: "completed" as const,
     },
   ];
-  const approvalView = buildApprovalOverlayView(
-    { id: 1, method: "item/permissions/requestApproval" },
-    1,
-    theme,
-    8,
-  );
   const views = [
     buildSlashCommandOverlayView(SLASH_COMMANDS, 1, theme, 8),
     buildResumeOverlayView(resumeRows, state, theme, 8, 80),
     buildHistoryOverlayView(historyRows, state, theme),
     buildThemeOverlayView(themeRows, theme, 8, 1),
     buildStatusLineOverlayView(statusRows, "preview", theme, 8, 1),
-    approvalView,
   ];
 
   for (const view of views) {

@@ -1,4 +1,3 @@
-import type { JSONRPCRequest } from "../../codex/app-server";
 import type { TuiState } from "../state";
 
 export const ACTIVITY_SPINNER_INTERVAL_MS = 140;
@@ -16,7 +15,6 @@ export const ACTIVITY_SPINNER_FRAMES = [
 ] as const;
 
 export interface ActivityStatusInput {
-  pendingApproval?: JSONRPCRequest;
   running: boolean;
   turnStatus: TuiState["turnStatus"];
   statusMessage?: string;
@@ -42,7 +40,6 @@ export function formatActivityElapsed(elapsedMs: number | undefined): string {
 }
 
 export function formatActivityStatus(input: ActivityStatusInput): string {
-  if (input.pendingApproval) return `! Action required: ${input.pendingApproval.method}`;
   if (input.turnStatus === "failed" && input.statusMessage) return `! ${input.statusMessage}`;
   if (input.running && input.turnStatus === "running") {
     const elapsed = formatActivityElapsed(input.elapsedMs);

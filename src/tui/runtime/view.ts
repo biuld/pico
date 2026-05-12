@@ -15,6 +15,7 @@ import { buildTranscriptCellsWithLive } from "../transcript";
 import type { TuiMsg } from "../update";
 import { composerOverlayInset, formatComposerStatus } from "../widgets/composer";
 import { formatComposerPlaceholder } from "../widgets/composer-placeholder";
+import { buildApprovalPanel } from "../widgets/approval-panel";
 import { formatTransientStatusLine } from "../widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
@@ -50,7 +51,12 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     input.queuedMessages?.[0],
     Math.max(1, input.rendererWidth - 4),
   );
-  const bottomInset = composerOverlayInset(pendingInputPreview.height);
+  const approvalPanel = buildApprovalPanel(
+    input.pendingApproval,
+    input.getState().approvalSelection,
+    Math.max(1, input.rendererWidth - 4),
+  );
+  const bottomInset = composerOverlayInset(approvalPanel.height + pendingInputPreview.height);
   const pickerViewportHeight = overlayListViewportHeight(input.rendererHeight, bottomInset);
   const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
   let state = input.getState();
@@ -93,7 +99,6 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     !input.pendingApproval &&
     input.streamingText.length === 0;
   const statusText = formatComposerStatus({
-    pendingApproval: input.pendingApproval,
     running: input.running,
     turnStatus: state.turnStatus,
     statusMessage: state.statusMessage,
@@ -132,6 +137,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
         items: state.statusLineItems,
         width: Math.max(1, input.rendererWidth - 4),
       }, theme),
+      approvalPanel,
       pendingInputPreview,
     },
     overlay: buildOverlayView({
@@ -149,7 +155,6 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       threadViewportHeight: pickerViewportHeight,
       pickerViewportHeight,
       rendererWidth: input.rendererWidth,
-      pendingApproval: input.pendingApproval,
     }),
   };
 }

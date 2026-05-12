@@ -17,7 +17,6 @@ export type FooterMode =
   | "Failed";
 
 export function footerMode(state: TuiState): FooterMode {
-  if (state.overlay === "approval") return "Approval";
   if (state.overlay === "slash") return "SlashPalette";
   if (state.overlay === "history") return "HistoryPicker";
   if (state.overlay === "threads") return "ResumePicker";
@@ -26,6 +25,7 @@ export function footerMode(state: TuiState): FooterMode {
   if (state.overlay === "transcript") return "TranscriptPager";
   if (state.overlay === "shortcuts") return "ShortcutOverlay";
   if (state.turnStatus === "failed") return "Failed";
+  if (state.turnStatus === "approval") return "Approval";
   if (state.turnStatus === "running") {
     return state.inputValue.trim().length > 0 ? "WorkingWithDraft" : "Working";
   }

@@ -3,10 +3,12 @@ import type { TuiState } from "./state";
 
 export {
   buildApprovalOptions,
+  buildApprovalPanel,
   formatApprovalOption,
   type ApprovalDecision,
   type ApprovalOption,
-} from "./widgets/approval-overlay";
+  type ApprovalPanelState,
+} from "./widgets/approval-panel";
 export {
   footerMode,
   formatBottomStatusLine,

@@ -1,6 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { filterSlashCommands } from "./commands";
-import { buildApprovalOptions, type ApprovalDecision } from "./widgets/approval-overlay";
+import { buildApprovalOptions, type ApprovalDecision } from "./widgets/approval-panel";
 import type { TuiState } from "./state";
 import type { TuiMsg } from "./update";
 
@@ -62,44 +62,12 @@ export function installOpenTuiKeybindings(
       return true;
     }
 
-    const state = runtime.getState();
-    if (state.overlay !== "approval" || !runtime.hasPendingApproval()) return false;
-
-    const options = buildApprovalOptions(
-      runtime.pendingApprovalMethod() || "",
-      state.approvalSelection,
-    );
-    const lower = sequence.toLowerCase();
-
-    if (sequence === "\u001b[A" || lower === "k" || sequence === "\u0010") {
-      runtime.dispatch({ type: "moveApproval", total: options.length, delta: -1 });
-      runtime.render();
-      return true;
-    }
-    if (sequence === "\u001b[B" || lower === "j" || sequence === "\u000e") {
-      runtime.dispatch({ type: "moveApproval", total: options.length, delta: 1 });
-      runtime.render();
-      return true;
-    }
-    if (sequence === "\r") {
-      runtime.resolveApproval(options[state.approvalSelection]?.decision || "decline");
-      return true;
-    }
-    if (lower === "a" || lower === "s" || lower === "d") {
-      const option = options.find((item) => item.shortcut === lower);
-      if (option) runtime.resolveApproval(option.decision);
-      return true;
-    }
-    if (sequence === "\u001b") {
-      runtime.resolveApproval("decline");
-      return true;
-    }
-    return true;
+    if (runtime.hasPendingApproval() && handleApprovalKey(sequence, runtime)) return true;
+    return false;
   });
 
   renderer.addInputHandler((sequence) => {
     const state = runtime.getState();
-    if (state.overlay === "approval") return false;
 
     if (state.overlay === "slash") {
       return handleSlashKey(sequence, runtime);
@@ -156,6 +124,38 @@ export function installOpenTuiKeybindings(
 
 let lastComposerEscAt = 0;
 let lastCtrlDAt = 0;
+
+function handleApprovalKey(sequence: string, runtime: KeybindingRuntime): boolean {
+  if (sequence === "\u001b") {
+    runtime.resolveApproval("decline");
+    return true;
+  }
+
+  const inputEmpty = runtime.getInputValue().trim().length === 0;
+  if (!inputEmpty) return false;
+
+  const state = runtime.getState();
+  const options = buildApprovalOptions(
+    runtime.pendingApprovalMethod() || "",
+    state.approvalSelection,
+  );
+
+  if (sequence === "\u001b[A" || sequence === "\u0010") {
+    runtime.dispatch({ type: "moveApproval", total: options.length, delta: -1 });
+    runtime.render();
+    return true;
+  }
+  if (sequence === "\u001b[B" || sequence === "\u000e") {
+    runtime.dispatch({ type: "moveApproval", total: options.length, delta: 1 });
+    runtime.render();
+    return true;
+  }
+  if (sequence === "\r") {
+    runtime.resolveApproval(options[state.approvalSelection]?.decision || "decline");
+    return true;
+  }
+  return false;
+}
 
 function isOptionUp(sequence: string): boolean {
   return sequence === "\u001b[1;3A" ||

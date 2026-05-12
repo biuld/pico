@@ -181,6 +181,124 @@ test("option up restores the queued draft into the composer", () => {
   expect(recallCount).toBe(1);
 });
 
+test("approval controls do not consume composer text", () => {
+  const handlers: Array<(sequence: string) => boolean> = [];
+  const renderer = {
+    addInputHandler: (handler: (sequence: string) => boolean) => {
+      handlers.push(handler);
+    },
+  } as unknown as CliRenderer;
+
+  let state = updateTuiState(createTuiState(), { type: "showApproval" });
+  let inputValue = "";
+  let resolvedDecision = "";
+  const runtime: KeybindingRuntime = {
+    getState: () => state,
+    getInputValue: () => inputValue,
+    hasPendingApproval: () => true,
+    pendingApprovalMethod: () => "item/permissions/requestApproval",
+    isRunning: () => true,
+    dispatch: (msg) => {
+      state = updateTuiState(state, msg);
+    },
+    render: () => {},
+    close: () => {},
+    focusInput: () => {},
+    setComposerFocus: () => {},
+    showHistory: () => {},
+    showThreads: () => {},
+    showTheme: () => {},
+    showStatusLine: () => {},
+    showTranscript: () => {},
+    showShortcuts: () => {},
+    moveHistorySelection: () => {},
+    moveThreadSelection: () => {},
+    moveThemeSelection: () => {},
+    moveStatusLineSelection: () => {},
+    restoreSelected: () => {},
+    resumeSelected: () => {},
+    selectTheme: () => {},
+    toggleStatusLineItem: () => {},
+    queueDraft: () => {},
+    recallQueuedDraft: () => {},
+    interruptTurn: () => {},
+    setInputValue: (value) => {
+      inputValue = value;
+    },
+    acceptSlashSelection: () => {},
+    resolveApproval: (decision) => {
+      resolvedDecision = decision;
+    },
+  };
+
+  installOpenTuiKeybindings(renderer, runtime);
+
+  expect(state.overlay).toBe("none");
+  expect(handlers[0]("s")).toBe(false);
+  expect(resolvedDecision).toBe("");
+
+  inputValue = "src/tui/runtime/index.ts";
+  expect(handlers[0]("\r")).toBe(false);
+  expect(resolvedDecision).toBe("");
+});
+
+test("approval controls handle empty-composer navigation and decisions", () => {
+  const handlers: Array<(sequence: string) => boolean> = [];
+  const renderer = {
+    addInputHandler: (handler: (sequence: string) => boolean) => {
+      handlers.push(handler);
+    },
+  } as unknown as CliRenderer;
+
+  let state = updateTuiState(createTuiState(), { type: "showApproval" });
+  const decisions: string[] = [];
+  const runtime: KeybindingRuntime = {
+    getState: () => state,
+    getInputValue: () => "",
+    hasPendingApproval: () => true,
+    pendingApprovalMethod: () => "item/permissions/requestApproval",
+    isRunning: () => true,
+    dispatch: (msg) => {
+      state = updateTuiState(state, msg);
+    },
+    render: () => {},
+    close: () => {},
+    focusInput: () => {},
+    setComposerFocus: () => {},
+    showHistory: () => {},
+    showThreads: () => {},
+    showTheme: () => {},
+    showStatusLine: () => {},
+    showTranscript: () => {},
+    showShortcuts: () => {},
+    moveHistorySelection: () => {},
+    moveThreadSelection: () => {},
+    moveThemeSelection: () => {},
+    moveStatusLineSelection: () => {},
+    restoreSelected: () => {},
+    resumeSelected: () => {},
+    selectTheme: () => {},
+    toggleStatusLineItem: () => {},
+    queueDraft: () => {},
+    recallQueuedDraft: () => {},
+    interruptTurn: () => {},
+    setInputValue: () => {},
+    acceptSlashSelection: () => {},
+    resolveApproval: (decision) => {
+      decisions.push(decision);
+    },
+  };
+
+  installOpenTuiKeybindings(renderer, runtime);
+
+  expect(handlers[0]("\u001b[B")).toBe(true);
+  expect(state.approvalSelection).toBe(1);
+  expect(handlers[0]("\r")).toBe(true);
+  expect(decisions.at(-1)).toBe("decline");
+  expect(handlers[0]("\u001b")).toBe(true);
+  expect(decisions.at(-1)).toBe("decline");
+});
+
 test("tab does not submit an empty composer", () => {
   const handlers: Array<(sequence: string) => boolean> = [];
   const renderer = {

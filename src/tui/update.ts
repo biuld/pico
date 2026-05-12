@@ -88,7 +88,7 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
     case "openShortcuts":
       return setOverlay(state, "shortcuts");
     case "showApproval":
-      return setOverlay(setTurnStatus(state, "approval"), "approval");
+      return setOverlay({ ...setTurnStatus(state, "approval"), approvalSelection: 0 }, "none");
     case "moveHistory":
       return syncListScroll(
         moveSelection(state, msg.entryIds, msg.delta),

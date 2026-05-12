@@ -14,6 +14,7 @@ import { emptyOverlay, type OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import type { TranscriptCell } from "../transcript";
 import { composerOverlayInset, ComposerView } from "./composer";
+import { emptyApprovalPanel, type ApprovalPanelState } from "./approval-panel";
 import { emptyPendingInputPreview, type PendingInputPreviewState } from "./pending-input-preview";
 import { OverlaySurface } from "./overlay";
 import { StartupBannerView, type StartupBannerState } from "./startup-banner";
@@ -38,6 +39,7 @@ export interface ComposerLayoutState {
   placeholder: string;
   statusLine: string | StyledText;
   inputValue: string;
+  approvalPanel: ApprovalPanelState;
   pendingInputPreview: PendingInputPreviewState;
 }
 
@@ -94,6 +96,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
     placeholder: "Ask Pico to do anything",
     statusLine: "",
     inputValue: "",
+    approvalPanel: emptyApprovalPanel(),
     pendingInputPreview: emptyPendingInputPreview(),
   });
   const [syntaxStyle, setSyntaxStyle] = createSignal(createTranscriptSyntaxStyle(theme));
@@ -189,6 +192,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
         placeholder={composer().placeholder}
         statusLine={composer().statusLine}
         inputValue={composer().inputValue}
+        approvalPanel={composer().approvalPanel}
         pendingInputPreview={composer().pendingInputPreview}
         onInput={handleInput}
         onSubmit={handleSubmit}
@@ -201,7 +205,9 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
         theme={activeTheme()}
         rendererWidth={size().width}
         rendererHeight={size().height}
-        bottomInset={composerOverlayInset(composer().pendingInputPreview.height)}
+        bottomInset={composerOverlayInset(
+          composer().approvalPanel.height + composer().pendingInputPreview.height,
+        )}
       />
     </box>
   ), renderer);

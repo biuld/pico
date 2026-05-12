@@ -1,11 +1,9 @@
-import type { JSONRPCRequest } from "../codex/app-server";
 import type { DraftAppState } from "../app/controller";
 import type { SlashCommandSpec } from "./commands";
 import type { HistoryTurnRow } from "./history";
 import { emptyOverlay, type OverlayView } from "./overlay-model";
 import type { TuiState } from "./state";
 import type { TuiTheme } from "./theme";
-import { buildApprovalOverlayView } from "./widgets/approval-overlay";
 import { buildHistoryOverlayView } from "./widgets/history-picker";
 import { buildResumeOverlayView, type ThreadRow } from "./widgets/resume-picker";
 import { buildShortcutOverlayView } from "./widgets/shortcut-overlay";
@@ -31,7 +29,6 @@ export interface OverlayViewInput {
   threadViewportHeight: number;
   pickerViewportHeight: number;
   rendererWidth: number;
-  pendingApproval?: JSONRPCRequest;
 }
 
 export function buildOverlayView(input: OverlayViewInput): OverlayView {
@@ -47,7 +44,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
     themeRows,
     statusLineRows,
     statusLinePreview,
-    pendingApproval,
   } = input;
 
   switch (state.overlay) {
@@ -62,15 +58,6 @@ export function buildOverlayView(input: OverlayViewInput): OverlayView {
       );
     case "shortcuts":
       return buildShortcutOverlayView();
-    case "approval":
-      return pendingApproval
-        ? buildApprovalOverlayView(
-            pendingApproval,
-            state.approvalSelection,
-            theme,
-            input.pickerViewportHeight,
-          )
-        : emptyOverlay();
     case "slash":
       return buildSlashCommandOverlayView(
         slashCommands,

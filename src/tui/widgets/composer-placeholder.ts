@@ -20,7 +20,7 @@ export type ComposerPlaceholderMode = "hidden" | "idle" | "working";
 export function composerPlaceholderMode(state: TuiState): ComposerPlaceholderMode {
   if (state.overlay !== "none") return "hidden";
   if (state.inputValue.trim().length > 0) return "hidden";
-  return state.turnStatus === "running" ? "working" : "idle";
+  return state.turnStatus === "running" || state.turnStatus === "approval" ? "working" : "idle";
 }
 
 export function formatComposerPlaceholder(state: TuiState, frame = 0): string {

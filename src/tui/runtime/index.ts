@@ -11,7 +11,7 @@ import type { PicoThreadInfo } from "../../thread/store";
 import { installOpenTuiKeybindings } from "../keybindings";
 import { createTuiState, type TuiState } from "../state";
 import { updateTuiState, type TuiMsg } from "../update";
-import type { ApprovalDecision } from "../widgets/approval-overlay";
+import type { ApprovalDecision } from "../widgets/approval-panel";
 import { composerPlaceholderMode } from "../widgets/composer-placeholder";
 import type { OpenTuiLayout } from "../widgets/layout";
 import { createRuntimeActions } from "./actions";
@@ -227,7 +227,7 @@ export function runOpenTuiRuntime(
   });
   appSession.on(PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED, () => {
     dispatch({ type: "showApproval" });
-    layout.blurInput();
+    layout.focusInput();
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, (event) => {

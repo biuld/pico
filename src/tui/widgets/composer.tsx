@@ -3,6 +3,11 @@ import type { InputRenderable, StyledText } from "@opentui/core";
 import type { TuiTheme } from "../theme";
 export { formatActivityStatus as formatComposerStatus } from "./activity-indicator";
 import {
+  ApprovalPanelView,
+  emptyApprovalPanel,
+  type ApprovalPanelState,
+} from "./approval-panel";
+import {
   emptyPendingInputPreview,
   PendingInputPreviewView,
   type PendingInputPreviewState,
@@ -16,8 +21,8 @@ export const COMPOSER_HEIGHT =
   COMPOSER_TRANSIENT_STATUS_HEIGHT + COMPOSER_ROW_HEIGHT + COMPOSER_STATUS_LINE_HEIGHT;
 export const COMPOSER_OVERLAY_INSET = COMPOSER_HEIGHT;
 
-export function composerOverlayInset(pendingInputPreviewHeight = 0): number {
-  return COMPOSER_HEIGHT + Math.max(0, pendingInputPreviewHeight);
+export function composerOverlayInset(extraHeight = 0): number {
+  return COMPOSER_HEIGHT + Math.max(0, extraHeight);
 }
 
 export interface ComposerViewProps {
@@ -26,6 +31,7 @@ export interface ComposerViewProps {
   placeholder: string;
   statusLine: string | StyledText;
   inputValue: string;
+  approvalPanel?: ApprovalPanelState;
   pendingInputPreview?: PendingInputPreviewState;
   onInput(value: string): void;
   onSubmit(): void;
@@ -33,14 +39,16 @@ export interface ComposerViewProps {
 }
 
 export function ComposerView(props: ComposerViewProps) {
+  const approvalPanel = () => props.approvalPanel || emptyApprovalPanel();
   const pendingInputPreview = () => props.pendingInputPreview || emptyPendingInputPreview();
+  const extraHeight = () => approvalPanel().height + pendingInputPreview().height;
 
   return (
     <box
       id="pico-bottom-pane"
       flexDirection="column"
       width="100%"
-      height={composerOverlayInset(pendingInputPreview().height)}
+      height={composerOverlayInset(extraHeight())}
       border={false}
       paddingX={2}
       paddingY={0}
@@ -54,6 +62,10 @@ export function ComposerView(props: ComposerViewProps) {
         fg={props.theme.colors.muted}
         wrapMode="none"
         truncate={true}
+      />
+      <ApprovalPanelView
+        panel={approvalPanel()}
+        theme={props.theme}
       />
       <PendingInputPreviewView
         preview={pendingInputPreview()}

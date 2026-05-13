@@ -26,7 +26,7 @@ test("solid layout bridge updates composer text and input handlers", async () =>
     width: 60,
     height: 12,
     theme: TUI_THEMES[0],
-    composer: {
+    bottomPane: {
       transientStatus: "• ready",
       placeholder: "Ask Pico",
       statusLine: new StyledText([fg(TUI_THEMES[0].colors.statusLine.model)("gpt-test")]),
@@ -52,7 +52,7 @@ test("solid layout bridge updates composer text and input handlers", async () =>
   expect(captureCharFrame()).toContain("gpt-test");
 
   layout.update({
-    overlay: {
+    pagerOverlay: {
       visible: true,
       title: "Solid Overlay",
       fullScreen: false,

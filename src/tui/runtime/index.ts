@@ -9,7 +9,7 @@ import type {
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../app-session";
 import type { PicoThreadInfo } from "../../thread/store";
 import { installOpenTuiKeybindings } from "../keybindings";
-import { createTuiState, type TuiState } from "../state";
+import { composerOwnsFocus, createTuiState, type TuiState } from "../state";
 import { updateTuiState, type TuiMsg } from "../update";
 import type { ApprovalDecision } from "../widgets/approval-panel";
 import { composerPlaceholderMode } from "../widgets/composer-placeholder";
@@ -41,7 +41,7 @@ export function runOpenTuiRuntime(
     const snapshot = appSession.snapshot;
     return snapshot.running &&
       !snapshot.pendingApproval &&
-      state.turnStatus === "running";
+      state.bottomPane.turnStatus === "running";
   };
 
   const clocks = createRuntimeClocks({
@@ -54,7 +54,7 @@ export function runOpenTuiRuntime(
   const copySelection = async (notifyWhenEmpty = false) => {
     const result = await copyRendererSelection(renderer, notifyWhenEmpty);
     if (!result.message) return;
-    dispatch({ type: "setTurnStatus", status: state.turnStatus, message: result.message });
+    dispatch({ type: "setTurnStatus", status: state.bottomPane.turnStatus, message: result.message });
     render();
   };
 
@@ -66,7 +66,7 @@ export function runOpenTuiRuntime(
   };
 
   const terminalFocusHandler = () => {
-    if (closing || state.overlay !== "none" || appSession.snapshot.pendingApproval) return;
+    if (closing || !composerOwnsFocus(state) || appSession.snapshot.pendingApproval) return;
     layout.focusInput();
   };
 
@@ -123,7 +123,11 @@ export function runOpenTuiRuntime(
 
   const submitInput = async () => {
     await submitRuntimeInput({
-      getOverlay: () => state.overlay,
+      getSubmitSurface: () => {
+        if (state.bottomPane.activeView === "commandPopup") return "commandPopup";
+        if (composerOwnsFocus(state)) return "composer";
+        return "blocked";
+      },
       getInputValue: () => layout.getInputValue(),
       acceptSlashSelection: () => actions.acceptSlashSelection(),
       handleLocalCommand: (command) => actions.handleLocalCommand(command),
@@ -133,7 +137,11 @@ export function runOpenTuiRuntime(
       queueDraft: actions.queueDraft,
       submit: (text) => appSession.submit(text),
       setBusyStatus: () => {
-        dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "turn is running" });
+        dispatch({
+          type: "setTurnStatus",
+          status: state.bottomPane.turnStatus,
+          message: "turn is running",
+        });
         render();
       },
     });
@@ -144,12 +152,12 @@ export function runOpenTuiRuntime(
   });
   appSession.on(PICO_APP_SESSION_EVENTS.CONFIG_CHANGED, render);
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_BUSY, () => {
-    dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "turn is running" });
+    dispatch({ type: "setTurnStatus", status: state.bottomPane.turnStatus, message: "turn is running" });
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_SUBMITTING, () => {
     dispatch({ type: "setTurnStatus", status: "running", message: "starting" });
-    dispatch({ type: "closeOverlay" });
+    dispatch({ type: "closeSurface" });
     clocks.restartActivity();
     render();
   });
@@ -182,7 +190,7 @@ export function runOpenTuiRuntime(
     const message = event.error instanceof Error ? event.error.message : String(event.error);
     dispatch({
       type: "setTurnStatus",
-      status: state.turnStatus,
+      status: state.bottomPane.turnStatus,
       message: `interrupt failed: ${message}`,
     });
     render();
@@ -222,7 +230,7 @@ export function runOpenTuiRuntime(
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => {
     clocks.finishActivity();
-    if (!closing && state.overlay === "none" && !appSession.snapshot.pendingApproval) {
+    if (!closing && composerOwnsFocus(state) && !appSession.snapshot.pendingApproval) {
       layout.focusInput();
     }
     render();
@@ -234,14 +242,14 @@ export function runOpenTuiRuntime(
   });
   appSession.on(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, (event) => {
     dispatch({ type: "setTurnStatus", status: event.running ? "running" : "idle" });
-    dispatch({ type: "closeOverlay" });
+    dispatch({ type: "closeSurface" });
     layout.focusInput();
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.QUEUE_CHANGED, (event) => {
     dispatch({
       type: "setTurnStatus",
-      status: state.turnStatus,
+      status: state.bottomPane.turnStatus,
       message: event.queuedCount > 0 ? `queued ${event.queuedCount}` : "queue empty",
     });
     render();

@@ -8,7 +8,7 @@ import { createTuiState } from "../src/tui/state";
 import { updateTuiState } from "../src/tui/update";
 import { createStore } from "./tui-test-helpers";
 
-test("history overlay groups each turn as a tree node with an agent summary", async () => {
+test("history picker groups each turn as a tree node with an agent summary", async () => {
   const store = await createStore();
   const turn = await store.appendTurn(store.leafId, "Explain Pico history");
   await store.appendResponseItem(turn.id, turn.id, {

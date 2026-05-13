@@ -11,7 +11,7 @@ export interface ThemeRow {
   isSelected: boolean;
 }
 
-export function buildThemeOverlayView(
+export function buildThemePickerView(
   rows: readonly ThemeRow[],
   theme: TuiTheme,
   viewportHeight: number,

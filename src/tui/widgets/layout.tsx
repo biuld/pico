@@ -5,7 +5,6 @@ import {
   type CliRenderer,
   type InputRenderable,
   type ScrollBoxRenderable,
-  type StyledText,
 } from "@opentui/core";
 import { render as renderSolid } from "@opentui/solid";
 import { createSignal, Show } from "solid-js";
@@ -13,10 +12,14 @@ import { createStore, reconcile } from "solid-js/store";
 import { emptyOverlay, type OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import type { TranscriptCell } from "../transcript";
-import { composerOverlayInset, ComposerView } from "./composer";
-import { emptyApprovalPanel, type ApprovalPanelState } from "./approval-panel";
-import { emptyPendingInputPreview, type PendingInputPreviewState } from "./pending-input-preview";
-import { OverlaySurface } from "./overlay";
+import {
+  bottomPaneHeight,
+  BottomPaneView,
+  emptyBottomPanePanel,
+  type BottomPaneLayoutState,
+} from "./bottom-pane";
+import { PagerOverlaySurface } from "./overlay";
+import { PickerSurface } from "./picker-surface";
 import { StartupBannerView, type StartupBannerState } from "./startup-banner";
 import {
   TranscriptPanelView,
@@ -30,17 +33,9 @@ export interface OpenTuiLayoutUpdate {
   height?: number;
   transcriptCells?: readonly TranscriptCell[];
   startupBanner?: StartupBannerState;
-  composer?: Partial<ComposerLayoutState>;
-  overlay?: OverlayView;
-}
-
-export interface ComposerLayoutState {
-  transientStatus: string;
-  placeholder: string;
-  statusLine: string | StyledText;
-  inputValue: string;
-  approvalPanel: ApprovalPanelState;
-  pendingInputPreview: PendingInputPreviewState;
+  bottomPane?: Partial<BottomPaneLayoutState>;
+  pickerSurface?: OverlayView;
+  pagerOverlay?: OverlayView;
 }
 
 export interface OpenTuiInputHandlers {
@@ -53,7 +48,8 @@ export interface OpenTuiLayout {
   transcript: TranscriptPanelHandle;
   update(next: OpenTuiLayoutUpdate): void;
   applyTheme(theme: TuiTheme): void;
-  applyOverlay(view: OverlayView): void;
+  applyPagerOverlay(view: OverlayView): void;
+  applyPickerSurface(view: OverlayView): void;
   resize(width: number, height: number): void;
   setInputHandlers(handlers: OpenTuiInputHandlers): void;
   focusInput(): void;
@@ -90,14 +86,14 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
     model: "",
     cwd: "",
   });
-  const [overlay, setOverlay] = createSignal<OverlayView>(emptyOverlay());
-  const [composer, setComposer] = createSignal<ComposerLayoutState>({
+  const [pagerOverlay, setPagerOverlay] = createSignal<OverlayView>(emptyOverlay());
+  const [pickerSurface, setPickerSurface] = createSignal<OverlayView>(emptyOverlay());
+  const [bottomPane, setBottomPane] = createSignal<BottomPaneLayoutState>({
+    panel: emptyBottomPanePanel(),
     transientStatus: "",
     placeholder: "Ask Pico to do anything",
     statusLine: "",
     inputValue: "",
-    approvalPanel: emptyApprovalPanel(),
-    pendingInputPreview: emptyPendingInputPreview(),
   });
   const [syntaxStyle, setSyntaxStyle] = createSignal(createTranscriptSyntaxStyle(theme));
 
@@ -109,12 +105,12 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
   };
 
   const setComposerInputValue = (value: string) => {
-    setComposer((previous) => ({ ...previous, inputValue: value }));
+    setBottomPane((previous) => ({ ...previous, inputValue: value }));
     if (input && input.value !== value) input.value = value;
   };
 
   const handleInput = (value: string) => {
-    setComposer((previous) => ({ ...previous, inputValue: value }));
+    setBottomPane((previous) => ({ ...previous, inputValue: value }));
     inputHandlers.onInput?.(value);
   };
 
@@ -150,12 +146,16 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
       setStartupBanner(next.startupBanner);
     }
 
-    if (next.composer) {
-      setComposer((previous) => ({ ...previous, ...next.composer }));
+    if (next.bottomPane) {
+      setBottomPane((previous) => ({ ...previous, ...next.bottomPane }));
     }
 
-    if (next.overlay) {
-      setOverlay(next.overlay);
+    if (next.pickerSurface) {
+      setPickerSurface(next.pickerSurface);
+    }
+
+    if (next.pagerOverlay) {
+      setPagerOverlay(next.pagerOverlay);
     }
   };
 
@@ -186,28 +186,28 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
           transcriptRoot = root;
         }}
       />
-      <ComposerView
+      <BottomPaneView
+        pane={bottomPane()}
         theme={activeTheme()}
-        transientStatus={composer().transientStatus}
-        placeholder={composer().placeholder}
-        statusLine={composer().statusLine}
-        inputValue={composer().inputValue}
-        approvalPanel={composer().approvalPanel}
-        pendingInputPreview={composer().pendingInputPreview}
         onInput={handleInput}
         onSubmit={handleSubmit}
         onInputRef={(nextInput) => {
           input = nextInput;
         }}
       />
-      <OverlaySurface
-        view={overlay()}
+      <PickerSurface
+        view={pickerSurface()}
         theme={activeTheme()}
         rendererWidth={size().width}
         rendererHeight={size().height}
-        bottomInset={composerOverlayInset(
-          composer().approvalPanel.height + composer().pendingInputPreview.height,
-        )}
+        bottomInset={bottomPaneHeight(bottomPane().panel)}
+      />
+      <PagerOverlaySurface
+        view={pagerOverlay()}
+        theme={activeTheme()}
+        rendererWidth={size().width}
+        rendererHeight={size().height}
+        bottomInset={bottomPaneHeight(bottomPane().panel)}
       />
     </box>
   ), renderer);
@@ -235,7 +235,8 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
     },
     update,
     applyTheme: (nextTheme) => update({ theme: nextTheme }),
-    applyOverlay: (view) => update({ overlay: view }),
+    applyPagerOverlay: (view) => update({ pagerOverlay: view }),
+    applyPickerSurface: (view) => update({ pickerSurface: view }),
     resize: (width, height) => update({ width, height }),
     setInputHandlers: (handlers) => {
       inputHandlers = handlers;
@@ -246,7 +247,7 @@ export function createOpenTuiLayout(renderer: CliRenderer, theme: TuiTheme): Ope
     blurInput: () => {
       input?.blur();
     },
-    getInputValue: () => input?.value ?? composer().inputValue,
+    getInputValue: () => input?.value ?? bottomPane().inputValue,
     setInputValue: setComposerInputValue,
   };
 }

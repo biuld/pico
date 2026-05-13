@@ -17,7 +17,7 @@ export function buildTranscriptPagerOverlayView(
   return {
     visible: true,
     title: "Transcript",
-    fullScreen: true,
+    fullScreen: false,
     scrollY: state.transcriptScroll,
     content: transcriptPagerText(buildTranscriptCellsWithLive(app, streamingText, liveLeafId)),
     footer: OVERLAY_HINTS.transcript,

@@ -1,8 +1,9 @@
 import { parseTuiInput, type TuiInputCommand } from "../commands";
-import type { TuiState } from "../state";
+
+export type RuntimeSubmitSurface = "composer" | "commandPopup" | "blocked";
 
 export interface RuntimeSubmitHost {
-  getOverlay(): TuiState["overlay"];
+  getSubmitSurface(): RuntimeSubmitSurface;
   getInputValue(): string;
   acceptSlashSelection(): Promise<void>;
   handleLocalCommand(command: TuiInputCommand): Promise<boolean>;
@@ -15,12 +16,12 @@ export interface RuntimeSubmitHost {
 }
 
 export async function submitRuntimeInput(host: RuntimeSubmitHost): Promise<void> {
-  const overlay = host.getOverlay();
-  if (overlay === "slash") {
+  const surface = host.getSubmitSurface();
+  if (surface === "commandPopup") {
     await host.acceptSlashSelection();
     return;
   }
-  if (overlay !== "none") return;
+  if (surface === "blocked") return;
 
   const command = parseTuiInput(host.getInputValue());
   const handledLocally = await host.handleLocalCommand(command);

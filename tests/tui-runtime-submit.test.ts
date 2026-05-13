@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import type { TuiInputCommand } from "../src/tui/commands";
 import { submitRuntimeInput, type RuntimeSubmitHost } from "../src/tui/runtime/submit";
-import type { TuiState } from "../src/tui/state";
 
 function createSubmitHost(overrides: Partial<RuntimeSubmitHost> = {}) {
   const calls = {
@@ -13,7 +12,7 @@ function createSubmitHost(overrides: Partial<RuntimeSubmitHost> = {}) {
     localCommands: [] as TuiInputCommand[],
   };
   const host: RuntimeSubmitHost = {
-    getOverlay: () => "none" as TuiState["overlay"],
+    getSubmitSurface: () => "composer",
     getInputValue: () => "hello",
     acceptSlashSelection: async () => {
       calls.acceptedSlash += 1;
@@ -78,9 +77,9 @@ test("submitRuntimeInput keeps non-running busy states as busy status", async ()
   expect(calls.busyStatus).toBe(1);
 });
 
-test("submitRuntimeInput routes slash overlay to slash selection", async () => {
+test("submitRuntimeInput routes command popup to slash selection", async () => {
   const { calls, host } = createSubmitHost({
-    getOverlay: () => "slash",
+    getSubmitSurface: () => "commandPopup",
   });
 
   await submitRuntimeInput(host);

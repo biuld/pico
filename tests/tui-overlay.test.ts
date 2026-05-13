@@ -3,32 +3,32 @@ import { createTuiState } from "../src/tui/state";
 import { TUI_THEMES } from "../src/tui/theme";
 import { updateTuiState } from "../src/tui/update";
 import { SLASH_COMMANDS } from "../src/tui/commands";
+import { buildBottomPanePanel } from "../src/tui/bottom-pane";
 import { buildApprovalPanel } from "../src/tui/widgets/approval-panel";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";
-import { buildHistoryOverlayView } from "../src/tui/widgets/history-picker";
-import { overlayFrame } from "../src/tui/widgets/overlay";
+import { buildHistoryPickerSurfaceView } from "../src/tui/widgets/history-picker";
+import { pagerOverlayFrame } from "../src/tui/widgets/overlay";
 import { buildPendingInputPreview } from "../src/tui/widgets/pending-input-preview";
 import {
-  buildResumeOverlayView,
+  buildResumePickerSurfaceView,
   buildThreadRows,
   formatThreadRow,
 } from "../src/tui/widgets/resume-picker";
-import { buildSlashCommandOverlayView } from "../src/tui/widgets/slash-command-popup";
-import { buildStatusLineOverlayView, buildStatusLineRows } from "../src/tui/widgets/statusline-picker";
-import { buildThemeOverlayView, buildThemeRows } from "../src/tui/widgets/theme-picker";
+import { buildStatusLineRows } from "../src/tui/widgets/statusline-picker";
+import { buildThemeRows } from "../src/tui/widgets/theme-picker";
 import { createStore } from "./tui-test-helpers";
 
-test("overlay anchors above the transient status line and composer", () => {
+test("pager overlay anchors above the bottom pane", () => {
   expect(COMPOSER_OVERLAY_INSET).toBe(COMPOSER_HEIGHT);
-  expect(overlayFrame(100, 30, COMPOSER_OVERLAY_INSET, false)).toEqual({
+  expect(pagerOverlayFrame(100, 30, COMPOSER_OVERLAY_INSET, false)).toEqual({
     left: 0,
     top: 0,
     bottom: undefined,
     width: 100,
     height: 30 - COMPOSER_OVERLAY_INSET,
   });
-  expect(overlayFrame(100, 30, COMPOSER_OVERLAY_INSET, true)).toEqual({
+  expect(pagerOverlayFrame(100, 30, COMPOSER_OVERLAY_INSET, true)).toEqual({
     left: 0,
     top: 0,
     bottom: undefined,
@@ -81,12 +81,53 @@ test("approval panel renders in the composer pane without overlay chrome", () =>
   expect(withoutDetails.lines.join("\n")).not.toContain("item/permissions/requestApproval");
 });
 
-test("theme overlay selects UI themes", async () => {
+test("bottom pane renders passive queued input and active approval content", () => {
+  const theme = TUI_THEMES[0];
+  const state = createTuiState();
+  const queued = buildBottomPanePanel({
+    state,
+    theme,
+    queuedMessage: { text: "follow up after the current turn" },
+    slashCommands: [],
+    themeRows: [],
+    statusLineRows: [],
+    statusLinePreview: "",
+    rendererWidth: 80,
+    rendererHeight: 24,
+  });
+
+  expect(queued.kind).toBe("queuedInput");
+  expect(queued.mode).toBe("passive");
+  expect(queued.rows.some((row) => String(row.content).includes("Queued follow-up input"))).toBe(true);
+
+  const approval = buildBottomPanePanel({
+    state: updateTuiState(state, { type: "showApproval" }),
+    theme,
+    pendingApproval: {
+      id: 1,
+      method: "item/permissions/requestApproval",
+      params: { reason: "needs workspace access" },
+    },
+    slashCommands: [],
+    themeRows: [],
+    statusLineRows: [],
+    statusLinePreview: "",
+    rendererWidth: 80,
+    rendererHeight: 24,
+  });
+
+  expect(approval.kind).toBe("approval");
+  expect(approval.mode).toBe("active");
+  expect(approval.rows.map((row) => String(row.content)).join("\n")).toContain("needs workspace access");
+  expect(approval.rows.map((row) => String(row.content)).join("\n")).not.toContain("item/permissions/requestApproval");
+});
+
+test("theme picker is a bottom-pane view", async () => {
   const store = await createStore();
   let state = createTuiState(store);
 
   state = updateTuiState(state, { type: "openTheme" });
-  expect(state.overlay).toBe("theme");
+  expect(state.bottomPane.activeView).toBe("themePicker");
   expect(footerMode(state)).toBe("ThemePicker");
 
   const rows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
@@ -95,10 +136,10 @@ test("theme overlay selects UI themes", async () => {
   state = updateTuiState(state, { type: "moveTheme", total: TUI_THEMES.length, delta: 1 });
   state = updateTuiState(state, { type: "themeSelected", themeName: TUI_THEMES[state.themeSelection].name });
   expect(state.themeName).toBe(TUI_THEMES[1].name);
-  expect(state.overlay).toBe("none");
+  expect(state.bottomPane.activeView).toBe("none");
 });
 
-test("resume overlay selects saved threads", async () => {
+test("resume picker surface selects saved threads", async () => {
   const store = await createStore();
   const threads = [
     {
@@ -118,7 +159,7 @@ test("resume overlay selects saved threads", async () => {
   expect(rows.some((row) => row.id === store.id && row.isCurrent)).toBe(true);
 
   state = updateTuiState(state, { type: "openThreads", threadId: store.id });
-  expect(state.overlay).toBe("threads");
+  expect(state.pickerSurface).toBe("resume");
 
   state = updateTuiState(state, {
     type: "syncThreads",
@@ -128,7 +169,7 @@ test("resume overlay selects saved threads", async () => {
   expect(state.selectedThreadId).toBe(store.id);
 });
 
-test("resume overlay keeps thread rows single-line and width bounded", () => {
+test("resume picker keeps thread rows single-line and width bounded", () => {
   const row = {
     id: "codex_0123456789",
     isCurrent: false,
@@ -161,9 +202,9 @@ test("resume overlay keeps thread rows single-line and width bounded", () => {
   expect(currentLine).not.toStartWith("*  ");
 });
 
-test("resume overlay applies renderer width to rows", () => {
+test("resume picker applies renderer width to rows", () => {
   const state = createTuiState();
-  const view = buildResumeOverlayView(
+  const view = buildResumePickerSurfaceView(
     [
       {
         id: "codex_0123456789",
@@ -189,7 +230,7 @@ test("resume overlay applies renderer width to rows", () => {
   expect(String(row?.content).length).toBeLessThanOrEqual(76);
 });
 
-test("resume overlay uses themed alternating row backgrounds", () => {
+test("resume picker uses themed alternating row backgrounds", () => {
   const state = createTuiState();
   const rows = Array.from({ length: 5 }, (_, index) => ({
     id: `thread-${index}`,
@@ -204,7 +245,7 @@ test("resume overlay uses themed alternating row backgrounds", () => {
   }));
   const theme = TUI_THEMES[0];
 
-  const view = buildResumeOverlayView(rows, state, theme, 4, 80);
+  const view = buildResumePickerSurfaceView(rows, state, theme, 4, 80);
 
   expect(view.content).toBe("");
   expect(view.rows).toHaveLength(5);
@@ -218,9 +259,12 @@ test("resume overlay uses themed alternating row backgrounds", () => {
   expect(String(view.rows?.[4]?.content)).toContain("thread 4");
 });
 
-test("navigable picker overlays render row views without textual selection markers", () => {
+test("navigable bottom-pane and picker surfaces render rows without textual selection markers", () => {
   const theme = TUI_THEMES[0];
   const state = createTuiState();
+  const commandState = updateTuiState(state, { type: "inputChanged", value: "/" });
+  const themeState = updateTuiState(state, { type: "openTheme" });
+  const statusState = updateTuiState(state, { type: "openStatusLine" });
   const themeRows = buildThemeRows(TUI_THEMES, state.themeName, 1);
   const statusRows = buildStatusLineRows(["model"], 1);
   const resumeRows = [
@@ -250,17 +294,44 @@ test("navigable picker overlays render row views without textual selection marke
       status: "completed" as const,
     },
   ];
-  const views = [
-    buildSlashCommandOverlayView(SLASH_COMMANDS, 1, theme, 8),
-    buildResumeOverlayView(resumeRows, state, theme, 8, 80),
-    buildHistoryOverlayView(historyRows, state, theme),
-    buildThemeOverlayView(themeRows, theme, 8, 1),
-    buildStatusLineOverlayView(statusRows, "preview", theme, 8, 1),
+  const rowSets = [
+    buildBottomPanePanel({
+      state: { ...commandState, slashSelection: 1 },
+      theme,
+      slashCommands: SLASH_COMMANDS,
+      themeRows: [],
+      statusLineRows: [],
+      statusLinePreview: "",
+      rendererWidth: 80,
+      rendererHeight: 24,
+    }).rows,
+    buildResumePickerSurfaceView(resumeRows, state, theme, 8, 80).rows,
+    buildHistoryPickerSurfaceView(historyRows, state, theme).rows,
+    buildBottomPanePanel({
+      state: { ...themeState, themeSelection: 1 },
+      theme,
+      slashCommands: [],
+      themeRows,
+      statusLineRows: [],
+      statusLinePreview: "",
+      rendererWidth: 80,
+      rendererHeight: 24,
+    }).rows,
+    buildBottomPanePanel({
+      state: { ...statusState, statusLineSelection: 1 },
+      theme,
+      slashCommands: [],
+      themeRows: [],
+      statusLineRows: statusRows,
+      statusLinePreview: "preview",
+      rendererWidth: 80,
+      rendererHeight: 24,
+    }).rows,
   ];
 
-  for (const view of views) {
-    expect(view.rows?.length).toBeGreaterThan(0);
-    expect(view.rows?.some((row) => /(^|\n)\s*>/.test(String(row.content)))).toBe(false);
-    expect(view.rows?.some((row) => row.backgroundColor === theme.colors.overlayRowSelected)).toBe(true);
+  for (const rows of rowSets) {
+    expect(rows?.length).toBeGreaterThan(0);
+    expect(rows?.some((row) => /(^|\n)\s*>/.test(String(row.content)))).toBe(false);
+    expect(rows?.some((row) => row.backgroundColor === theme.colors.overlayRowSelected)).toBe(true);
   }
 });

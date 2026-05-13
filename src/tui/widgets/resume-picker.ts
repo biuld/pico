@@ -17,7 +17,7 @@ export interface ThreadRow {
   responseItemCount: number;
 }
 
-export function buildResumeOverlayView(
+export function buildResumePickerSurfaceView(
   rows: readonly ThreadRow[],
   state: TuiState,
   theme: TuiTheme,

@@ -60,11 +60,11 @@ test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () =
 
   expect(handlers[0]("\u0003")).toBe(true);
   expect(closeCount).toBe(0);
-  expect(state.statusMessage).toBe("ctrl+d twice to exit");
+  expect(state.bottomPane.statusMessage).toBe("ctrl+d twice to exit");
 
   expect(handlers[0]("\u0004")).toBe(true);
   expect(closeCount).toBe(0);
-  expect(state.statusMessage).toBe("ctrl+d again to exit");
+  expect(state.bottomPane.statusMessage).toBe("ctrl+d again to exit");
 
   expect(handlers[0]("\u0004")).toBe(true);
   expect(closeCount).toBe(1);
@@ -233,7 +233,7 @@ test("approval controls own focus and consume composer input", () => {
 
   installOpenTuiKeybindings(renderer, runtime);
 
-  expect(state.overlay).toBe("none");
+  expect(state.bottomPane.activeView).toBe("approval");
   expect(handlers[0]("s")).toBe(true);
   expect(resolvedDecision).toBe("");
 
@@ -457,11 +457,11 @@ test("filters slash commands for popup selection without tab completion", async 
   expect(filterSlashCommands("/rename name")).toEqual([]);
 
   state = updateTuiState(state, { type: "inputChanged", value: "/" });
-  expect(state.overlay).toBe("slash");
+  expect(state.bottomPane.activeView).toBe("commandPopup");
 
   state = updateTuiState(state, { type: "moveSlash", total: 9, delta: 1 });
   expect(state.slashSelection).toBe(1);
 
   state = updateTuiState(state, { type: "inputChanged", value: "/rename name" });
-  expect(state.overlay).toBe("none");
+  expect(state.bottomPane.activeView).toBe("none");
 });

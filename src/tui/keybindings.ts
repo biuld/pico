@@ -50,7 +50,7 @@ export function installOpenTuiKeybindings(
       }
       runtime.dispatch({
         type: "setTurnStatus",
-        status: runtime.getState().turnStatus,
+        status: runtime.getState().bottomPane.turnStatus,
         message: "ctrl+d twice to exit",
       });
       runtime.render();
@@ -69,26 +69,26 @@ export function installOpenTuiKeybindings(
   renderer.addInputHandler((sequence) => {
     const state = runtime.getState();
 
-    if (state.overlay === "slash") {
-      return handleSlashKey(sequence, runtime);
-    }
-    if (state.overlay === "history") {
+    if (state.pickerSurface === "history") {
       return handleHistoryKey(sequence, runtime);
     }
-    if (state.overlay === "threads") {
+    if (state.pickerSurface === "resume") {
       return handleThreadKey(sequence, runtime);
     }
-    if (state.overlay === "theme") {
-      return handleThemeKey(sequence, runtime);
-    }
-    if (state.overlay === "statusline") {
-      return handleStatusLineKey(sequence, runtime);
-    }
-    if (state.overlay === "transcript") {
+    if (state.pagerOverlay === "transcript") {
       return handleTranscriptKey(sequence, runtime);
     }
-    if (state.overlay === "shortcuts") {
+    if (state.pagerOverlay === "shortcuts") {
       return handleShortcutKey(sequence, runtime);
+    }
+    if (state.bottomPane.activeView === "commandPopup") {
+      return handleSlashKey(sequence, runtime);
+    }
+    if (state.bottomPane.activeView === "themePicker") {
+      return handleThemeKey(sequence, runtime);
+    }
+    if (state.bottomPane.activeView === "statuslinePicker") {
+      return handleStatusLineKey(sequence, runtime);
     }
     if (sequence === "\u0014") {
       runtime.showTranscript();
@@ -178,7 +178,7 @@ function handleCtrlD(runtime: KeybindingRuntime): void {
   lastCtrlDAt = now;
   runtime.dispatch({
     type: "setTurnStatus",
-    status: runtime.getState().turnStatus,
+    status: runtime.getState().bottomPane.turnStatus,
     message: "ctrl+d again to exit",
   });
   runtime.render();
@@ -200,7 +200,7 @@ function handleComposerEsc(runtime: KeybindingRuntime): void {
   lastComposerEscAt = now;
   runtime.dispatch({
     type: "setTurnStatus",
-    status: runtime.getState().turnStatus,
+    status: runtime.getState().bottomPane.turnStatus,
     message: "esc again for history",
   });
   runtime.render();
@@ -219,11 +219,14 @@ function handleSlashKey(sequence: string, runtime: KeybindingRuntime): boolean {
     return true;
   }
   if (sequence === "\u001b") {
-    runtime.dispatch({ type: "closeOverlay" });
+    runtime.dispatch({ type: "closeSurface" });
     runtime.render();
     return true;
   }
-  if (sequence === "\t") return true;
+  if (sequence === "\t" || sequence === "\r") {
+    runtime.acceptSlashSelection();
+    return true;
+  }
   return false;
 }
 
@@ -242,7 +245,7 @@ function handleHistoryKey(sequence: string, runtime: KeybindingRuntime): boolean
   }
   if (sequence === "r") {
     runtime.setInputValue("/rename ");
-    runtime.dispatch({ type: "closeOverlay" });
+    runtime.dispatch({ type: "closeSurface" });
     runtime.focusInput();
     runtime.render();
     return true;

@@ -23,7 +23,7 @@ import {
 } from "../src/tui/widgets/footer";
 import { OVERLAY_HINTS } from "../src/tui/widgets/overlay-hints";
 import {
-  buildStatusLineOverlayView,
+  buildStatusLinePickerView,
   buildStatusLineRows,
   formatStatusLineRow,
 } from "../src/tui/widgets/statusline-picker";
@@ -127,7 +127,7 @@ test("statusline command configures visible status line items", async () => {
   expect(state.statusLineItems).toContain("model");
 
   state = updateTuiState(state, { type: "openStatusLine" });
-  expect(state.overlay).toBe("statusline");
+  expect(state.bottomPane.activeView).toBe("statuslinePicker");
   expect(footerMode(state)).toBe("StatusLinePicker");
   expect(formatComposerPlaceholder(state)).toBe("");
 
@@ -144,7 +144,7 @@ test("statusline command configures visible status line items", async () => {
     store,
     ["model", "five-hour-limit", "thread-id"],
   )).toBe("[model] · [five_hour_limit] · [thread_id]");
-  const view = buildStatusLineOverlayView(rows, "openai · gpt-test", TUI_THEMES[0], 8, state.statusLineSelection);
+  const view = buildStatusLinePickerView(rows, "openai · gpt-test", TUI_THEMES[0], 8, state.statusLineSelection);
   expect(view.footer).toBe(OVERLAY_HINTS.statusline);
 
   state = updateTuiState(state, { type: "moveStatusLine", total: rows.length, delta: 2 });

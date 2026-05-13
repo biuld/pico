@@ -1,23 +1,26 @@
 import { slashQuery } from "./commands";
 import {
+  closeFocusSurfaces,
   moveApprovalSelection,
   moveSelection,
-  moveThreadSelection,
   moveSlashSelection,
   moveStatusLineSelection,
   moveThemeSelection,
+  moveThreadSelection,
   resetTranscriptScroll,
   scrollTranscript,
   selectEntry,
   selectThread,
   selectTheme,
-  setOverlay,
+  setBottomPaneView,
+  setPagerOverlay,
+  setPickerSurface,
   setTurnStatus,
   syncListScroll,
-  syncThreadScroll,
   syncSlashSelection,
   syncStatusLineSelection,
   syncThemeSelection,
+  syncThreadScroll,
   toggleStatusLineItem,
   updateInput,
   type TuiState,
@@ -29,7 +32,7 @@ import type { ThemeName } from "./theme";
 export type TuiMsg =
   | { type: "inputChanged"; value: string }
   | { type: "setInput"; value: string }
-  | { type: "closeOverlay" }
+  | { type: "closeSurface" }
   | { type: "openHistory"; leafId: string }
   | { type: "openThreads"; threadId: string }
   | { type: "openTheme" }
@@ -64,31 +67,39 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
     case "inputChanged": {
       let next = updateInput(state, msg.value);
       const query = slashQuery(msg.value);
-      if (next.overlay === "slash" && query === undefined) {
-        next = setOverlay(next, "none");
-      } else if (next.overlay === "none" && query !== undefined) {
-        next = setOverlay(next, "slash");
+      if (next.bottomPane.activeView === "commandPopup" && query === undefined) {
+        next = setBottomPaneView(next, "none");
+      } else if (
+        next.bottomPane.activeView === "none" &&
+        next.pickerSurface === "none" &&
+        next.pagerOverlay === "none" &&
+        query !== undefined
+      ) {
+        next = setBottomPaneView(next, "commandPopup");
       }
       return next;
     }
     case "setInput":
       return updateInput(state, msg.value);
-    case "closeOverlay":
-      return setOverlay(state, "none");
+    case "closeSurface":
+      return closeFocusSurfaces(state);
     case "openHistory":
-      return setOverlay(selectEntry(state, msg.leafId), "history");
+      return setPickerSurface(selectEntry(state, msg.leafId), "history");
     case "openThreads":
-      return setOverlay(selectThread(state, msg.threadId), "threads");
+      return setPickerSurface(selectThread(state, msg.threadId), "resume");
     case "openTheme":
-      return setOverlay(state, "theme");
+      return setBottomPaneView(state, "themePicker");
     case "openStatusLine":
-      return setOverlay(state, "statusline");
+      return setBottomPaneView(state, "statuslinePicker");
     case "openTranscript":
-      return setOverlay(resetTranscriptScroll(state), "transcript");
+      return setPagerOverlay(resetTranscriptScroll(state), "transcript");
     case "openShortcuts":
-      return setOverlay(state, "shortcuts");
+      return setPagerOverlay(state, "shortcuts");
     case "showApproval":
-      return setOverlay({ ...setTurnStatus(state, "approval"), approvalSelection: 0 }, "none");
+      return setBottomPaneView(
+        { ...setTurnStatus(state, "approval"), approvalSelection: 0 },
+        "approval",
+      );
     case "moveHistory":
       return syncListScroll(
         moveSelection(state, msg.entryIds, msg.delta),
@@ -132,21 +143,18 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
     case "setTurnStatus":
       return setTurnStatus(state, msg.status, msg.message);
     case "restoreCompleted":
-      return setOverlay(
+      return closeFocusSurfaces(
         setTurnStatus(selectEntry(state, msg.branchId), "idle", `backtracked ${shortId(msg.targetId)}`),
-        "none",
       );
     case "renameCompleted":
       return setTurnStatus(state, "idle", `renamed ${shortId(msg.entryId)}`);
     case "resumeCompleted":
-      return setOverlay(
+      return closeFocusSurfaces(
         setTurnStatus(selectThread(state, msg.threadId), "idle", `resumed ${shortId(msg.threadId)}`),
-        "none",
       );
     case "themeSelected":
-      return setOverlay(
+      return closeFocusSurfaces(
         setTurnStatus(selectTheme(state, msg.themeName), "idle", `theme ${msg.themeName}`),
-        "none",
       );
   }
 }

@@ -26,7 +26,7 @@ export const STATUS_LINE_ITEMS: readonly StatusLineItemSpec[] = [
   { id: "thread-id", label: "Thread id", description: "active Codex thread id" },
 ];
 
-export function buildStatusLineOverlayView(
+export function buildStatusLinePickerView(
   rows: readonly StatusLineRow[],
   preview: string,
   theme: TuiTheme,

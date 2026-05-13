@@ -11,7 +11,7 @@ import {
 import { updateTuiState } from "../src/tui/update";
 import { createStore } from "./tui-test-helpers";
 
-test("TUI state helpers keep overlay state immutable", async () => {
+test("TUI state helpers keep surface state immutable", async () => {
   const store = await createStore();
   const state = createTuiState(store);
   const withInput = updateInput(state, "hello");
@@ -19,12 +19,12 @@ test("TUI state helpers keep overlay state immutable", async () => {
   const scrolled = scrollTranscript(running, -10);
   const inHistory = updateTuiState(scrolled, { type: "openHistory", leafId: store.leafId });
 
-  expect(state.inputValue).toBe("");
-  expect(state.overlay).toBe("none");
-  expect(withInput.inputValue).toBe("hello");
-  expect(running.turnStatus).toBe("running");
+  expect(state.bottomPane.draft).toBe("");
+  expect(state.pickerSurface).toBe("none");
+  expect(withInput.bottomPane.draft).toBe("hello");
+  expect(running.bottomPane.turnStatus).toBe("running");
   expect(scrolled.transcriptScroll).toBe(0);
-  expect(inHistory.overlay).toBe("history");
+  expect(inHistory.pickerSurface).toBe("history");
 });
 
 test("selection helpers move through visible history turn ids and keep scroll in view", async () => {

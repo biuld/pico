@@ -17,19 +17,21 @@ export type FooterMode =
   | "Failed";
 
 export function footerMode(state: TuiState): FooterMode {
-  if (state.overlay === "slash") return "SlashPalette";
-  if (state.overlay === "history") return "HistoryPicker";
-  if (state.overlay === "threads") return "ResumePicker";
-  if (state.overlay === "theme") return "ThemePicker";
-  if (state.overlay === "statusline") return "StatusLinePicker";
-  if (state.overlay === "transcript") return "TranscriptPager";
-  if (state.overlay === "shortcuts") return "ShortcutOverlay";
-  if (state.turnStatus === "failed") return "Failed";
-  if (state.turnStatus === "approval") return "Approval";
-  if (state.turnStatus === "running") {
-    return state.inputValue.trim().length > 0 ? "WorkingWithDraft" : "Working";
+  if (state.bottomPane.activeView === "commandPopup") return "SlashPalette";
+  if (state.bottomPane.activeView === "themePicker") return "ThemePicker";
+  if (state.bottomPane.activeView === "statuslinePicker") return "StatusLinePicker";
+  if (state.pickerSurface === "history") return "HistoryPicker";
+  if (state.pickerSurface === "resume") return "ResumePicker";
+  if (state.pagerOverlay === "transcript") return "TranscriptPager";
+  if (state.pagerOverlay === "shortcuts") return "ShortcutOverlay";
+  if (state.bottomPane.turnStatus === "failed") return "Failed";
+  if (state.bottomPane.turnStatus === "approval" || state.bottomPane.activeView === "approval") {
+    return "Approval";
   }
-  return state.inputValue.trim().length > 0 ? "ComposerHasDraft" : "ComposerEmpty";
+  if (state.bottomPane.turnStatus === "running") {
+    return state.bottomPane.draft.trim().length > 0 ? "WorkingWithDraft" : "Working";
+  }
+  return state.bottomPane.draft.trim().length > 0 ? "ComposerHasDraft" : "ComposerEmpty";
 }
 
 export function formatTransientStatusLine(transientStatus = ""): string {

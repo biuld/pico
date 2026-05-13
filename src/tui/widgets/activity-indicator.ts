@@ -16,7 +16,7 @@ export const ACTIVITY_SPINNER_FRAMES = [
 
 export interface ActivityStatusInput {
   running: boolean;
-  turnStatus: TuiState["turnStatus"];
+  turnStatus: TuiState["bottomPane"]["turnStatus"];
   statusMessage?: string;
   frame?: number;
   elapsedMs?: number;

@@ -5,7 +5,7 @@ import type { OverlayRowView, OverlayView } from "../overlay-model";
 import type { TuiTheme } from "../theme";
 import { SolidText } from "./solid-text";
 
-export interface PagerOverlaySurfaceProps {
+export interface PickerSurfaceProps {
   view: OverlayView;
   theme: TuiTheme;
   rendererWidth: number;
@@ -13,34 +13,25 @@ export interface PagerOverlaySurfaceProps {
   bottomInset: number;
 }
 
-export interface OverlayFrame {
-  left: number;
-  top: number;
-  bottom: number | undefined;
-  width: number;
-  height: number;
-}
-
-export function PagerOverlaySurface(props: PagerOverlaySurfaceProps) {
-  const frame = () => pagerOverlayFrame(
+export function PickerSurface(props: PickerSurfaceProps) {
+  const frame = () => pickerSurfaceFrame(
     props.rendererWidth,
     props.rendererHeight,
     props.bottomInset,
-    props.view.fullScreen,
   );
   const rows = () => props.view.rows || [];
   const rendersRows = () => rows().length > 0;
 
   return (
     <box
-      id="pico-overlay"
+      id="pico-picker-surface"
       position="absolute"
-      zIndex={20}
+      zIndex={18}
       visible={props.view.visible}
       flexDirection="column"
       left={props.view.visible ? frame().left : 0}
       top={props.view.visible ? frame().top : 0}
-      bottom={props.view.visible ? frame().bottom : undefined}
+      bottom={undefined}
       width={props.view.visible ? frame().width : "100%"}
       height={props.view.visible ? frame().height : 1}
       title={props.view.visible ? props.view.title : undefined}
@@ -49,7 +40,7 @@ export function PagerOverlaySurface(props: PagerOverlaySurfaceProps) {
       backgroundColor="transparent"
     >
       <box
-        id="pico-overlay-body"
+        id="pico-picker-surface-body"
         flexDirection="column"
         width="100%"
         height="100%"
@@ -59,7 +50,7 @@ export function PagerOverlaySurface(props: PagerOverlaySurfaceProps) {
         backgroundColor={props.theme.colors.overlay}
       >
         <SolidText
-          id="pico-overlay-text"
+          id="pico-picker-surface-text"
           width="100%"
           height={1}
           flexGrow={1}
@@ -70,14 +61,14 @@ export function PagerOverlaySurface(props: PagerOverlaySurfaceProps) {
           truncate={false}
           scrollY={props.view.scrollY}
         />
-        <OverlayList
+        <PickerSurfaceList
           rows={rows()}
           visible={rendersRows()}
           scrollTop={Math.max(0, props.view.rowScrollY || 0)}
           theme={props.theme}
         />
         <SolidText
-          id="pico-overlay-footer"
+          id="pico-picker-surface-footer"
           width="100%"
           height={1}
           visible={Boolean(props.view.footer)}
@@ -91,7 +82,7 @@ export function PagerOverlaySurface(props: PagerOverlaySurfaceProps) {
   );
 }
 
-function OverlayList(props: {
+function PickerSurfaceList(props: {
   rows: readonly OverlayRowView[];
   visible: boolean;
   scrollTop: number;
@@ -105,7 +96,7 @@ function OverlayList(props: {
 
   return (
     <scrollbox
-      id="pico-overlay-list"
+      id="pico-picker-surface-list"
       ref={(node) => {
         list = node;
       }}
@@ -131,23 +122,23 @@ function OverlayList(props: {
       }}
     >
       <For each={props.rows}>
-        {(row) => <OverlayRow row={row} theme={props.theme} />}
+        {(row) => <PickerSurfaceRow row={row} theme={props.theme} />}
       </For>
     </scrollbox>
   );
 }
 
-function OverlayRow(props: { row: OverlayRowView; theme: TuiTheme }) {
+function PickerSurfaceRow(props: { row: OverlayRowView; theme: TuiTheme }) {
   return (
     <box
-      id={`pico-overlay-row-${safeId(props.row.id)}`}
+      id={`pico-picker-surface-row-${safeId(props.row.id)}`}
       flexDirection="row"
       width="100%"
       height={props.row.height || 1}
       backgroundColor={props.row.backgroundColor || props.theme.colors.overlayRow}
     >
       <SolidText
-        id={`pico-overlay-row-text-${safeId(props.row.id)}`}
+        id={`pico-picker-surface-row-text-${safeId(props.row.id)}`}
         width="100%"
         height={props.row.height || 1}
         flexGrow={1}
@@ -160,31 +151,23 @@ function OverlayRow(props: { row: OverlayRowView; theme: TuiTheme }) {
   );
 }
 
-export function pagerOverlayFrame(
+export interface PickerSurfaceFrame {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function pickerSurfaceFrame(
   rendererWidth: number,
   rendererHeight: number,
   bottomInset: number,
-  fullScreen: boolean,
-): OverlayFrame {
-  const width = Math.max(1, rendererWidth);
-  const height = Math.max(1, rendererHeight);
-
-  if (fullScreen) {
-    return {
-      left: 0,
-      top: 0,
-      bottom: undefined,
-      width,
-      height,
-    };
-  }
-
+): PickerSurfaceFrame {
   return {
     left: 0,
     top: 0,
-    bottom: undefined,
-    width,
-    height: Math.max(1, height - Math.max(0, bottomInset)),
+    width: Math.max(1, rendererWidth),
+    height: Math.max(1, Math.max(1, rendererHeight) - Math.max(0, bottomInset)),
   };
 }
 

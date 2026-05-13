@@ -14,7 +14,7 @@ import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
 import type { OpenTuiLayout } from "../widgets/layout";
 import { buildThreadRows } from "../widgets/resume-picker";
 import { STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
-import { overlayListViewportHeight } from "./view";
+import { surfaceListViewportHeight } from "./view";
 
 export interface RuntimeActions {
   setComposerFocus(): void;
@@ -56,7 +56,7 @@ export interface RuntimeActionHost {
 
 export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
   const setComposerFocus = () => {
-    host.dispatch({ type: "closeOverlay" });
+    host.dispatch({ type: "closeSurface" });
     host.layout.focusInput();
     host.render();
   };
@@ -70,7 +70,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     if (!host.isBusy()) return false;
     host.dispatch({
       type: "setTurnStatus",
-      status: host.getState().turnStatus,
+      status: host.getState().bottomPane.turnStatus,
       message: "turn is running",
     });
     host.render();
@@ -147,7 +147,11 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const app = host.appSession.app;
     const state = host.getState();
     if (!app.store) {
-      host.dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no turns yet" });
+      host.dispatch({
+        type: "setTurnStatus",
+        status: state.bottomPane.turnStatus,
+        message: "no turns yet",
+      });
       host.render();
       return;
     }
@@ -159,7 +163,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       delta,
       viewportHeight: Math.max(
         1,
-        Math.floor(overlayListViewportHeight(host.renderer.height) / HISTORY_ROW_HEIGHT),
+        Math.floor(surfaceListViewportHeight(host.renderer.height) / HISTORY_ROW_HEIGHT),
       ),
     });
     host.render();
@@ -173,7 +177,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       type: "moveThread",
       threadIds: rows.map((row) => row.id),
       delta,
-      viewportHeight: overlayListViewportHeight(host.renderer.height),
+      viewportHeight: surfaceListViewportHeight(host.renderer.height),
     });
     host.render();
   };
@@ -208,7 +212,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     if (!queued) {
       host.dispatch({
         type: "setTurnStatus",
-        status: host.getState().turnStatus,
+        status: host.getState().bottomPane.turnStatus,
         message: "nothing to queue",
       });
       host.render();
@@ -218,7 +222,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     setInputValue("");
     host.dispatch({
       type: "setTurnStatus",
-      status: host.getState().turnStatus,
+      status: host.getState().bottomPane.turnStatus,
       message: `queued ${host.appSession.snapshot.queuedMessages.length}`,
     });
     host.layout.focusInput();
@@ -230,7 +234,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     if (!queued) {
       host.dispatch({
         type: "setTurnStatus",
-        status: host.getState().turnStatus,
+        status: host.getState().bottomPane.turnStatus,
         message: "no queued input",
       });
       host.render();
@@ -240,7 +244,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     setInputValue(queued.text);
     host.dispatch({
       type: "setTurnStatus",
-      status: host.getState().turnStatus,
+      status: host.getState().bottomPane.turnStatus,
       message: "queued input restored",
     });
     host.layout.focusInput();
@@ -286,7 +290,11 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const app = host.appSession.app;
     const state = host.getState();
     if (!app.store) {
-      host.dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no turns yet" });
+      host.dispatch({
+        type: "setTurnStatus",
+        status: state.bottomPane.turnStatus,
+        message: "no turns yet",
+      });
       host.render();
       return;
     }
@@ -294,7 +302,11 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const rows = buildHistoryTurnRows(app.store, state.selectedEntryId);
     const selected = rows.find((row) => row.id === state.selectedEntryId);
     if (!selected) {
-      host.dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no turns yet" });
+      host.dispatch({
+        type: "setTurnStatus",
+        status: state.bottomPane.turnStatus,
+        message: "no turns yet",
+      });
       host.render();
       return;
     }
@@ -331,7 +343,11 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const app = host.appSession.app;
     const state = host.getState();
     if (!app.store) {
-      host.dispatch({ type: "setTurnStatus", status: state.turnStatus, message: "no turns yet" });
+      host.dispatch({
+        type: "setTurnStatus",
+        status: state.bottomPane.turnStatus,
+        message: "no turns yet",
+      });
       host.render();
       return;
     }
@@ -368,7 +384,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       const app = host.appSession.app;
       host.dispatch({
         type: "setTurnStatus",
-        status: host.getState().turnStatus,
+        status: host.getState().bottomPane.turnStatus,
         message: app.store
           ? `thread ${shortId(app.store.id)} leaf ${shortId(app.store.leafId)}`
           : "thread new",
@@ -382,13 +398,13 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     }
     if (command.type === "unknown") {
       host.dispatch({ type: "setTurnStatus", status: "failed", message: command.message });
-      host.dispatch({ type: "closeOverlay" });
+      host.dispatch({ type: "closeSurface" });
       host.render();
       return true;
     }
 
     await renameSelected(command.label);
-    host.dispatch({ type: "closeOverlay" });
+    host.dispatch({ type: "closeSurface" });
     return true;
   };
 
@@ -398,7 +414,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     if (!command) {
       host.dispatch({
         type: "setTurnStatus",
-        status: host.getState().turnStatus,
+        status: host.getState().bottomPane.turnStatus,
         message: "no matching command",
       });
       host.render();
@@ -407,7 +423,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
 
     if (command.takesArgument) {
       setInputValue(`/${command.name} `);
-      host.dispatch({ type: "closeOverlay" });
+      host.dispatch({ type: "closeSurface" });
       host.layout.focusInput();
       host.render();
       return;

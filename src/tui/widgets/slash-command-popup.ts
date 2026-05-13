@@ -11,7 +11,7 @@ export interface SlashCommandRow {
   isSelected: boolean;
 }
 
-export function buildSlashCommandOverlayView(
+export function buildSlashCommandPopupView(
   commands: readonly SlashCommandSpec[],
   selectedIndex: number,
   theme: TuiTheme,

@@ -2,16 +2,6 @@
 import type { InputRenderable, StyledText } from "@opentui/core";
 import type { TuiTheme } from "../theme";
 export { formatActivityStatus as formatComposerStatus } from "./activity-indicator";
-import {
-  ApprovalPanelView,
-  emptyApprovalPanel,
-  type ApprovalPanelState,
-} from "./approval-panel";
-import {
-  emptyPendingInputPreview,
-  PendingInputPreviewView,
-  type PendingInputPreviewState,
-} from "./pending-input-preview";
 import { SolidText } from "./solid-text";
 
 export const COMPOSER_TRANSIENT_STATUS_HEIGHT = 1;
@@ -31,24 +21,18 @@ export interface ComposerViewProps {
   placeholder: string;
   statusLine: string | StyledText;
   inputValue: string;
-  approvalPanel?: ApprovalPanelState;
-  pendingInputPreview?: PendingInputPreviewState;
   onInput(value: string): void;
   onSubmit(): void;
   onInputRef(input: InputRenderable): void;
 }
 
 export function ComposerView(props: ComposerViewProps) {
-  const approvalPanel = () => props.approvalPanel || emptyApprovalPanel();
-  const pendingInputPreview = () => props.pendingInputPreview || emptyPendingInputPreview();
-  const extraHeight = () => approvalPanel().height + pendingInputPreview().height;
-
   return (
     <box
-      id="pico-bottom-pane"
+      id="pico-composer"
       flexDirection="column"
       width="100%"
-      height={composerOverlayInset(extraHeight())}
+      height={COMPOSER_HEIGHT}
       border={false}
       paddingX={2}
       paddingY={0}
@@ -62,14 +46,6 @@ export function ComposerView(props: ComposerViewProps) {
         fg={props.theme.colors.muted}
         wrapMode="none"
         truncate={true}
-      />
-      <ApprovalPanelView
-        panel={approvalPanel()}
-        theme={props.theme}
-      />
-      <PendingInputPreviewView
-        preview={pendingInputPreview()}
-        theme={props.theme}
       />
       <box
         id="pico-composer-row"

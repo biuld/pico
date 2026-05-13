@@ -1,9 +1,11 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
 import type { DraftAppState } from "../../app/controller";
 import type { PicoThreadInfo } from "../../thread/store";
+import { buildBottomPanePanel } from "../bottom-pane";
 import { filterSlashCommands } from "../commands";
 import { buildHistoryTurnRows } from "../history";
-import { buildOverlayView } from "../overlays";
+import { buildPagerOverlay } from "../pager-overlays";
+import { buildPickerSurface, pickerSurfaceListViewportHeight } from "../picker-surfaces";
 import type { TuiState } from "../state";
 import {
   formatCodexStatusLineStyled,
@@ -13,16 +15,13 @@ import {
 import { getTheme, TUI_THEMES } from "../theme";
 import { buildTranscriptCellsWithLive } from "../transcript";
 import type { TuiMsg } from "../update";
-import { composerOverlayInset, formatComposerStatus } from "../widgets/composer";
+import { bottomPaneHeight } from "../widgets/bottom-pane";
+import { formatComposerStatus } from "../widgets/composer";
 import { formatComposerPlaceholder } from "../widgets/composer-placeholder";
-import { buildApprovalPanel } from "../widgets/approval-panel";
 import { formatTransientStatusLine } from "../widgets/footer";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
-import {
-  buildPendingInputPreview,
-  type PendingInputPreviewMessage,
-} from "../widgets/pending-input-preview";
+import type { PendingInputPreviewMessage } from "../widgets/pending-input-preview";
 import { buildThreadRows } from "../widgets/resume-picker";
 import { buildStartupBannerState } from "../widgets/startup-banner";
 import { buildStatusLineRows, STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
@@ -47,25 +46,43 @@ export interface RuntimeViewInput {
 }
 
 export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayoutUpdate {
-  const pendingInputPreview = buildPendingInputPreview(
-    input.queuedMessages?.[0],
-    Math.max(1, input.rendererWidth - 4),
-  );
-  const approvalPanel = buildApprovalPanel(
-    input.pendingApproval,
-    input.getState().approvalSelection,
-    Math.max(1, input.rendererWidth - 4),
-  );
-  const bottomInset = composerOverlayInset(approvalPanel.height + pendingInputPreview.height);
-  const pickerViewportHeight = overlayListViewportHeight(input.rendererHeight, bottomInset);
-  const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
   let state = input.getState();
   const theme = getTheme(state.themeName);
   const slashCommands = filterSlashCommands(input.inputValue);
   input.dispatch({ type: "syncSlash", total: slashCommands.length });
+  input.dispatch({ type: "syncTheme", total: TUI_THEMES.length });
+  input.dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
 
   state = input.getState();
   const store = input.app.store;
+  const codexStatus = input.app.codex.statusSnapshot;
+  const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
+  const statusLineRows = buildStatusLineRows(
+    state.statusLineItems,
+    state.statusLineSelection,
+    (item) => statusLineItemValue(item, codexStatus, store),
+  );
+  const statusLinePreview = formatConfiguredStatusPreviewText(
+    codexStatus,
+    store,
+    state.statusLineItems,
+  );
+  let bottomPanePanel = buildBottomPanePanel({
+    state,
+    theme,
+    pendingApproval: input.pendingApproval,
+    queuedMessage: input.queuedMessages?.[0],
+    slashCommands,
+    themeRows,
+    statusLineRows,
+    statusLinePreview,
+    rendererWidth: input.rendererWidth,
+    rendererHeight: input.rendererHeight,
+  });
+  let bottomInset = bottomPaneHeight(bottomPanePanel);
+  const pickerViewportHeight = pickerSurfaceListViewportHeight(input.rendererHeight, bottomInset);
+  const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
+
   const selectedEntryId = state.selectedEntryId || store?.leafId || "";
   const historyRows = store ? buildHistoryTurnRows(store, selectedEntryId) : [];
   input.dispatch({
@@ -82,13 +99,25 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     viewportHeight: pickerViewportHeight,
   });
 
-  input.dispatch({ type: "syncTheme", total: TUI_THEMES.length });
   state = input.getState();
-  const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
-  input.dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
+  bottomPanePanel = buildBottomPanePanel({
+    state,
+    theme,
+    pendingApproval: input.pendingApproval,
+    queuedMessage: input.queuedMessages?.[0],
+    slashCommands,
+    themeRows: buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection),
+    statusLineRows: buildStatusLineRows(
+      state.statusLineItems,
+      state.statusLineSelection,
+      (item) => statusLineItemValue(item, codexStatus, store),
+    ),
+    statusLinePreview,
+    rendererWidth: input.rendererWidth,
+    rendererHeight: input.rendererHeight,
+  });
+  bottomInset = bottomPaneHeight(bottomPanePanel);
 
-  state = input.getState();
-  const codexStatus = input.app.codex.statusSnapshot;
   const transcriptCells = buildTranscriptCellsWithLive(
     input.app,
     input.streamingText,
@@ -100,21 +129,11 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     input.streamingText.length === 0;
   const statusText = formatComposerStatus({
     running: input.running,
-    turnStatus: state.turnStatus,
-    statusMessage: state.statusMessage,
+    turnStatus: state.bottomPane.turnStatus,
+    statusMessage: state.bottomPane.statusMessage,
     frame: input.activityFrame,
     elapsedMs: input.activityElapsedMs,
   });
-  const statusLineRows = buildStatusLineRows(
-    state.statusLineItems,
-    state.statusLineSelection,
-    (item) => statusLineItemValue(item, codexStatus, store),
-  );
-  const statusLinePreview = formatConfiguredStatusPreviewText(
-    codexStatus,
-    store,
-    state.statusLineItems,
-  );
 
   return {
     width: input.rendererWidth,
@@ -127,7 +146,8 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       cwd: store?.cwd || input.app.cwd,
       rendererWidth: input.rendererWidth,
     }),
-    composer: {
+    bottomPane: {
+      panel: bottomPanePanel,
       transientStatus: formatTransientStatusLine(statusText),
       placeholder: formatComposerPlaceholder(state, input.placeholderFrame),
       statusLine: formatCodexStatusLineStyled({
@@ -137,32 +157,28 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
         items: state.statusLineItems,
         width: Math.max(1, input.rendererWidth - 4),
       }, theme),
-      approvalPanel,
-      pendingInputPreview,
+      inputValue: input.inputValue,
     },
-    overlay: buildOverlayView({
-      app: input.app,
+    pickerSurface: buildPickerSurface({
       state,
       theme,
-      streamingText: input.streamingText,
-      liveLeafId: input.liveLeafId,
-      slashCommands,
       historyRows,
       threadRows,
-      themeRows,
-      statusLineRows,
-      statusLinePreview,
       threadViewportHeight: pickerViewportHeight,
-      pickerViewportHeight,
       rendererWidth: input.rendererWidth,
+    }),
+    pagerOverlay: buildPagerOverlay({
+      app: input.app,
+      state,
+      streamingText: input.streamingText,
+      liveLeafId: input.liveLeafId,
     }),
   };
 }
 
-export function overlayListViewportHeight(
+export function surfaceListViewportHeight(
   rendererHeight: number,
-  bottomInset = composerOverlayInset(),
+  bottomInset = 0,
 ): number {
-  const overlayHeight = Math.max(1, rendererHeight - bottomInset);
-  return Math.max(1, overlayHeight - 3);
+  return pickerSurfaceListViewportHeight(rendererHeight, bottomInset);
 }

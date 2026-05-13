@@ -7,7 +7,7 @@ import { selectableOverlayRow } from "./overlay-rows";
 
 export const HISTORY_ROW_HEIGHT = 2;
 
-export function buildHistoryOverlayView(
+export function buildHistoryPickerSurfaceView(
   rows: readonly HistoryTurnRow[],
   state: TuiState,
   theme: TuiTheme,

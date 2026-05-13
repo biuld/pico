@@ -1,7 +1,7 @@
 import type { OverlayView } from "../overlay-model";
 import { OVERLAY_HINTS } from "./overlay-hints";
 
-export function buildShortcutOverlayView(): OverlayView {
+export function buildShortcutPagerOverlayView(): OverlayView {
   return {
     visible: true,
     title: "Shortcuts",

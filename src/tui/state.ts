@@ -2,22 +2,32 @@ import type { PicoThreadStore } from "../thread/store";
 import { normalizeStatusLineItems, type StatusLineItemId } from "./statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "./theme";
 
-export type OverlayMode =
+export type BottomPaneViewKind =
   | "none"
-  | "slash"
-  | "history"
-  | "threads"
-  | "theme"
-  | "statusline"
-  | "transcript"
-  | "shortcuts";
+  | "approval"
+  | "commandPopup"
+  | "themePicker"
+  | "statuslinePicker";
+
+export type PickerSurfaceKind = "none" | "history" | "resume";
+
+export type PagerOverlayKind = "none" | "transcript" | "shortcuts";
 
 export type TurnStatus = "idle" | "running" | "approval" | "failed";
+
+export interface BottomPaneState {
+  draft: string;
+  activeView: BottomPaneViewKind;
+  turnStatus: TurnStatus;
+  statusMessage?: string;
+}
 
 export interface TuiState {
   selectedEntryId: string;
   selectedThreadId: string;
-  overlay: OverlayMode;
+  bottomPane: BottomPaneState;
+  pickerSurface: PickerSurfaceKind;
+  pagerOverlay: PagerOverlayKind;
   historyScroll: number;
   threadScroll: number;
   transcriptScroll: number;
@@ -27,9 +37,6 @@ export interface TuiState {
   statusLineItems: StatusLineItemId[];
   approvalSelection: number;
   themeName: ThemeName;
-  inputValue: string;
-  turnStatus: TurnStatus;
-  statusMessage?: string;
 }
 
 export interface CreateTuiStateOptions {
@@ -43,7 +50,13 @@ export function createTuiState(
   return {
     selectedEntryId: store?.leafId || "",
     selectedThreadId: store?.id || "",
-    overlay: "none",
+    bottomPane: {
+      draft: "",
+      activeView: "none",
+      turnStatus: "idle",
+    },
+    pickerSurface: "none",
+    pagerOverlay: "none",
     historyScroll: 0,
     threadScroll: 0,
     transcriptScroll: 0,
@@ -53,13 +66,11 @@ export function createTuiState(
     statusLineItems: normalizeStatusLineItems(options.statusLineItems),
     approvalSelection: 0,
     themeName: DEFAULT_THEME_NAME,
-    inputValue: "",
-    turnStatus: "idle",
   };
 }
 
-export function updateInput(state: TuiState, inputValue: string): TuiState {
-  return { ...state, inputValue };
+export function updateInput(state: TuiState, draft: string): TuiState {
+  return { ...state, bottomPane: { ...state.bottomPane, draft } };
 }
 
 export function selectEntry(state: TuiState, selectedEntryId: string): TuiState {
@@ -116,14 +127,78 @@ export function syncThreadScroll(
   return { ...state, threadScroll: Math.max(0, threadScroll) };
 }
 
-export function setOverlay(state: TuiState, overlay: OverlayMode): TuiState {
+export function setBottomPaneView(
+  state: TuiState,
+  activeView: BottomPaneViewKind,
+): TuiState {
   return {
     ...state,
-    overlay,
-    slashSelection: overlay === "slash" ? state.slashSelection : 0,
-    themeSelection: overlay === "theme" ? state.themeSelection : 0,
-    statusLineSelection: overlay === "statusline" ? state.statusLineSelection : 0,
+    bottomPane: { ...state.bottomPane, activeView },
+    pickerSurface: activeView === "none" ? state.pickerSurface : "none",
+    pagerOverlay: activeView === "none" ? state.pagerOverlay : "none",
+    slashSelection: activeView === "commandPopup" ? state.slashSelection : 0,
+    themeSelection: activeView === "themePicker" ? state.themeSelection : 0,
+    statusLineSelection: activeView === "statuslinePicker" ? state.statusLineSelection : 0,
   };
+}
+
+export function setPickerSurface(
+  state: TuiState,
+  pickerSurface: PickerSurfaceKind,
+): TuiState {
+  return {
+    ...state,
+    bottomPane: {
+      ...state.bottomPane,
+      activeView: pickerSurface === "none" ? state.bottomPane.activeView : "none",
+    },
+    pickerSurface,
+    pagerOverlay: pickerSurface === "none" ? state.pagerOverlay : "none",
+  };
+}
+
+export function setPagerOverlay(state: TuiState, pagerOverlay: PagerOverlayKind): TuiState {
+  return {
+    ...state,
+    bottomPane: {
+      ...state.bottomPane,
+      activeView: pagerOverlay === "none" ? state.bottomPane.activeView : "none",
+    },
+    pickerSurface: pagerOverlay === "none" ? state.pickerSurface : "none",
+    pagerOverlay,
+  };
+}
+
+export function closeFocusSurfaces(state: TuiState): TuiState {
+  return {
+    ...state,
+    bottomPane: { ...state.bottomPane, activeView: "none" },
+    pickerSurface: "none",
+    pagerOverlay: "none",
+    slashSelection: 0,
+    themeSelection: 0,
+    statusLineSelection: 0,
+  };
+}
+
+export function bottomPaneBlocksComposerInput(state: TuiState): boolean {
+  return state.bottomPane.activeView === "approval" ||
+    state.bottomPane.activeView === "themePicker" ||
+    state.bottomPane.activeView === "statuslinePicker";
+}
+
+export function pickerSurfaceOwnsFocus(state: TuiState): boolean {
+  return state.pickerSurface !== "none";
+}
+
+export function pagerOverlayOwnsFocus(state: TuiState): boolean {
+  return state.pagerOverlay !== "none";
+}
+
+export function composerOwnsFocus(state: TuiState): boolean {
+  return !pickerSurfaceOwnsFocus(state) &&
+    !pagerOverlayOwnsFocus(state) &&
+    !bottomPaneBlocksComposerInput(state);
 }
 
 export function setTurnStatus(
@@ -131,7 +206,10 @@ export function setTurnStatus(
   turnStatus: TurnStatus,
   statusMessage?: string,
 ): TuiState {
-  return { ...state, turnStatus, statusMessage };
+  return {
+    ...state,
+    bottomPane: { ...state.bottomPane, turnStatus, statusMessage },
+  };
 }
 
 export function scrollTranscript(state: TuiState, delta: number): TuiState {
@@ -201,7 +279,7 @@ export function toggleStatusLineItem(state: TuiState, item: StatusLineItemId): T
   return {
     ...state,
     statusLineItems: isEnabled
-      ? state.statusLineItems.filter((id) => id !== item)
+      ? state.statusLineItems.filter((current) => current !== item)
       : [...state.statusLineItems, item],
   };
 }

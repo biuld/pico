@@ -51,8 +51,8 @@ export {
 
 export function formatStatusLine(store: PicoThreadStore, state: TuiState): string {
   const selected = state.selectedEntryId === store.leafId ? "leaf" : shortId(state.selectedEntryId);
-  const message = state.statusMessage ? ` ${state.statusMessage}` : "";
-  return `pico ${shortId(store.id)} | ${state.turnStatus} | branch ${selected}${message}`;
+  const message = state.bottomPane.statusMessage ? ` ${state.bottomPane.statusMessage}` : "";
+  return `pico ${shortId(store.id)} | ${state.bottomPane.turnStatus} | branch ${selected}${message}`;
 }
 
 function shortId(id: string): string {

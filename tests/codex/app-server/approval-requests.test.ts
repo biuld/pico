@@ -13,8 +13,8 @@ test("runTurn resolves approval server requests over stdio", async () => {
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/start",
-      params: { cwd, ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/fork",
+      params: { ephemeral: true, experimentalRawEvents: true },
       respond: threadStartResponse(cwd),
     },
     {

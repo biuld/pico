@@ -1,31 +1,30 @@
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-import { entryMovesLeaf, isTerminalTurnEntry } from "./entries";
+import { entryMovesLeaf } from "./entries";
 import { now, randomHex, uuidV7 } from "./id";
 import { appendJsonlLine, parseJsonl, writeJsonl } from "./jsonl";
 import { threadDir, threadPath } from "./paths";
 import { summarizeThreadJsonl } from "./summary";
 import {
   childrenOf as threadChildrenOf,
-  collectInjectItems as threadCollectInjectItems,
+  collectResponseItems,
   getPathEntries as threadPathEntries,
-  labels as threadLabels,
+  isUserInputEntry,
+  linearizeForCodex as threadLinearizeForCodex,
 } from "./tree";
 import type {
-  BranchEntry,
-  ConfigChangeEntry,
-  LabelEntry,
   PicoConfigSnapshot,
-  ResponseItem,
-  ResponseItemEntry,
   PicoThreadEntry,
   PicoThreadHeader,
   PicoThreadInfo,
-  TurnAbortedEntry,
-  TurnCompletedEntry,
-  TurnEntry,
-  TurnFailedEntry,
+  RawResponseItem,
+  ResponseItem,
+  RolloutEntry,
+  RolloutItem,
   TurnOverrides,
+  UserInputResponseItem,
 } from "./types";
 import {
   CURRENT_THREAD_VERSION,
@@ -43,6 +42,8 @@ export type {
   RawResponseItem,
   ResponseItem,
   ResponseItemEntry,
+  RolloutEntry,
+  RolloutItem,
   PicoThreadEntry,
   PicoThreadHeader,
   PicoThreadInfo,
@@ -51,6 +52,8 @@ export type {
   TurnEntry,
   TurnFailedEntry,
   TurnOverrides,
+  TurnStatus,
+  UserInputResponseItem,
 } from "./types";
 
 export class PicoThreadStore {
@@ -138,46 +141,35 @@ export class PicoThreadStore {
     try {
       filenames = await readdir(dir);
     } catch (err) {
-      if (isMissingDirectory(err)) {
-        return [];
-      }
+      if (isMissingDirectory(err)) return [];
       throw err;
     }
 
-    const jsonlFiles = filenames.filter((filename) => filename.endsWith(".jsonl"));
-    if (jsonlFiles.length === 0) {
-      return [];
-    }
-
     const threads: PicoThreadInfo[] = [];
-    for (const filename of jsonlFiles) {
+    for (const filename of filenames.filter((name) => name.endsWith(".jsonl"))) {
       const content = await Bun.file(`${dir}/${filename}`).text();
-      const lines = parseJsonl(content);
-      const info = summarizeThreadJsonl(lines);
+      const info = summarizeThreadJsonl(parseJsonl(content));
       if (info) threads.push(info);
     }
 
     return threads.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async appendTurn(
+  backtrack(entryId: string): void {
+    if (!this.hasEntry(entryId)) throw new Error(`Entry not found: ${entryId}`);
+    this._leafId = entryId;
+  }
+
+  async appendRolloutItem(
     parentId: string | null,
-    userInput: string,
-    overrides: TurnOverrides = {},
-  ): Promise<TurnEntry> {
+    item: RolloutItem,
+  ): Promise<RolloutEntry> {
     this.assertParent(parentId);
-    const id = this.nextEntryId("turn");
-    const timestamp = now();
-    const entry: TurnEntry = {
-      type: "turn",
-      id,
+    const entry: RolloutEntry = {
+      id: this.nextEntryId(item.type === "branch_out" ? "branch" : "item"),
       parentId,
-      timestamp,
-      userInput,
-      cwd: overrides.cwd || this.cwd,
-      overrides,
-      status: "started",
-      startedAt: timestamp,
+      timestamp: now(),
+      item,
     };
     await this.appendEntry(entry, true);
     return entry;
@@ -185,153 +177,147 @@ export class PicoThreadStore {
 
   async appendResponseItem(
     parentId: string,
-    turnId: string,
+    responseItemOrTurnId: ResponseItem | string,
+    maybeResponseItem?: ResponseItem,
+  ): Promise<RolloutEntry> {
+    const responseItem = maybeResponseItem || responseItemOrTurnId;
+    if (typeof responseItem === "string") {
+      throw new Error("Invalid response_item payload");
+    }
+    return this.appendRolloutItem(parentId, { type: "response_item", payload: responseItem });
+  }
+
+  async appendTurn(
+    parentId: string,
+    userInput: string,
+    overrides: TurnOverrides = {},
+  ): Promise<RolloutEntry> {
+    return this.appendUserInput(parentId, userInput, overrides);
+  }
+
+  async appendResponseItemForTurn(
+    parentId: string,
+    _turnId: string,
     responseItem: ResponseItem,
-  ): Promise<ResponseItemEntry> {
-    this.assertParent(parentId);
-    this.assertTurn(turnId);
-    const entry: ResponseItemEntry = {
+  ): Promise<RolloutEntry> {
+    return this.appendResponseItem(parentId, responseItem);
+  }
+
+  async appendUserInput(
+    parentId: string,
+    text: string,
+    overrides: TurnOverrides = {},
+  ): Promise<RolloutEntry> {
+    const timestamp = now();
+    return this.appendRolloutItem(parentId, {
       type: "response_item",
-      id: this.nextEntryId("item"),
-      parentId,
-      timestamp: now(),
-      turnId,
-      responseItem,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
+      payload: userInputResponseItem(this.nextEntryId("user"), text, timestamp, {
+        ...overrides,
+        cwd: overrides.cwd || this.cwd,
+      }),
+    });
+  }
+
+  async appendEventMsg(parentId: string, payload: unknown): Promise<RolloutEntry> {
+    return this.appendRolloutItem(parentId, { type: "event_msg", payload });
   }
 
   async appendTurnCompleted(
     parentId: string,
     turnId: string,
     result?: unknown,
-  ): Promise<TurnCompletedEntry> {
-    this.assertParent(parentId);
-    this.assertTurn(turnId);
-    this.assertTurnHasNoTerminalEntry(turnId);
-    const timestamp = now();
-    const entry: TurnCompletedEntry = {
+  ): Promise<RolloutEntry> {
+    return this.appendEventMsg(parentId, {
       type: "turn_completed",
-      id: this.nextEntryId("done"),
-      parentId,
-      timestamp,
       turnId,
-      status: "completed",
-      completedAt: timestamp,
       result,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
+      completedAt: now(),
+    });
   }
 
   async appendTurnFailed(
     parentId: string,
     turnId: string,
     error: Error | string,
-  ): Promise<TurnFailedEntry> {
-    this.assertParent(parentId);
-    this.assertTurn(turnId);
-    this.assertTurnHasNoTerminalEntry(turnId);
-    const timestamp = now();
-    const entry: TurnFailedEntry = {
+  ): Promise<RolloutEntry> {
+    return this.appendEventMsg(parentId, {
       type: "turn_failed",
-      id: this.nextEntryId("fail"),
-      parentId,
-      timestamp,
       turnId,
-      status: "failed",
-      failedAt: timestamp,
       error: error instanceof Error ? error.message : error,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
+      failedAt: now(),
+    });
   }
 
   async appendTurnAborted(
     parentId: string,
     turnId: string,
     reason?: string,
-  ): Promise<TurnAbortedEntry> {
-    this.assertParent(parentId);
-    this.assertTurn(turnId);
-    this.assertTurnHasNoTerminalEntry(turnId);
-    const timestamp = now();
-    const entry: TurnAbortedEntry = {
+  ): Promise<RolloutEntry> {
+    return this.appendEventMsg(parentId, {
       type: "turn_aborted",
-      id: this.nextEntryId("abort"),
-      parentId,
-      timestamp,
       turnId,
-      status: "aborted",
-      abortedAt: timestamp,
       reason,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
+      abortedAt: now(),
+    });
   }
 
-  async appendLabel(targetId: string, label: string): Promise<LabelEntry> {
-    this.assertParent(targetId);
-    const entry: LabelEntry = {
-      type: "label",
-      id: this.nextEntryId("label"),
-      parentId: targetId,
-      timestamp: now(),
-      targetId,
-      label,
-    };
-    await this.appendEntry(entry, false);
-    return entry;
-  }
-
-  async appendBranch(targetId: string, name?: string): Promise<BranchEntry> {
-    this.assertParent(targetId);
-    const entry: BranchEntry = {
-      type: "branch",
-      id: this.nextEntryId("branch"),
-      parentId: targetId,
-      timestamp: now(),
-      targetId,
-      name,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
-  }
-
-  async appendConfigChange(config: PicoConfigSnapshot): Promise<ConfigChangeEntry> {
-    const entry: ConfigChangeEntry = {
-      type: "config_change",
-      id: this.nextEntryId("config"),
-      parentId: this.leafId,
-      timestamp: now(),
-      config,
-    };
-    await this.appendEntry(entry, true);
-    return entry;
-  }
-
-  checkout(entryId: string): void {
-    if (!this.hasEntry(entryId)) {
-      throw new Error(`Entry not found: ${entryId}`);
+  async ensureBranchForAppend(): Promise<string> {
+    const leafId = this.leafId;
+    if (leafId === this.header.id) {
+      if (this.childrenOf(leafId).length === 0) return leafId;
+      const branch = await this.appendRolloutItem(leafId, { type: "branch_out" });
+      return branch.id;
     }
-    this._leafId = entryId;
+
+    const leaf = this.entryById(leafId);
+    if (!leaf) return leafId;
+    if (leaf.item.type === "branch_out" && this.childrenOf(leafId).length === 0) return leafId;
+    if (this.childrenOf(leafId).length === 0) return leafId;
+
+    const branch = await this.appendRolloutItem(leafId, { type: "branch_out" });
+    return branch.id;
   }
 
   getPathEntries(leafId: string = this.leafId): PicoThreadEntry[] {
     return threadPathEntries(this.header.id, this.entries, leafId);
   }
 
-  collectInjectItems(leafId: string = this.leafId): ResponseItem[] {
-    return threadCollectInjectItems(this.header.id, this.entries, leafId);
+  linearizeForCodex(leafId: string = this.leafId): unknown[] {
+    return threadLinearizeForCodex(this.header.id, this.entries, leafId);
+  }
+
+  async writeLinearizedRolloutFile(leafId: string = this.leafId): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "pico-rollout-"));
+    const path = join(dir, "thread.jsonl");
+    await writeJsonl(path, this.linearizeForCodex(leafId));
+    return path;
   }
 
   childrenOf(parentId: string): PicoThreadEntry[] {
     return threadChildrenOf(this.entries, parentId);
   }
 
+  collectInjectItems(leafId: string = this.leafId): ResponseItem[] {
+    return collectResponseItems(this.header.id, this.entries, leafId).filter(
+      (item) => item.role !== "user",
+    );
+  }
+
   labels(): Map<string, string> {
-    return threadLabels(this.entries);
+    return new Map();
+  }
+
+  checkout(entryId: string): void {
+    this.backtrack(entryId);
+  }
+
+  async appendBranch(targetId: string): Promise<RolloutEntry> {
+    this.backtrack(targetId);
+    return this.appendRolloutItem(targetId, { type: "branch_out" });
+  }
+
+  async appendLabel(_targetId: string, _label: string): Promise<never> {
+    throw new Error("Labels are out of scope for rollout storage");
   }
 
   private async appendEntry(entry: PicoThreadEntry, moveLeaf: boolean): Promise<void> {
@@ -345,12 +331,15 @@ export class PicoThreadStore {
     }
     this.entryIds.add(entry.id);
     this.entries.push(entry);
-    this.applyEntryDerivedState(entry);
     if (moveLeaf) this._leafId = entry.id;
   }
 
   private hasEntry(id: string): boolean {
     return id === this.header.id || this.entryIds.has(id);
+  }
+
+  private entryById(id: string): PicoThreadEntry | undefined {
+    return this.entries.find((entry) => entry.id === id);
   }
 
   private assertParent(parentId: string | null): void {
@@ -359,24 +348,9 @@ export class PicoThreadStore {
     }
   }
 
-  private assertTurn(turnId: string): void {
-    if (!this.entries.some((entry) => entry.type === "turn" && entry.id === turnId)) {
-      throw new Error(`Turn entry not found: ${turnId}`);
-    }
-  }
-
-  private assertTurnHasNoTerminalEntry(turnId: string): void {
-    if (this.entries.some((entry) => isTerminalTurnEntry(entry) && entry.turnId === turnId)) {
-      throw new Error(`Turn already has a terminal entry: ${turnId}`);
-    }
-  }
-
   private validateLoadedEntry(raw: unknown): PicoThreadEntry {
     return validateLoadedThreadEntry(raw, {
       assertParent: (parentId) => this.assertParent(parentId),
-      assertTurn: (turnId) => this.assertTurn(turnId),
-      assertTurnHasNoTerminalEntry: (turnId) => this.assertTurnHasNoTerminalEntry(turnId),
-      hasEntry: (id) => this.hasEntry(id),
     });
   }
 
@@ -387,23 +361,47 @@ export class PicoThreadStore {
     } while (this.entryIds.has(id));
     return id;
   }
+}
 
-  private applyEntryDerivedState(entry: PicoThreadEntry): void {
-    if (entry.type === "turn_completed") {
-      this.setTurnStatus(entry.turnId, "completed");
-    } else if (entry.type === "turn_failed") {
-      this.setTurnStatus(entry.turnId, "failed");
-    } else if (entry.type === "turn_aborted") {
-      this.setTurnStatus(entry.turnId, "aborted");
-    }
-  }
+export function userInputResponseItem(
+  id: string,
+  text: string,
+  timestamp: string = now(),
+  overrides: TurnOverrides = {},
+): UserInputResponseItem {
+  return {
+    id,
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text }],
+    pico: {
+      kind: "user_input",
+      status: "started",
+      overrides,
+      cwd: overrides.cwd,
+    },
+    created_at: timestamp,
+  };
+}
 
-  private setTurnStatus(turnId: string, status: TurnEntry["status"]): void {
-    const turn = this.entries.find(
-      (entry): entry is TurnEntry => entry.type === "turn" && entry.id === turnId,
-    );
-    if (turn) turn.status = status;
-  }
+export function userTextFromResponseItem(item: ResponseItem): string | undefined {
+  if (item.role !== "user") return undefined;
+  const content = item.content;
+  if (!Array.isArray(content)) return undefined;
+  const parts = content
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      const value = part as Record<string, unknown>;
+      return typeof value.text === "string" ? value.text : "";
+    })
+    .filter(Boolean);
+  return parts.join("\n") || undefined;
+}
+
+export function entryUserText(entry: RolloutEntry): string | undefined {
+  return isUserInputEntry(entry) && entry.item.type === "response_item"
+    ? userTextFromResponseItem(entry.item.payload)
+    : undefined;
 }
 
 function isMissingDirectory(err: unknown): boolean {

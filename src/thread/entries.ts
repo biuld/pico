@@ -1,16 +1,5 @@
-import type {
-  PicoThreadEntry,
-  TurnAbortedEntry,
-  TurnCompletedEntry,
-  TurnFailedEntry,
-} from "./types";
+import type { PicoThreadEntry } from "./types";
 
-export function entryMovesLeaf(entry: PicoThreadEntry): boolean {
-  return entry.type !== "label";
-}
-
-export function isTerminalTurnEntry(
-  entry: PicoThreadEntry,
-): entry is TurnCompletedEntry | TurnFailedEntry | TurnAbortedEntry {
-  return entry.type === "turn_completed" || entry.type === "turn_failed" || entry.type === "turn_aborted";
+export function entryMovesLeaf(_entry: PicoThreadEntry): boolean {
+  return true;
 }

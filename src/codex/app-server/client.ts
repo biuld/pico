@@ -29,6 +29,7 @@ import type {
   ModelListParams,
   ModelListResponse,
   ThreadInjectItemsParams,
+  ThreadForkParams,
   ThreadListParams,
   ThreadListResponse,
   ThreadReadResponse,
@@ -167,6 +168,21 @@ export class CodexAppServerClient extends EventEmitter {
   async startEphemeralThread(params: Partial<ThreadStartParams> = {}): Promise<ThreadStartResponse> {
     const response = await this.request<ThreadStartResponse>("thread/start", {
       ...params,
+      ephemeral: true,
+      experimentalRawEvents: true,
+    });
+    this.status = updateCodexStatusFromThreadStart(this.status, response);
+    this.emit("status", this.statusSnapshot);
+    return response;
+  }
+
+  async forkEphemeralThreadFromPath(
+    path: string,
+    params: Partial<Omit<ThreadForkParams, "path" | "ephemeral">> = {},
+  ): Promise<ThreadStartResponse> {
+    const response = await this.request<ThreadStartResponse>("thread/fork", {
+      ...params,
+      path,
       ephemeral: true,
       experimentalRawEvents: true,
     });

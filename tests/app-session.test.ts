@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppState } from "../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../src/app-session";
-import { PicoThreadStore } from "../src/thread/store";
+import { PicoThreadStore, entryUserText } from "../src/thread/store";
 
 class SessionCodex extends EventEmitter {
   shutdownCount = 0;
 
-  async startEphemeralThread() {
+  async forkEphemeralThreadFromPath() {
     return {
       thread: {
         id: "thread-1",
@@ -33,8 +33,6 @@ class SessionCodex extends EventEmitter {
       cwd: process.cwd(),
     };
   }
-
-  async injectItems() {}
 
   async startTurn() {
     setTimeout(() => {
@@ -169,8 +167,8 @@ test("app session drains queued follow-up messages after a turn finishes", async
   expect(appSession.snapshot.queuedMessages).toEqual([]);
   expect(
     store.allEntries
-      .filter((entry) => entry.type === "turn")
-      .map((entry) => entry.userInput),
+      .map((entry) => entryUserText(entry))
+      .filter(Boolean),
   ).toEqual(["first", "third"]);
 });
 
@@ -247,7 +245,10 @@ test("app session interrupts the active codex turn", async () => {
     { threadId: "thread-1", turnId: "codex-turn-interrupt" },
   ]);
   expect(appSession.snapshot.running).toBe(false);
-  expect(store.allEntries.at(-1)).toMatchObject({ type: "turn_aborted" });
+  expect(store.allEntries.at(-1)?.item).toMatchObject({
+    type: "event_msg",
+    payload: { type: "turn_aborted" },
+  });
 });
 
 test("app session sends the queued follow-up after interrupting the active turn", async () => {
@@ -323,8 +324,8 @@ test("app session sends the queued follow-up after interrupting the active turn"
   expect(appSession.snapshot.queuedMessages).toEqual([]);
   expect(
     store.allEntries
-      .filter((entry) => entry.type === "turn")
-      .map((entry) => entry.userInput),
+      .map((entry) => entryUserText(entry))
+      .filter(Boolean),
   ).toEqual(["first", "queued"]);
 });
 

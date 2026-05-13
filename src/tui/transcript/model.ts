@@ -1,5 +1,5 @@
 import type { DraftAppState } from "../../app/controller";
-import type { PicoThreadStore } from "../../thread/store";
+import { entryUserText, type PicoThreadStore } from "../../thread/store";
 import {
   assistantMarkdownCell,
   systemNoticeCell,
@@ -15,22 +15,43 @@ export function buildTranscriptCells(
 ): TranscriptCell[] {
   const cells: TranscriptCell[] = [];
   const pendingCalls = new Map<string, number>();
+  let currentUserCellIndex: number | undefined;
   for (const entry of store.getPathEntries(leafId)) {
-    if (entry.type === "turn") {
+    const userText = entryUserText(entry);
+    if (userText) {
       pendingCalls.clear();
-      cells.push(userMessageCell(entry.id, entry.userInput, entry.status));
+      const pico = entry.item.type === "response_item"
+        ? entry.item.payload.pico as Record<string, unknown> | undefined
+        : undefined;
+      const status = pico?.status === "started" ? "started" : "completed";
+      cells.push(userMessageCell(entry.id, userText, status));
+      currentUserCellIndex = cells.length - 1;
       continue;
     }
-    if (entry.type === "response_item") {
-      appendTranscriptCells(cells, pendingCalls, transcriptCellsForResponseItem(entry.id, entry.responseItem));
+    if (entry.item.type === "branch_out") continue;
+    if (entry.item.type === "response_item") {
+      appendTranscriptCells(cells, pendingCalls, transcriptCellsForResponseItem(entry.id, entry.item.payload));
       continue;
     }
-    if (entry.type === "turn_failed") {
-      cells.push(systemNoticeCell(entry.id, entry.error, "failed"));
-      continue;
-    }
-    if (entry.type === "turn_aborted") {
-      cells.push(systemNoticeCell(entry.id, entry.reason || "Turn aborted", "aborted"));
+    if (entry.item.type === "event_msg" && entry.item.payload && typeof entry.item.payload === "object") {
+      const event = entry.item.payload as Record<string, unknown>;
+      if (event.type === "turn_completed" && currentUserCellIndex !== undefined) {
+        cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "completed" };
+        continue;
+      }
+      if (event.type === "turn_failed") {
+        if (currentUserCellIndex !== undefined) {
+          cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "failed" };
+        }
+        cells.push(systemNoticeCell(entry.id, String(event.error || "Turn failed"), "failed"));
+        continue;
+      }
+      if (event.type === "turn_aborted") {
+        if (currentUserCellIndex !== undefined) {
+          cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "aborted" };
+        }
+        cells.push(systemNoticeCell(entry.id, String(event.reason || "Turn aborted"), "aborted"));
+      }
     }
   }
   return cells;

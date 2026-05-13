@@ -163,6 +163,11 @@ export type ThreadInjectItemsParams = Omit<ProtocolThreadInjectItemsParams, "ite
   items: JsonValue[] | unknown[];
 };
 
+export type ThreadForkParams = Partial<ThreadStartParams> & {
+  path: string;
+  ephemeral?: boolean | null;
+};
+
 export type TurnStartParams = Omit<
   Partial<ProtocolTurnStartParams>,
   "threadId" | "input" | "approvalPolicy" | "personality"

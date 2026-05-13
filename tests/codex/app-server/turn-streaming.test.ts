@@ -14,8 +14,8 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/start",
-      params: { cwd, ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/fork",
+      params: { ephemeral: true, experimentalRawEvents: true },
       respond: threadStartResponse(cwd),
     },
     {
@@ -63,6 +63,11 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
     expect(events).toContain("raw-item:completed");
     expect(events).toContain("turn:completed");
     expect(store.collectInjectItems()).toEqual([assistantMessage("assistant-output", "hello")]);
+    const forkRequest = (await fixture.readLog()).find((entry) => {
+      const message = entry.message as Record<string, unknown> | undefined;
+      return entry.type === "received" && message?.method === "thread/fork";
+    });
+    expect(forkRequest).toBeTruthy();
   } finally {
     await fixture.client.shutdown();
   }

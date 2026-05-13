@@ -243,13 +243,6 @@ function handleHistoryKey(sequence: string, runtime: KeybindingRuntime): boolean
     runtime.restoreSelected();
     return true;
   }
-  if (sequence === "r") {
-    runtime.setInputValue("/rename ");
-    runtime.dispatch({ type: "closeSurface" });
-    runtime.focusInput();
-    runtime.render();
-    return true;
-  }
   if (sequence === "/") {
     runtime.setInputValue("/");
     runtime.dispatch({ type: "inputChanged", value: "/" });

@@ -2,370 +2,149 @@ import { beforeEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PicoThreadStore } from "../src/thread/store";
+import { PicoThreadStore, entryUserText } from "../src/thread/store";
+import { parseJsonl } from "../src/thread/jsonl";
 
 let cwd: string;
 
 beforeEach(async () => {
-  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
-  Bun.env.HOME = home;
   cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
 });
 
-test("writes and loads Pico JSONL v1 threads", async () => {
+test("stores entries as rollout entries with a unified RolloutItem ADT", async () => {
   const store = await PicoThreadStore.create(cwd, { model: "test-model" });
-  const turn = await store.appendTurn(store.leafId, "hello");
-  const rawItem = {
+  const user = await store.appendUserInput(store.leafId, "hello");
+  const assistant = await store.appendResponseItem(user.id, {
+    id: "assistant-1",
     type: "message",
     role: "assistant",
     content: [{ type: "output_text", text: "hi" }],
-  };
-  const item = await store.appendResponseItem(turn.id, turn.id, rawItem);
-  await store.appendTurnCompleted(item.id, turn.id, { ok: true });
-
-  const loaded = await PicoThreadStore.load(cwd, store.id);
-
-  expect(loaded.id).toBe(store.id);
-  expect(loaded.cwd).toBe(cwd);
-  expect(loaded.config).toEqual({ model: "test-model" });
-  expect(loaded.collectInjectItems()).toEqual([rawItem]);
-  expect(store.path).toContain("/.pico/threads/");
-});
-
-test("persists Pico JSONL entries with tree metadata and raw response items", async () => {
-  const store = await PicoThreadStore.create(cwd, { model: "test-model" });
-  const turn = await store.appendTurn(store.leafId, "inspect repo", { model: "turn-model" });
-  const rawItem = {
-    type: "function_call_output",
-    call_id: "call-1",
-    output: {
-      success: true,
-      body: [{ type: "text", text: "done" }],
-    },
-  };
-  const item = await store.appendResponseItem(turn.id, turn.id, rawItem);
-  const done = await store.appendTurnCompleted(item.id, turn.id, { codexTurnId: "codex-turn-1" });
-  const branch = await store.appendBranch(done.id, "branch from done");
-  await store.appendLabel(done.id, "root done");
-
-  const lines = await readJsonl(store.path);
-
-  expect(lines).toHaveLength(6);
-  expect(lines[0]).toMatchObject({
-    type: "thread",
-    version: 1,
-    id: store.id,
-    cwd,
-    config: { model: "test-model" },
   });
+  await store.appendEventMsg(assistant.id, { type: "turn_completed", turnId: user.id });
+
+  const lines = parseJsonl(await Bun.file(store.path).text());
+  expect(lines.slice(1).every((line) => "item" in (line as Record<string, unknown>))).toBe(true);
   expect(lines[1]).toMatchObject({
-    type: "turn",
-    id: turn.id,
+    id: user.id,
     parentId: store.id,
-    userInput: "inspect repo",
-    overrides: { model: "turn-model" },
+    item: { type: "response_item" },
   });
   expect(lines[2]).toMatchObject({
-    type: "response_item",
-    id: item.id,
-    parentId: turn.id,
-    turnId: turn.id,
-    responseItem: rawItem,
+    id: assistant.id,
+    parentId: user.id,
+    item: { type: "response_item", payload: { id: "assistant-1" } },
   });
   expect(lines[3]).toMatchObject({
-    type: "turn_completed",
-    id: done.id,
-    parentId: item.id,
-    turnId: turn.id,
-    result: { codexTurnId: "codex-turn-1" },
-  });
-  expect(lines[4]).toMatchObject({
-    type: "branch",
-    id: branch.id,
-    parentId: done.id,
-    targetId: done.id,
-    name: "branch from done",
-  });
-  expect(lines[5]).toMatchObject({
-    type: "label",
-    parentId: done.id,
-    targetId: done.id,
-    label: "root done",
+    parentId: assistant.id,
+    item: { type: "event_msg", payload: { type: "turn_completed" } },
   });
 });
 
-test("loads turn status from terminal entries instead of persisted turn status", async () => {
+test("backtrack changes only the in-memory leaf and reload returns to persisted tip", async () => {
   const store = await PicoThreadStore.create(cwd);
-  const turn = await store.appendTurn(store.leafId, "derive status");
-  const item = await store.appendResponseItem(turn.id, turn.id, {
-    type: "message",
-    role: "assistant",
-    content: [{ type: "output_text", text: "done" }],
-  });
-  await store.appendTurnCompleted(item.id, turn.id);
+  const first = await store.appendUserInput(store.leafId, "first");
+  const second = await store.appendUserInput(first.id, "second");
 
-  const lines = await readJsonl(store.path);
-  expect(lines[1]).toMatchObject({ type: "turn", status: "started" });
+  store.backtrack(first.id);
+  expect(store.leafId).toBe(first.id);
+  expect(parseJsonl(await Bun.file(store.path).text())).toHaveLength(3);
 
   const loaded = await PicoThreadStore.load(cwd, store.id);
-  const loadedTurn = loaded.allEntries.find((entry) => entry.type === "turn");
-  expect(loadedTurn).toMatchObject({ id: turn.id, status: "completed" });
+  expect(loaded.leafId).toBe(second.id);
 });
 
-test("rejects JSONL entries with missing parents", async () => {
+test("backtrack then append creates exactly one branch_out entry", async () => {
   const store = await PicoThreadStore.create(cwd);
-  const header = (await readJsonl(store.path))[0];
-  await writeJsonl(store.path, [
-    header,
-    {
-      type: "turn",
-      id: "turn_missing_parent",
-      parentId: "missing-parent",
-      timestamp: new Date().toISOString(),
-      userInput: "hello",
-      cwd,
-      status: "started",
-      startedAt: new Date().toISOString(),
-    },
-  ]);
+  const root = await store.appendUserInput(store.leafId, "root");
+  const left = await store.appendUserInput(root.id, "left");
 
-  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Parent entry not found");
+  store.backtrack(root.id);
+  const parent = await store.ensureBranchForAppend();
+  const right = await store.appendUserInput(parent, "right");
+
+  const branchEntries = store.allEntries.filter((entry) => entry.item.type === "branch_out");
+  expect(branchEntries).toHaveLength(1);
+  expect(branchEntries[0]).toMatchObject({ parentId: root.id, item: { type: "branch_out" } });
+  expect(right.parentId).toBe(branchEntries[0].id);
+  expect(left.parentId).toBe(root.id);
 });
 
-test("rejects JSONL with invalid thread headers", async () => {
+test("empty branch_out remains appendable and is not duplicated", async () => {
   const store = await PicoThreadStore.create(cwd);
-  await writeJsonl(store.path, [
-    {
-      type: "thread",
-      version: 1,
-      id: store.id,
-      createdAt: new Date().toISOString(),
-      cwd,
-      config: null,
-    },
-  ]);
+  const root = await store.appendUserInput(store.leafId, "root");
+  const left = await store.appendUserInput(root.id, "left");
 
-  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Invalid thread header config");
+  store.backtrack(root.id);
+  const branch = await store.ensureBranchForAppend();
+  expect(store.allEntries.at(-1)?.item.type).toBe("branch_out");
+  const parent = await store.ensureBranchForAppend();
+  const right = await store.appendUserInput(parent, "right");
+
+  expect(parent).toBe(branch);
+  expect(right.parentId).toBe(branch);
+  expect(store.allEntries.filter((entry) => entry.item.type === "branch_out")).toHaveLength(1);
+  expect(left.parentId).toBe(root.id);
 });
 
-test("rejects JSONL response items and terminal entries for unknown turns", async () => {
+test("linearizeForCodex skips branch_out and preserves selected path rollout items", async () => {
   const store = await PicoThreadStore.create(cwd);
-  const header = (await readJsonl(store.path))[0];
-  await writeJsonl(store.path, [
-    header,
-    {
-      type: "turn",
-      id: "turn_valid",
-      parentId: store.id,
-      timestamp: new Date().toISOString(),
-      userInput: "hello",
-      cwd,
-      status: "started",
-      startedAt: new Date().toISOString(),
-    },
-    {
-      type: "response_item",
-      id: "item_bad_turn",
-      parentId: "turn_valid",
-      timestamp: new Date().toISOString(),
-      turnId: "missing-turn",
-      responseItem: { type: "message" },
-    },
-  ]);
+  const root = await store.appendUserInput(store.leafId, "root");
+  const rootAssistant = await store.appendResponseItem(root.id, { id: "root-item", type: "message" });
+  await store.appendUserInput(rootAssistant.id, "left");
 
-  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("Turn entry not found");
+  store.backtrack(rootAssistant.id);
+  const branch = await store.ensureBranchForAppend();
+  const right = await store.appendUserInput(branch, "right");
+  await store.appendResponseItem(right.id, { id: "right-item", type: "message" });
+
+  const linearized = store.linearizeForCodex() as Array<Record<string, any>>;
+  expect(linearized.map((line) => line.type)).toEqual([
+    "response_item",
+    "response_item",
+    "response_item",
+    "response_item",
+  ]);
+  expect(linearized.map((line) => line.payload?.id).filter(Boolean)).toEqual([
+    root.item.type === "response_item" ? root.item.payload.id : undefined,
+    "root-item",
+    right.item.type === "response_item" ? right.item.payload.id : undefined,
+    "right-item",
+  ]);
+  expect(linearized.some((line) => line.type === "branch_out")).toBe(false);
 });
 
-test("rejects JSONL turns with multiple terminal entries", async () => {
-  const store = await PicoThreadStore.create(cwd);
-  const header = (await readJsonl(store.path))[0];
-  await writeJsonl(store.path, [
-    header,
-    {
-      type: "turn",
-      id: "turn_duplicate_terminal",
-      parentId: store.id,
-      timestamp: new Date().toISOString(),
-      userInput: "hello",
-      cwd,
-      status: "started",
-      startedAt: new Date().toISOString(),
-    },
-    {
-      type: "turn_completed",
-      id: "done_one",
-      parentId: "turn_duplicate_terminal",
-      timestamp: new Date().toISOString(),
-      turnId: "turn_duplicate_terminal",
-      status: "completed",
-      completedAt: new Date().toISOString(),
-    },
-    {
-      type: "turn_failed",
-      id: "fail_two",
-      parentId: "done_one",
-      timestamp: new Date().toISOString(),
-      turnId: "turn_duplicate_terminal",
-      status: "failed",
-      failedAt: new Date().toISOString(),
-      error: "duplicate",
-    },
-  ]);
-
-  await expect(PicoThreadStore.load(cwd, store.id)).rejects.toThrow("terminal entry");
-});
-
-test("lists Pico threads for the cwd", async () => {
+test("thread listing summarizes user response items and assistant response items", async () => {
   const first = await PicoThreadStore.create(cwd);
   const second = await PicoThreadStore.create(cwd);
-  const turn = await second.appendTurn(second.leafId, "hello");
-  const item = await second.appendResponseItem(turn.id, turn.id, {
-    type: "message",
-    role: "assistant",
-    content: [{ type: "output_text", text: "hi" }],
-  });
-  await second.appendTurnCompleted(item.id, turn.id);
+  const user = await second.appendUserInput(second.leafId, "hello");
+  await second.appendResponseItem(user.id, { id: "assistant", type: "message" });
 
   const threads = await PicoThreadStore.list(cwd);
 
   expect(threads.map((thread) => thread.id)).toContain(first.id);
-  expect(threads.map((thread) => thread.id)).toContain(second.id);
   expect(threads.find((thread) => thread.id === second.id)).toMatchObject({
     leafId: second.leafId,
     preview: "hello",
     turnCount: 1,
-    responseItemCount: 1,
+    responseItemCount: 2,
   });
-  expect(typeof threads.find((thread) => thread.id === second.id)?.updatedAt).toBe("string");
 });
 
-test("collectInjectItems only returns the selected branch path", async () => {
+test("collectInjectItems returns assistant items only from the selected branch path", async () => {
   const store = await PicoThreadStore.create(cwd);
-  const firstTurn = await store.appendTurn(store.leafId, "root");
-  const rootItem = await store.appendResponseItem(firstTurn.id, firstTurn.id, {
-    id: "root-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(rootItem.id, firstTurn.id);
+  const root = await store.appendUserInput(store.leafId, "root");
+  const rootAssistant = await store.appendResponseItem(root.id, { id: "root-item", type: "message" });
+  const left = await store.appendUserInput(rootAssistant.id, "left");
+  await store.appendResponseItem(left.id, { id: "left-item", type: "message" });
 
-  const branchPoint = rootItem.id;
+  store.backtrack(rootAssistant.id);
+  const branch = await store.ensureBranchForAppend();
+  const right = await store.appendUserInput(branch, "right");
+  await store.appendResponseItem(right.id, { id: "right-item", type: "message" });
 
-  const leftTurn = await store.appendTurn(branchPoint, "left");
-  const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
-    id: "left-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(leftItem.id, leftTurn.id);
-  const leftLeaf = store.leafId;
-
-  store.checkout(branchPoint);
-  const rightTurn = await store.appendTurn(branchPoint, "right");
-  const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
-    id: "right-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(rightItem.id, rightTurn.id);
-  const rightLeaf = store.leafId;
-
-  expect(store.collectInjectItems(leftLeaf).map((item) => item.id)).toEqual([
-    "root-item",
-    "left-item",
-  ]);
-  expect(store.collectInjectItems(rightLeaf).map((item) => item.id)).toEqual([
-    "root-item",
-    "right-item",
+  expect(store.collectInjectItems().map((item) => item.id)).toEqual(["root-item", "right-item"]);
+  expect(store.getPathEntries().map((entry) => entryUserText(entry)).filter(Boolean)).toEqual([
+    "root",
+    "right",
   ]);
 });
-
-test("loaded JSONL assembles injection items from the selected leaf path", async () => {
-  const store = await PicoThreadStore.create(cwd);
-  const rootTurn = await store.appendTurn(store.leafId, "root");
-  const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
-    id: "root-item",
-    type: "message",
-  });
-  const rootDone = await store.appendTurnCompleted(rootItem.id, rootTurn.id);
-
-  const leftTurn = await store.appendTurn(rootDone.id, "left");
-  const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
-    id: "left-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(leftItem.id, leftTurn.id);
-  const leftLeaf = store.leafId;
-
-  await store.appendBranch(rootDone.id, "back to root");
-  const rightTurn = await store.appendTurn(store.leafId, "right");
-  const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
-    id: "right-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(rightItem.id, rightTurn.id);
-  const rightLeaf = store.leafId;
-
-  const loaded = await PicoThreadStore.load(cwd, store.id);
-
-  expect(loaded.collectInjectItems(leftLeaf).map((item) => item.id)).toEqual([
-    "root-item",
-    "left-item",
-  ]);
-  expect(loaded.collectInjectItems(rightLeaf).map((item) => item.id)).toEqual([
-    "root-item",
-    "right-item",
-  ]);
-  expect(loaded.collectInjectItems().map((item) => item.id)).toEqual([
-    "root-item",
-    "right-item",
-  ]);
-});
-
-test("response items round-trip by deep equality", async () => {
-  const store = await PicoThreadStore.create(cwd);
-  const turn = await store.appendTurn(store.leafId, "tools");
-  const responseItem = {
-    type: "function_call_output",
-    call_id: "call-1",
-    output: {
-      success: true,
-      body: [{ type: "text", text: "done" }],
-    },
-  };
-  const item = await store.appendResponseItem(turn.id, turn.id, responseItem);
-  await store.appendTurnCompleted(item.id, turn.id);
-
-  const loaded = await PicoThreadStore.load(cwd, store.id);
-  expect(loaded.collectInjectItems()[0]).toEqual(responseItem);
-});
-
-test("labels do not move the leaf but branch entries do", async () => {
-  const store = await PicoThreadStore.create(cwd);
-  const turn = await store.appendTurn(store.leafId, "root");
-  const item = await store.appendResponseItem(turn.id, turn.id, {
-    id: "root-item",
-    type: "message",
-  });
-  await store.appendTurnCompleted(item.id, turn.id);
-  const completedLeaf = store.leafId;
-
-  await store.appendLabel(item.id, "root label");
-  expect(store.leafId).toBe(completedLeaf);
-
-  await store.appendBranch(item.id, "branch from item");
-  const branchLeaf = store.leafId;
-  expect(branchLeaf).not.toBe(completedLeaf);
-
-  const loaded = await PicoThreadStore.load(cwd, store.id);
-  expect(loaded.leafId).toBe(branchLeaf);
-  expect(loaded.collectInjectItems()).toEqual([{ id: "root-item", type: "message" }]);
-});
-
-async function readJsonl(path: string): Promise<Record<string, unknown>[]> {
-  return (await Bun.file(path).text())
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as Record<string, unknown>);
-}
-
-async function writeJsonl(path: string, lines: readonly Record<string, unknown>[]): Promise<void> {
-  await Bun.write(path, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`);
-}

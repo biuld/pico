@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { PicoThreadStore, type TurnEntry } from "../../../src/thread/store";
+import { PicoThreadStore, entryUserText } from "../../../src/thread/store";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -13,8 +13,8 @@ test("failed completion becomes a failed Pico turn", async () => {
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/start",
-      params: { cwd, ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/fork",
+      params: { ephemeral: true, experimentalRawEvents: true },
       respond: threadStartResponse(cwd),
     },
     {
@@ -40,13 +40,10 @@ test("failed completion becomes a failed Pico turn", async () => {
       runTurn({ cwd, store, codex: fixture.client, config: {} } as AppState, "fail"),
     ).rejects.toThrow("mock failure");
 
-    const turn = store.allEntries.find(
-      (entry): entry is TurnEntry => entry.type === "turn" && entry.userInput === "fail",
-    );
-    expect(turn?.status).toBe("failed");
-    expect(store.allEntries.at(-1)).toMatchObject({
-      type: "turn_failed",
-      error: "mock failure",
+    expect(store.allEntries.some((entry) => entryUserText(entry) === "fail")).toBe(true);
+    expect(store.allEntries.at(-1)?.item).toMatchObject({
+      type: "event_msg",
+      payload: { type: "turn_failed", error: "mock failure" },
     });
   } finally {
     await fixture.client.shutdown();

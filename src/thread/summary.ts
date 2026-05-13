@@ -1,4 +1,5 @@
 import { entryMovesLeaf } from "./entries";
+import { entryUserText } from "./store";
 import type {
   PicoThreadEntry,
   PicoThreadHeader,
@@ -14,16 +15,17 @@ export function summarizeThreadJsonl(lines: readonly unknown[]): PicoThreadInfo 
   let preview = "";
   let turnCount = 0;
   let responseItemCount = 0;
-  let label: string | undefined;
 
   for (const raw of lines.slice(1)) {
     const entry = raw as PicoThreadEntry;
     if (entryMovesLeaf(entry)) leafId = entry.id;
     if (entry.timestamp) updatedAt = entry.timestamp;
-    if (entry.type === "turn" && !preview) preview = previewText(entry.userInput);
-    if (entry.type === "turn") turnCount++;
-    if (entry.type === "response_item") responseItemCount++;
-    if (entry.type === "label") label = entry.label;
+    const userText = entryUserText(entry);
+    if (userText) {
+      if (!preview) preview = previewText(userText);
+      turnCount++;
+    }
+    if (entry.item?.type === "response_item") responseItemCount++;
   }
 
   return {
@@ -35,7 +37,6 @@ export function summarizeThreadJsonl(lines: readonly unknown[]): PicoThreadInfo 
     preview,
     turnCount,
     responseItemCount,
-    label,
   };
 }
 

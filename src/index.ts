@@ -18,9 +18,7 @@ async function main(): Promise<void> {
     const threads = await PicoThreadStore.list(options.cwd);
     for (const thread of threads) {
       console.log(
-        `${thread.id} leaf=${thread.leafId} turns=${thread.turnCount} items=${thread.responseItemCount} ${
-          thread.label || ""
-        }`,
+        `${thread.id} leaf=${thread.leafId} turns=${thread.turnCount} items=${thread.responseItemCount}`,
       );
     }
     return;
@@ -34,7 +32,7 @@ async function main(): Promise<void> {
     });
     const action = result.dryRun ? "would_import" : "imported";
     console.log(
-      `Codex import: ${action}=${result.dryRun ? result.wouldImport : result.imported} skipped=${result.skipped} failed=${result.failed}`,
+      `Codex rollout import: ${action}=${result.dryRun ? result.wouldImport : result.imported} skipped=${result.skipped} failed=${result.failed}`,
     );
     for (const thread of result.threads) {
       if (thread.status === "imported" || thread.status === "would_import") {

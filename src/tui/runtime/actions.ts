@@ -337,26 +337,6 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     host.render();
   };
 
-  const renameSelected = async (label: string) => {
-    if (busyGuard()) return;
-
-    const app = host.appSession.app;
-    const state = host.getState();
-    if (!app.store) {
-      host.dispatch({
-        type: "setTurnStatus",
-        status: state.bottomPane.turnStatus,
-        message: "no turns yet",
-      });
-      host.render();
-      return;
-    }
-
-    await host.appSession.rename(state.selectedEntryId, label);
-    host.dispatch({ type: "renameCompleted", entryId: state.selectedEntryId });
-    host.render();
-  };
-
   const handleLocalCommand = async (command: TuiInputCommand): Promise<boolean> => {
     if (command.type === "empty") return true;
     if (command.type === "submit") return false;
@@ -403,8 +383,9 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       return true;
     }
 
-    await renameSelected(command.label);
+    host.dispatch({ type: "setTurnStatus", status: "failed", message: "unsupported command" });
     host.dispatch({ type: "closeSurface" });
+    host.render();
     return true;
   };
 

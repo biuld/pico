@@ -104,8 +104,8 @@ test("history keeps direct turn history as siblings and selection moves only acr
     "left prompt",
     "right prompt",
   ]);
-  expect(rows[0].userPrefix).toBe("├── ");
-  expect(rows[1].userPrefix).toBe("├── ");
-  expect(rows[2].userPrefix).toBe("└── ");
+  expect(rows[0].userPrefix).toBe("└── ");
+  expect(rows[1].userPrefix).toBe("    ├── ");
+  expect(rows[2].userPrefix).toBe("    └── ");
   expect(state.selectedEntryId).toBe(leftDone.id);
 });

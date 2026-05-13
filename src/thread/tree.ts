@@ -1,7 +1,7 @@
 import type {
   PicoThreadEntry,
   ResponseItem,
-  ResponseItemEntry,
+  RolloutEntry,
 } from "./types";
 
 export function getPathEntries(
@@ -33,14 +33,24 @@ export function getPathEntries(
   return path;
 }
 
-export function collectInjectItems(
+export function linearizeForCodex(
+  rootId: string,
+  entries: readonly PicoThreadEntry[],
+  leafId: string,
+): unknown[] {
+  return getPathEntries(rootId, entries, leafId)
+    .filter((entry) => entry.item.type !== "branch_out")
+    .map(codexRolloutLine);
+}
+
+export function collectResponseItems(
   rootId: string,
   entries: readonly PicoThreadEntry[],
   leafId: string,
 ): ResponseItem[] {
   return getPathEntries(rootId, entries, leafId)
-    .filter((entry): entry is ResponseItemEntry => entry.type === "response_item")
-    .map((entry) => entry.responseItem);
+    .filter((entry) => entry.item.type === "response_item")
+    .map((entry) => entry.item.payload);
 }
 
 export function childrenOf(
@@ -50,10 +60,16 @@ export function childrenOf(
   return entries.filter((entry) => entry.parentId === parentId);
 }
 
-export function labels(entries: readonly PicoThreadEntry[]): Map<string, string> {
-  const result = new Map<string, string>();
-  for (const entry of entries) {
-    if (entry.type === "label") result.set(entry.targetId, entry.label);
-  }
-  return result;
+export function isUserInputEntry(entry: RolloutEntry): boolean {
+  if (entry.item.type !== "response_item") return false;
+  const payload = entry.item.payload;
+  return payload.role === "user" || (payload.pico as Record<string, unknown> | undefined)?.kind === "user_input";
+}
+
+function codexRolloutLine(entry: RolloutEntry): unknown {
+  return {
+    timestamp: entry.timestamp,
+    type: entry.item.type,
+    payload: entry.item.payload,
+  };
 }

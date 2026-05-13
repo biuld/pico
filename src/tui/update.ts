@@ -58,7 +58,6 @@ export type TuiMsg =
   | { type: "selectEntry"; entryId: string }
   | { type: "setTurnStatus"; status: TurnStatus; message?: string }
   | { type: "restoreCompleted"; branchId: string; targetId: string }
-  | { type: "renameCompleted"; entryId: string }
   | { type: "resumeCompleted"; threadId: string }
   | { type: "themeSelected"; themeName: ThemeName };
 
@@ -146,8 +145,6 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return closeFocusSurfaces(
         setTurnStatus(selectEntry(state, msg.branchId), "idle", `backtracked ${shortId(msg.targetId)}`),
       );
-    case "renameCompleted":
-      return setTurnStatus(state, "idle", `renamed ${shortId(msg.entryId)}`);
     case "resumeCompleted":
       return closeFocusSurfaces(
         setTurnStatus(selectThread(state, msg.threadId), "idle", `resumed ${shortId(msg.threadId)}`),

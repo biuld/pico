@@ -15,8 +15,8 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/start",
-      params: { cwd, ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/fork",
+      params: { ephemeral: true, experimentalRawEvents: true },
       respond: threadStartResponse(cwd),
     },
     {
@@ -61,9 +61,9 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
     await finished;
 
     expect(session.snapshot.running).toBe(false);
-    expect(store.allEntries.at(-1)).toMatchObject({
-      type: "turn_aborted",
-      reason: "interrupted by test",
+    expect(store.allEntries.at(-1)?.item).toMatchObject({
+      type: "event_msg",
+      payload: { type: "turn_aborted", reason: "interrupted by test" },
     });
   } finally {
     await fixture.client.shutdown();

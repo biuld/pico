@@ -137,18 +137,16 @@ export class PicoAppSession extends EventEmitter {
 
   async restore(entryId: string) {
     const store = this.requireStore();
-    const branch = await store.appendBranch(entryId);
+    store.backtrack(entryId);
     this.clearActiveCodexTurn();
     this.clearQueuedMessages();
-    this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_BRANCHED, branch);
-    return branch;
-  }
-
-  async rename(entryId: string, label: string) {
-    const store = this.requireStore();
-    const entry = await store.appendLabel(entryId, label);
-    this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_LABELED, entry);
-    return entry;
+    this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_BRANCHED, {
+      id: entryId,
+      parentId: null,
+      timestamp: new Date().toISOString(),
+      item: { type: "branch_out" },
+    });
+    return { id: entryId, targetId: entryId };
   }
 
   async resume(threadId: string): Promise<void> {

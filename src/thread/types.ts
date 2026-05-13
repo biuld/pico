@@ -29,71 +29,36 @@ export interface BaseEntry {
   timestamp: string;
 }
 
-export interface TurnEntry extends BaseEntry {
-  type: "turn";
-  userInput: string;
-  cwd: string;
-  overrides?: TurnOverrides;
-  status: "started" | "completed" | "failed" | "aborted";
-  startedAt: string;
+export type CodexRolloutItemType = "response_item" | "event_msg" | "compacted";
+
+export type RolloutItem =
+  | { type: "response_item"; payload: RawResponseItem }
+  | { type: "event_msg"; payload: unknown }
+  | { type: "compacted"; payload: unknown }
+  | { type: "branch_out" };
+
+export interface RolloutEntry extends BaseEntry {
+  item: RolloutItem;
 }
 
-export interface ResponseItemEntry extends BaseEntry {
-  type: "response_item";
-  turnId: string;
-  responseItem: RawResponseItem;
-}
+export type PicoThreadEntry = RolloutEntry;
 
-export interface TurnCompletedEntry extends BaseEntry {
-  type: "turn_completed";
-  turnId: string;
-  status: "completed";
-  completedAt: string;
-  result?: unknown;
-}
-
-export interface TurnFailedEntry extends BaseEntry {
-  type: "turn_failed";
-  turnId: string;
-  status: "failed";
-  failedAt: string;
-  error: string;
-}
-
-export interface TurnAbortedEntry extends BaseEntry {
-  type: "turn_aborted";
-  turnId: string;
-  status: "aborted";
-  abortedAt: string;
-  reason?: string;
-}
-
-export interface LabelEntry extends BaseEntry {
-  type: "label";
-  targetId: string;
-  label: string;
-}
-
-export interface BranchEntry extends BaseEntry {
-  type: "branch";
-  targetId: string;
-  name?: string;
-}
-
-export interface ConfigChangeEntry extends BaseEntry {
-  type: "config_change";
-  config: PicoConfigSnapshot;
-}
-
-export type PicoThreadEntry =
-  | TurnEntry
-  | ResponseItemEntry
-  | TurnCompletedEntry
-  | TurnFailedEntry
-  | TurnAbortedEntry
-  | LabelEntry
-  | BranchEntry
-  | ConfigChangeEntry;
+export type TurnEntry = RolloutEntry & {
+  type?: "turn";
+  userInput?: string;
+  status?: TurnStatus;
+};
+export type ResponseItemEntry = RolloutEntry & {
+  type?: "response_item";
+  responseItem?: RawResponseItem;
+  turnId?: string;
+};
+export type TurnCompletedEntry = RolloutEntry;
+export type TurnFailedEntry = RolloutEntry;
+export type TurnAbortedEntry = RolloutEntry;
+export type BranchEntry = RolloutEntry & { targetId?: string; name?: string };
+export type LabelEntry = RolloutEntry & { targetId?: string; label?: string };
+export type ConfigChangeEntry = RolloutEntry;
 
 export interface TurnOverrides {
   model?: string;
@@ -115,4 +80,14 @@ export interface PicoThreadInfo {
   turnCount: number;
   responseItemCount: number;
   label?: string;
+}
+
+export type TurnStatus = "started" | "completed" | "failed" | "aborted";
+
+export interface UserInputResponseItem extends RawResponseItem {
+  id: string;
+  type: "message";
+  role: "user";
+  content: Array<{ type: "input_text"; text: string }>;
+  pico?: { kind: "user_input"; status?: TurnStatus; overrides?: TurnOverrides; cwd?: string };
 }

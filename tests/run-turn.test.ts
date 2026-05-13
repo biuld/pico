@@ -9,16 +9,17 @@ import {
   type AppState,
   type DraftAppState,
 } from "../src/app/controller";
-import { PicoThreadStore, type TurnEntry } from "../src/thread/store";
+import { PicoThreadStore, entryUserText } from "../src/thread/store";
 import type { JSONRPCRequest } from "../src/codex/app-server";
 
 class FakeCodex extends EventEmitter {
   userAgent = "fake-codex";
   codexHome = "/tmp/fake-codex-home";
-  injectedItems: unknown[] = [];
+  forkPath = "";
   resolvedRequests: Array<{ id: string | number; result: unknown }> = [];
 
-  async startEphemeralThread() {
+  async forkEphemeralThreadFromPath(path: string) {
+    this.forkPath = path;
     return {
       thread: {
         id: "thread-1",
@@ -40,10 +41,6 @@ class FakeCodex extends EventEmitter {
       modelProvider: "fake",
       cwd: process.cwd(),
     };
-  }
-
-  async injectItems(_threadId: string, items: unknown[]) {
-    this.injectedItems = items;
   }
 
   async startTurn() {
@@ -101,7 +98,7 @@ test("ensureAppThread creates Pico JSONL only when a turn needs persistence", as
   ]);
 });
 
-test("runTurn injects branch history, filters raw items, and persists completion", async () => {
+test("runTurn forks from a linearized branch path, filters raw items, and persists completion", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
@@ -119,16 +116,17 @@ test("runTurn injects branch history, filters raw items, and persists completion
 
   await withQuietConsole(() => runTurn(app, "next"));
 
-  expect(codex.injectedItems).toEqual([{ id: "previous-item", type: "message" }]);
+  const forkLines = (await Bun.file(codex.forkPath).text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(forkLines.map((line) => line.payload?.id)).toContain("previous-item");
   expect(store.collectInjectItems().map((item) => item.id)).toEqual([
     "previous-item",
     "kept-item",
   ]);
-  const turn = store.allEntries.find(
-    (entry): entry is TurnEntry => entry.type === "turn" && entry.userInput === "next",
-  );
-  expect(turn?.status).toBe("completed");
-  expect(store.allEntries.at(-1)?.type).toBe("turn_completed");
+  expect(store.allEntries.some((entry) => entryUserText(entry) === "next")).toBe(true);
+  expect(store.allEntries.at(-1)?.item).toMatchObject({ type: "event_msg", payload: { type: "turn_completed" } });
 });
 
 test("runTurn sends raw items assembled from loaded JSONL branch path", async () => {
@@ -165,9 +163,15 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
 
   await withQuietConsole(() => runTurn(app, "continue right branch"));
 
-  expect(codex.injectedItems).toEqual([
-    { id: "root-item", type: "message" },
-    { id: "right-item", type: "message" },
+  const forkLines = (await Bun.file(codex.forkPath).text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(forkLines.map((line) => line.payload?.id).filter(Boolean)).toEqual([
+    rootTurn.item.type === "response_item" ? rootTurn.item.payload.id : undefined,
+    "root-item",
+    rightTurn.item.type === "response_item" ? rightTurn.item.payload.id : undefined,
+    "right-item",
   ]);
 });
 
@@ -227,13 +231,10 @@ test("runTurn persists interrupted completions as aborted turns", async () => {
   const result = await withQuietConsole(() => runTurn(app, "interrupt me"));
 
   expect(result.status).toBe("aborted");
-  const turn = store.allEntries.find(
-    (entry): entry is TurnEntry => entry.type === "turn" && entry.userInput === "interrupt me",
-  );
-  expect(turn?.status).toBe("aborted");
-  expect(store.allEntries.at(-1)).toMatchObject({
-    type: "turn_aborted",
-    reason: "interrupted by user",
+  expect(store.allEntries.some((entry) => entryUserText(entry) === "interrupt me")).toBe(true);
+  expect(store.allEntries.at(-1)?.item).toMatchObject({
+    type: "event_msg",
+    payload: { type: "turn_aborted", reason: "interrupted by user" },
   });
 });
 

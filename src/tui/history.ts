@@ -1,13 +1,9 @@
 import type {
-  BranchEntry,
-  ResponseItemEntry,
   PicoThreadEntry,
   PicoThreadStore,
-  TurnAbortedEntry,
-  TurnCompletedEntry,
-  TurnEntry,
-  TurnFailedEntry,
+  ResponseItem,
 } from "../thread/store";
+import { entryUserText } from "../thread/store";
 import { responseItemAgentText } from "./response-items";
 
 export interface HistoryTurnRow {
@@ -20,16 +16,18 @@ export interface HistoryTurnRow {
   summaryPrefix: string;
   userText: string;
   agentSummary: string;
-  status: TurnEntry["status"];
+  status: "started" | "completed" | "failed" | "aborted";
 }
 
 interface TurnNode {
-  turn: TurnEntry;
+  id: string;
+  parentId: string | null;
   order: number;
   endId: string;
+  userText: string;
   agentParts: string[];
-  failed?: string;
-  aborted?: string;
+  status: HistoryTurnRow["status"];
+  failure?: string;
 }
 
 const ROOT = "__pico_history_root__";
@@ -41,41 +39,53 @@ export function buildHistoryTurnRows(
   selectedEntryId = store.leafId,
 ): HistoryTurnRow[] {
   const entries = [...store.allEntries];
-  const byId = entryMap(entries);
   const nodes = new Map<string, TurnNode>();
+  const entryToTurn = new Map<string, string>();
   const children = new Map<string, string[]>();
+  const activeTurnId = nearestTurnId(store.getPathEntries(), entryToTurn);
 
   for (const [index, entry] of entries.entries()) {
-    if (entry.type !== "turn") continue;
+    const userText = entryUserText(entry);
+    if (!userText) continue;
 
-    const parentTurnId = branchParentTurnId(byId, entry.parentId);
+    const parentTurnId = nearestTurnAncestor(entries, entry.parentId);
     const parentKey = parentTurnId || ROOT;
     nodes.set(entry.id, {
-      turn: entry,
+      id: entry.id,
+      parentId: parentTurnId || null,
       order: index,
       endId: entry.id,
+      userText,
       agentParts: [],
+      status: "completed",
     });
+    entryToTurn.set(entry.id, entry.id);
     children.set(parentKey, [...(children.get(parentKey) || []), entry.id]);
   }
 
+  let currentTurnId: string | undefined;
   for (const entry of entries) {
-    if (entry.type === "response_item") {
-      addResponseItem(nodes, entry);
-    } else if (entry.type === "turn_completed") {
-      const node = nodes.get(entry.turnId);
-      if (node) node.endId = entry.id;
-    } else if (entry.type === "turn_failed") {
-      const node = nodes.get(entry.turnId);
-      if (node) {
-        node.endId = entry.id;
-        node.failed = entry.error;
-      }
-    } else if (entry.type === "turn_aborted") {
-      const node = nodes.get(entry.turnId);
-      if (node) {
-        node.endId = entry.id;
-        node.aborted = entry.reason || "aborted";
+    if (entryUserText(entry)) {
+      currentTurnId = entry.id;
+      continue;
+    }
+    const turnId = nearestTurnAncestor(entries, entry.parentId) || currentTurnId;
+    if (!turnId) continue;
+    entryToTurn.set(entry.id, turnId);
+    const node = nodes.get(turnId);
+    if (!node) continue;
+    node.endId = entry.id;
+    if (entry.item.type === "response_item") {
+      const text = responseItemAgentText(entry.item.payload as ResponseItem);
+      if (text) node.agentParts.push(text);
+    } else if (entry.item.type === "event_msg") {
+      const event = entry.item.payload as Record<string, unknown> | undefined;
+      if (event?.type === "turn_failed") {
+        node.status = "failed";
+        node.failure = typeof event.error === "string" ? event.error : "failed";
+      } else if (event?.type === "turn_aborted") {
+        node.status = "aborted";
+        node.failure = typeof event.reason === "string" ? event.reason : "aborted";
       }
     }
   }
@@ -84,8 +94,7 @@ export function buildHistoryTurnRows(
     ids.sort((a, b) => (nodes.get(a)?.order || 0) - (nodes.get(b)?.order || 0));
   }
 
-  const selectedTurnId = turnIdForEntry(byId, selectedEntryId);
-  const activeTurnId = turnIdForEntry(byId, store.leafId);
+  const selectedTurnId = turnIdForEntry(entries, selectedEntryId);
   const rows: HistoryTurnRow[] = [];
 
   const visit = (turnId: string, ancestorLasts: boolean[], isLast: boolean) => {
@@ -101,9 +110,9 @@ export function buildHistoryTurnRows(
       isSelected: turnId === selectedTurnId,
       userPrefix: `${prefix}${isLast ? "└── " : "├── "}`,
       summaryPrefix: `${prefix}${isLast ? "    " : "│   "}`,
-      userText: truncate(node.turn.userInput, 96),
+      userText: truncate(node.userText, 96),
       agentSummary: turnSummary(node),
-      status: node.turn.status,
+      status: node.status,
     });
 
     const childIds = children.get(turnId) || [];
@@ -140,32 +149,19 @@ export function historyUserMarker(_row: Pick<HistoryTurnRow, "isSelected">): str
   return "";
 }
 
-function addResponseItem(nodes: Map<string, TurnNode>, entry: ResponseItemEntry): void {
-  const node = nodes.get(entry.turnId);
-  if (!node) return;
-
-  node.endId = entry.id;
-  const text = responseItemAgentText(entry.responseItem);
-  if (text) node.agentParts.push(text);
-}
-
 function turnSummary(node: TurnNode): string {
-  if (node.failed) return `agent: failed: ${truncate(node.failed)}`;
-  if (node.aborted) return `agent: aborted: ${truncate(node.aborted)}`;
+  if (node.failure) return `agent: ${node.status}: ${truncate(node.failure)}`;
 
   const text = node.agentParts.join(" ").replace(/\s+/g, " ").trim();
   if (!text) return "agent: no assistant summary";
   return `agent: ${truncate(text, AGENT_SUMMARY_MAX_LENGTH)}`;
 }
 
-function entryMap(entries: readonly PicoThreadEntry[]): Map<string, PicoThreadEntry> {
-  return new Map(entries.map((entry) => [entry.id, entry]));
-}
-
 function nearestTurnAncestor(
-  byId: Map<string, PicoThreadEntry>,
+  entries: readonly PicoThreadEntry[],
   entryId: string | null,
 ): string | undefined {
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const seen = new Set<string>();
   let current = entryId;
 
@@ -175,35 +171,7 @@ function nearestTurnAncestor(
 
     const entry = byId.get(current);
     if (!entry) return undefined;
-    if (entry.type === "turn") return entry.id;
-    current = entry.parentId;
-  }
-
-  return undefined;
-}
-
-function branchParentTurnId(
-  byId: Map<string, PicoThreadEntry>,
-  entryId: string | null,
-): string | undefined {
-  const branch = nearestBranchAncestor(byId, entryId);
-  return branch ? nearestTurnAncestor(byId, branch.targetId) : undefined;
-}
-
-function nearestBranchAncestor(
-  byId: Map<string, PicoThreadEntry>,
-  entryId: string | null,
-): BranchEntry | undefined {
-  const seen = new Set<string>();
-  let current = entryId;
-
-  while (current) {
-    if (seen.has(current)) return undefined;
-    seen.add(current);
-
-    const entry = byId.get(current);
-    if (!entry) return undefined;
-    if (entry.type === "branch") return entry;
+    if (entryUserText(entry)) return entry.id;
     current = entry.parentId;
   }
 
@@ -211,20 +179,23 @@ function nearestBranchAncestor(
 }
 
 function turnIdForEntry(
-  byId: Map<string, PicoThreadEntry>,
+  entries: readonly PicoThreadEntry[],
   entryId: string,
 ): string | undefined {
-  const entry = byId.get(entryId);
+  const entry = entries.find((candidate) => candidate.id === entryId);
   if (!entry) return undefined;
-  if (entry.type === "turn") return entry.id;
-  if (hasTurnId(entry)) return entry.turnId;
-  return nearestTurnAncestor(byId, entry.parentId);
+  if (entryUserText(entry)) return entry.id;
+  return nearestTurnAncestor(entries, entry.parentId);
 }
 
-function hasTurnId(
-  entry: PicoThreadEntry,
-): entry is ResponseItemEntry | TurnCompletedEntry | TurnFailedEntry | TurnAbortedEntry {
-  return "turnId" in entry;
+function nearestTurnId(
+  path: readonly PicoThreadEntry[],
+  _entryToTurn: Map<string, string>,
+): string | undefined {
+  for (const entry of path.toReversed()) {
+    if (entryUserText(entry)) return entry.id;
+  }
+  return undefined;
 }
 
 function treePrefix(ancestorLasts: readonly boolean[]): string {

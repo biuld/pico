@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import { CodexAppServerClient, normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
 import { loadPicoConfig, type PicoConfig } from "../config";
-import { PicoThreadStore, type RawResponseItem, type TurnOverrides } from "../thread/store";
+import { PicoThreadStore, type RawResponseItem, type RolloutEntry, type TurnOverrides } from "../thread/store";
 
 export interface AppState {
   store: PicoThreadStore;
@@ -116,14 +116,12 @@ export class PicoController extends EventEmitter {
   }
 
   async checkout(entryId: string): Promise<void> {
-    this.store.checkout(entryId);
-    const branch = await this.store.appendBranch(entryId);
-    this.emit("thread:changed", { type: "branch", entry: branch, leafId: this.store.leafId });
+    this.store.backtrack(entryId);
+    this.emit("thread:changed", { type: "backtrack", entryId, leafId: this.store.leafId });
   }
 
-  async label(entryId: string, label: string): Promise<void> {
-    const entry = await this.store.appendLabel(entryId, label);
-    this.emit("thread:changed", { type: "label", entry, leafId: this.store.leafId });
+  async label(_entryId: string, _label: string): Promise<void> {
+    throw new Error("Labels are out of scope for rollout storage");
   }
 
   async shutdown(): Promise<void> {
@@ -213,7 +211,14 @@ export async function runTurn(
   let parentId = store.leafId;
 
   try {
-    const thread = await codex.startEphemeralThread({
+    const branchParentId = await store.ensureBranchForAppend();
+    if (branchParentId !== parentId) {
+      emit?.("thread:changed", { type: "branch", leafId: store.leafId, fromId: parentId });
+      parentId = branchParentId;
+    }
+
+    const rolloutPath = await store.writeLinearizedRolloutFile(parentId);
+    const thread = await codex.forkEphemeralThreadFromPath(rolloutPath, {
       cwd: turnOverrides.cwd || store.cwd,
       model: turnOverrides.model,
       modelProvider: turnOverrides.modelProvider,
@@ -224,12 +229,7 @@ export async function runTurn(
     });
     threadId = thread.thread.id;
 
-    const injectItems = store.collectInjectItems();
-    if (injectItems.length > 0) {
-      await codex.injectItems(threadId, injectItems);
-    }
-
-    const picoTurn = await store.appendTurn(store.leafId, userInput, turnOverrides);
+    const picoTurn = await store.appendUserInput(parentId, userInput, turnOverrides);
     picoTurnId = picoTurn.id;
     parentId = picoTurn.id;
     codexTurnId = picoTurn.id;
@@ -249,7 +249,7 @@ export async function runTurn(
 
     const queueRawItemWrite = (item: RawResponseItem) => {
       pendingRawWrites = pendingRawWrites.then(async () => {
-        const entry = await store.appendResponseItem(parentId, picoTurn.id, item);
+        const entry = await store.appendResponseItem(parentId, item);
         parentId = entry.id;
         rawItemCount += 1;
         emit?.("raw-item:completed", {
@@ -348,7 +348,12 @@ export async function runTurn(
       const terminalStatus = turnCompletionStatus(completed);
       if (terminalStatus === "interrupted" || terminalStatus === "aborted") {
         const reason = turnAbortedReason(completed);
-        await store.appendTurnAborted(parentId, picoTurn.id, reason);
+        const aborted = await appendTurnEvent(store, parentId, "turn_aborted", {
+          turnId: picoTurn.id,
+          reason,
+          codexTurnId: turnId,
+        });
+        parentId = aborted.id;
         terminalEntryWritten = true;
         const result = {
           turnId: picoTurn.id,
@@ -368,15 +373,22 @@ export async function runTurn(
       }
       if (terminalStatus === "failed") {
         const error = turnFailureError(completed);
-        await store.appendTurnFailed(parentId, picoTurn.id, error);
+        const failed = await appendTurnEvent(store, parentId, "turn_failed", {
+          turnId: picoTurn.id,
+          error: error.message,
+          codexTurnId: turnId,
+        });
+        parentId = failed.id;
         terminalEntryWritten = true;
         throw error;
       }
 
-      await store.appendTurnCompleted(parentId, picoTurn.id, {
+      const completedEntry = await appendTurnEvent(store, parentId, "turn_completed", {
+        turnId: picoTurn.id,
         codexTurnId: turnId,
         completed,
       });
+      parentId = completedEntry.id;
       terminalEntryWritten = true;
       const result = {
         turnId: picoTurn.id,
@@ -392,7 +404,11 @@ export async function runTurn(
     } catch (err) {
       await pendingRawWrites.catch(() => {});
       if (!terminalEntryWritten) {
-        await store.appendTurnFailed(parentId, picoTurn.id, err instanceof Error ? err : String(err));
+        await appendTurnEvent(store, parentId, "turn_failed", {
+          turnId: picoTurn.id,
+          error: err instanceof Error ? err.message : String(err),
+          codexTurnId,
+        });
       }
       throw err;
     } finally {
@@ -461,4 +477,17 @@ function maybeObjectValue(value: unknown): Record<string, unknown> | undefined {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function appendTurnEvent(
+  store: PicoThreadStore,
+  parentId: string,
+  type: "turn_completed" | "turn_failed" | "turn_aborted",
+  payload: Record<string, unknown>,
+): Promise<RolloutEntry> {
+  return store.appendEventMsg(parentId, {
+    type,
+    ...payload,
+    timestamp: new Date().toISOString(),
+  });
 }

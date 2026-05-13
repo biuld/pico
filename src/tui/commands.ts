@@ -6,7 +6,6 @@ export type TuiInputCommand =
   | { type: "resume" }
   | { type: "theme" }
   | { type: "statusline" }
-  | { type: "rename"; label: string }
   | { type: "status" }
   | { type: "quit" }
   | { type: "unknown"; message: string };
@@ -23,7 +22,6 @@ export const SLASH_COMMANDS: readonly SlashCommandSpec[] = [
   { name: "resume", description: "resume a saved thread" },
   { name: "theme", description: "choose a color theme" },
   { name: "statusline", description: "configure status line items" },
-  { name: "rename", description: "rename the current thread", takesArgument: true },
   { name: "status", description: "show current thread status" },
   { name: "quit", description: "exit Pico" },
   { name: "exit", description: "exit Pico" },
@@ -34,18 +32,13 @@ export function parseTuiInput(input: string): TuiInputCommand {
   if (!trimmed) return { type: "empty" };
   if (!trimmed.startsWith("/")) return { type: "submit", text: trimmed };
 
-  const [command, ...rest] = trimmed.slice(1).split(/\s+/);
-  const body = rest.join(" ").trim();
+  const [command] = trimmed.slice(1).split(/\s+/);
 
   if (command === "new") return { type: "new" };
   if (command === "clear") return { type: "clear" };
   if (command === "resume") return { type: "resume" };
   if (command === "theme") return { type: "theme" };
   if (command === "statusline") return { type: "statusline" };
-  if (command === "rename") {
-    if (!body) return { type: "unknown", message: `/${command} requires a name` };
-    return { type: "rename", label: body };
-  }
   if (command === "status") return { type: "status" };
   if (command === "quit" || command === "exit") return { type: "quit" };
 

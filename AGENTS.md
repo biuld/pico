@@ -77,11 +77,13 @@ pico/
 ## Key Design Rules
 
 1. **Server is stateless.** Always `ephemeral: true` for threads. All persistence is client-side JSONL.
-2. **Branching via JSONL tree, not Codex fork.** `parentId` in JSONL entries defines the tree. Codex `thread/fork` is not used.
-3. **Pico JSONL v1 thread format.** Thread entries use Pico's own tree metadata and raw Codex `ResponseItem` payloads.
+2. **Branching via JSONL tree, not server-side persistence.** `parentId` in JSONL entries defines Pico's tree. Codex `thread/fork` is used only to create an ephemeral execution context from a temporary linear rollout file.
+3. **Pico JSONL v1 thread format.** Thread entries use Pico's own tree metadata plus a unified rollout-compatible `RolloutItem` ADT.
 4. **Codex app-server access goes through `src/codex/app-server`.** Do not parse JSON-RPC notifications or call app-server methods from TUI code. Add SDK methods/status projection there first, then consume semantic state from `app`/`tui`. Keep protocol types minimal: define only the app-server capabilities Pico currently uses.
 5. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`. Our PicoThreadStore is self-contained.
-6. **Raw item round-trip.** `experimentalRawEvents: true` + `rawResponseItem/completed` → store raw `responseItem` → `thread/inject_items`.
+6. **Rollout item round-trip.** `response_item`, `event_msg`, and `compacted` are Codex rollout-compatible variants; Pico's current persisted variant is only `branch_out`.
+7. **Execution context from temporary rollout.** Before normal prompts, `!cmd`, or `/compact`, Pico linearizes the selected branch path, skips `branch_out`, writes a temporary rollout JSONL file, then calls `thread/fork { path, ephemeral: true }`.
+8. **Current branch primitives.** `backtrack(entryId)` is an in-memory current-leaf action and is not persisted. `branch_out` is persisted automatically before appending from an older history node. Labels, rename, branch deletion, and branch names are out of scope.
 7. **Every app-server call has protocol coverage.** When adding a new Codex app-server request, notification handler, or server-request response path, add or update a scripted mock scenario test under `tests/codex/app-server/` using `tools/codex-app-server/mock-codex-app-server.ts`. The test must assert the JSON-RPC method and the meaningful params Pico sends or handles.
 
 ## Code Conventions

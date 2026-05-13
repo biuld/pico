@@ -10,16 +10,12 @@ import { loadPicoConfig, type PicoConfig } from "../config";
 import { now } from "../thread/id";
 import { parseJsonl, writeJsonl } from "../thread/jsonl";
 import { threadDir, threadPath } from "../thread/paths";
+import { userInputResponseItem } from "../thread/store";
 import type {
-  LabelEntry,
   PicoConfigSnapshot,
   PicoThreadEntry,
   PicoThreadHeader,
   RawResponseItem,
-  ResponseItemEntry,
-  TurnCompletedEntry,
-  TurnEntry,
-  TurnFailedEntry,
   TurnOverrides,
 } from "../thread/types";
 
@@ -85,7 +81,9 @@ interface RolloutLine {
 }
 
 interface ActiveTurn {
-  turn: TurnEntry;
+  entry: PicoThreadEntry;
+  userInput: string;
+  overrides: TurnOverrides;
   codexTurnId?: string;
   itemCount: number;
   failedReason?: string;
@@ -291,15 +289,20 @@ export function convertCodexRollout(
   const closeActiveTurn = (timestamp: string) => {
     if (!active) return;
     if (active.failedReason) {
-      const failed: TurnFailedEntry = {
-        type: "turn_failed",
+      const failed: PicoThreadEntry = {
         id: ids("fail"),
         parentId,
         timestamp,
-        turnId: active.turn.id,
-        status: "failed",
-        failedAt: timestamp,
-        error: active.failedReason,
+        item: {
+          type: "event_msg",
+          payload: {
+            type: "turn_failed",
+            turnId: active.entry.id,
+            status: "failed",
+            failedAt: timestamp,
+            error: active.failedReason,
+          },
+        },
       };
       entries.push(failed);
       parentId = failed.id;
@@ -307,19 +310,24 @@ export function convertCodexRollout(
       return;
     }
 
-    const completed: TurnCompletedEntry = {
-      type: "turn_completed",
+    const completed: PicoThreadEntry = {
       id: ids("done"),
       parentId,
       timestamp,
-      turnId: active.turn.id,
-      status: "completed",
-      completedAt: timestamp,
-      result: compactRecord({
-        importedFrom: "codex",
-        codexThreadId,
-        codexTurnId: active.codexTurnId,
-      }),
+      item: {
+        type: "event_msg",
+        payload: {
+          type: "turn_completed",
+          turnId: active.entry.id,
+          status: "completed",
+          completedAt: timestamp,
+          result: compactRecord({
+            importedFrom: "codex",
+            codexThreadId,
+            codexTurnId: active.codexTurnId,
+          }),
+        },
+      },
     };
     entries.push(completed);
     parentId = completed.id;
@@ -327,20 +335,21 @@ export function convertCodexRollout(
   };
 
   const openTurn = (userInput: string, timestamp: string, overrides: TurnOverrides = {}) => {
-    const turn: TurnEntry = {
-      type: "turn",
+    const entry: PicoThreadEntry = {
       id: ids("turn"),
       parentId,
       timestamp,
-      userInput,
-      cwd,
-      overrides,
-      status: "started",
-      startedAt: timestamp,
+      item: {
+        type: "response_item",
+        payload: userInputResponseItem(ids("user"), userInput, timestamp, {
+          ...overrides,
+          cwd,
+        }),
+      },
     };
-    entries.push(turn);
-    parentId = turn.id;
-    active = { turn, itemCount: 0 };
+    entries.push(entry);
+    parentId = entry.id;
+    active = { entry, userInput, overrides: { ...overrides, cwd }, itemCount: 0 };
   };
 
   for (const line of lines) {
@@ -350,7 +359,7 @@ export function convertCodexRollout(
     if (line.type === "event_msg") {
       const userInput = eventUserText(payload);
       if (userInput) {
-        if (active && sameText(active.turn.userInput, userInput) && active.itemCount <= 1) {
+        if (active && sameText(active.userInput, userInput) && active.itemCount <= 1) {
           continue;
         }
         closeActiveTurn(timestamp);
@@ -366,8 +375,8 @@ export function convertCodexRollout(
       const context = asRecord(payload);
       if (active && context) {
         active.codexTurnId = stringValue(context.turn_id) || stringValue(context.turnId) || active.codexTurnId;
-        active.turn.overrides = compactTurnOverrides({
-          ...active.turn.overrides,
+        active.overrides = compactTurnOverrides({
+          ...active.overrides,
           model: stringValue(context.model),
           modelProvider: stringValue(context.model_provider) || stringValue(context.modelProvider),
           approvalPolicy: stringValue(context.approval_policy) || stringValue(context.approvalPolicy),
@@ -375,6 +384,7 @@ export function convertCodexRollout(
           cwd: stringValue(context.cwd),
           personality: stringValue(context.personality),
         });
+        applyUserInputOverrides(active.entry, active.overrides);
       }
       continue;
     }
@@ -385,7 +395,7 @@ export function convertCodexRollout(
 
     const userInput = responseItemUserText(item);
     if (userInput) {
-      if (!active || !sameText(active.turn.userInput, userInput) || active.itemCount > 1) {
+      if (!active || !sameText(active.userInput, userInput) || active.itemCount > 1) {
         closeActiveTurn(timestamp);
         openTurn(userInput, timestamp);
       }
@@ -394,13 +404,14 @@ export function convertCodexRollout(
       openTurn("Imported Codex turn", timestamp);
     }
 
-    const responseItem: ResponseItemEntry = {
-      type: "response_item",
+    const responseItem: PicoThreadEntry = {
       id: ids("item"),
       parentId,
       timestamp,
-      turnId: active!.turn.id,
-      responseItem: item as RawResponseItem,
+      item: {
+        type: "response_item",
+        payload: item as RawResponseItem,
+      },
     };
     entries.push(responseItem);
     parentId = responseItem.id;
@@ -408,22 +419,8 @@ export function convertCodexRollout(
   }
 
   closeActiveTurn(updatedAt);
-  if (!entries.some((entry) => entry.type === "turn")) {
+  if (!entries.some(isImportedUserTurn)) {
     throw new Error("Codex rollout has no importable user turns");
-  }
-
-  const label = stringValue(options.codexThread.name) || stringValue(options.codexThread.preview);
-  if (label) {
-    const targetId = parentId;
-    const labelEntry: LabelEntry = {
-      type: "label",
-      id: ids("label"),
-      parentId: targetId,
-      timestamp: updatedAt,
-      targetId,
-      label,
-    };
-    entries.push(labelEntry);
   }
 
   return {
@@ -432,9 +429,23 @@ export function convertCodexRollout(
     cwd,
     codexThreadId,
     picoThreadId,
-    turnCount: entries.filter((entry) => entry.type === "turn").length,
-    responseItemCount: entries.filter((entry) => entry.type === "response_item").length,
+    turnCount: entries.filter(isImportedUserTurn).length,
+    responseItemCount: entries.filter((entry) => entry.item.type === "response_item").length,
   };
+}
+
+function isImportedUserTurn(entry: PicoThreadEntry): boolean {
+  if (entry.item.type !== "response_item") return false;
+  return entry.item.payload.role === "user";
+}
+
+function applyUserInputOverrides(entry: PicoThreadEntry, overrides: TurnOverrides): void {
+  if (entry.item.type !== "response_item") return;
+  const payload = entry.item.payload;
+  const pico = payload.pico;
+  if (!pico || typeof pico !== "object" || Array.isArray(pico)) return;
+  (pico as Record<string, unknown>).overrides = overrides;
+  (pico as Record<string, unknown>).cwd = overrides.cwd;
 }
 
 export function importedPicoThreadId(codexThreadId: string): string {

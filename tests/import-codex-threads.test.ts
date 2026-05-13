@@ -58,11 +58,10 @@ test("imports Codex rollout JSONL into Pico thread JSONL", async () => {
     modelProvider: "openai",
   });
   expect(store.collectInjectItems()).toEqual([
-    rollout.userItem,
     rollout.assistantItem,
     rollout.toolItem,
   ]);
-  expect(store.labels().get(store.leafId)).toBe("Imported thread");
+  expect(store.labels().size).toBe(0);
 });
 
 test("skips already imported Codex threads on repeated import", async () => {

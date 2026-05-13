@@ -421,8 +421,10 @@ test("parses local TUI slash commands", () => {
   expect(parseTuiInput("/resume")).toEqual({ type: "resume" });
   expect(parseTuiInput("/theme")).toEqual({ type: "theme" });
   expect(parseTuiInput("/statusline")).toEqual({ type: "statusline" });
-  expect(parseTuiInput("/rename first turn")).toEqual({ type: "rename", label: "first turn" });
-  expect(parseTuiInput("/rename")).toEqual({ type: "unknown", message: "/rename requires a name" });
+  expect(parseTuiInput("/rename first turn")).toEqual({
+    type: "unknown",
+    message: "Unknown command: /rename",
+  });
   expect(parseTuiInput("/status")).toEqual({ type: "status" });
   expect(parseTuiInput("/quit")).toEqual({ type: "quit" });
   expect(parseTuiInput("/exit")).toEqual({ type: "quit" });
@@ -445,14 +447,13 @@ test("filters slash commands for popup selection without tab completion", async 
     "resume",
     "theme",
     "statusline",
-    "rename",
     "status",
     "quit",
     "exit",
   ]);
   expect(filterSlashCommands("/l").map((command) => command.name)).toEqual([]);
   expect(filterSlashCommands("/c").map((command) => command.name)).toEqual(["clear"]);
-  expect(filterSlashCommands("/r").map((command) => command.name)).toEqual(["resume", "rename"]);
+  expect(filterSlashCommands("/r").map((command) => command.name)).toEqual(["resume"]);
   expect(filterSlashCommands("/s").map((command) => command.name)).toEqual(["statusline", "status"]);
   expect(filterSlashCommands("/rename name")).toEqual([]);
 

@@ -1,19 +1,16 @@
 import { EventEmitter } from "events";
-import {
-  approvalResult,
-  createDraftApp,
-  ensureAppThread,
-  loadApp,
-  runTurn,
-  type AppState,
-  type AssistantDeltaEvent,
-  type DraftAppState,
-  type RawItemEvent,
-  type TurnAbortedEvent,
-  type TurnCompletedEvent,
-  type TurnFailedEvent,
-  type TurnStartedEvent,
-} from "../app/controller";
+import { approvalResult, runTurn } from "../app/turn-runner";
+import { createDraftApp, ensureAppThread, loadApp } from "../app/factory";
+import type {
+  AppState,
+  AssistantDeltaEvent,
+  DraftAppState,
+  RawItemEvent,
+  TurnAbortedEvent,
+  TurnCompletedEvent,
+  TurnFailedEvent,
+  TurnStartedEvent,
+} from "../app/types";
 import type { JSONRPCRequest } from "../codex/app-server";
 import { PicoThreadStore, type PicoThreadInfo, type RawResponseItem } from "../thread/store";
 import {

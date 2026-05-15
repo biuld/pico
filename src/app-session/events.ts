@@ -6,7 +6,7 @@ import type {
   TurnCompletedEvent,
   TurnFailedEvent,
   TurnStartedEvent,
-} from "../app/controller";
+} from "../app/types";
 import type { CodexStatusSnapshot, JSONRPCRequest } from "../codex/app-server";
 import type { RolloutEntry } from "../thread/store";
 

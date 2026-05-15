@@ -1,6 +1,6 @@
 import { historyUserMarker, type HistoryTurnRow } from "../history";
-import type { OverlayView } from "../overlay-model";
-import type { TuiState } from "../state";
+import type { OverlayView } from "../core/overlay-model";
+import type { TuiState } from "../core/state";
 import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";
 import { selectableOverlayRow } from "./overlay-rows";

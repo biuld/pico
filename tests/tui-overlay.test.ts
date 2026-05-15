@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { createTuiState } from "../src/tui/state";
+import { createTuiState } from "../src/tui/core/state";
 import { TUI_THEMES } from "../src/tui/theme";
-import { updateTuiState } from "../src/tui/update";
+import { updateTuiState } from "../src/tui/core/update";
 import { SLASH_COMMANDS } from "../src/tui/commands";
-import { buildBottomPanePanel } from "../src/tui/bottom-pane";
+import { buildBottomPanePanel } from "../src/tui/surfaces/bottom-pane";
 import { buildApprovalPanel } from "../src/tui/widgets/approval-panel";
 import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
 import { footerMode } from "../src/tui/widgets/footer";

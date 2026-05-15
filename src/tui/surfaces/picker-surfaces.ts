@@ -1,9 +1,9 @@
-import type { HistoryTurnRow } from "./history";
-import { emptyOverlay, type OverlayView } from "./overlay-model";
-import type { TuiState } from "./state";
-import type { TuiTheme } from "./theme";
-import { buildHistoryPickerSurfaceView } from "./widgets/history-picker";
-import { buildResumePickerSurfaceView, type ThreadRow } from "./widgets/resume-picker";
+import type { HistoryTurnRow } from "../history";
+import { emptyOverlay, type OverlayView } from "../core/overlay-model";
+import type { TuiState } from "../core/state";
+import type { TuiTheme } from "../theme";
+import { buildHistoryPickerSurfaceView } from "../widgets/history-picker";
+import { buildResumePickerSurfaceView, type ThreadRow } from "../widgets/resume-picker";
 
 export type PickerSurfaceView = OverlayView;
 

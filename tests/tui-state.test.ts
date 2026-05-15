@@ -7,8 +7,8 @@ import {
   setTurnStatus,
   syncListScroll,
   updateInput,
-} from "../src/tui/state";
-import { updateTuiState } from "../src/tui/update";
+} from "../src/tui/core/state";
+import { updateTuiState } from "../src/tui/core/update";
 import { createStore } from "./tui-test-helpers";
 
 test("TUI state helpers keep surface state immutable", async () => {

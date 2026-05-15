@@ -1,12 +1,12 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
 import type { DraftAppState } from "../../app/controller";
 import type { PicoThreadInfo } from "../../thread/store";
-import { buildBottomPanePanel } from "../bottom-pane";
+import { buildBottomPanePanel } from "../surfaces/bottom-pane";
 import { filterSlashCommands } from "../commands";
 import { buildHistoryTurnRows } from "../history";
-import { buildPagerOverlay } from "../pager-overlays";
-import { buildPickerSurface, pickerSurfaceListViewportHeight } from "../picker-surfaces";
-import type { TuiState } from "../state";
+import { buildPagerOverlay } from "../surfaces/pager-overlays";
+import { buildPickerSurface, pickerSurfaceListViewportHeight } from "../surfaces/picker-surfaces";
+import type { TuiState } from "../core/state";
 import {
   formatCodexStatusLineStyled,
   formatConfiguredStatusPreviewText,
@@ -14,7 +14,7 @@ import {
 } from "../statusline";
 import { getTheme, TUI_THEMES } from "../theme";
 import { buildTranscriptCellsWithLive } from "../transcript";
-import type { TuiMsg } from "../update";
+import type { TuiMsg } from "../core/update";
 import { bottomPaneHeight } from "../widgets/bottom-pane";
 import { formatComposerStatus } from "../widgets/composer";
 import { formatComposerPlaceholder } from "../widgets/composer-placeholder";

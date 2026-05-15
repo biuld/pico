@@ -1,8 +1,8 @@
 import type { CliRenderer } from "@opentui/core";
 import { filterSlashCommands } from "./commands";
 import { buildApprovalOptions, type ApprovalDecision } from "./widgets/approval-panel";
-import type { TuiState } from "./state";
-import type { TuiMsg } from "./update";
+import type { TuiState } from "./core/state";
+import type { TuiMsg } from "./core/update";
 
 export interface KeybindingRuntime {
   getState(): TuiState;

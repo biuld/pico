@@ -1,4 +1,4 @@
-import type { TuiState } from "../state";
+import type { TuiState } from "../core/state";
 
 export const COMPOSER_PLACEHOLDER_INTERVAL_MS = 4200;
 

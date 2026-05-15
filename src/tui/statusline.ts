@@ -1,7 +1,7 @@
 import { StyledText, dim, fg } from "@opentui/core";
 import type { CodexStatusSnapshot } from "../codex/app-server";
 import type { PicoThreadStore } from "../thread/store";
-import type { TuiState } from "./state";
+import type { TuiState } from "./core/state";
 import type { TuiTheme } from "./theme";
 
 export type StatusLineItemId =

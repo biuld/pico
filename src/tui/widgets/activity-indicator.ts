@@ -1,4 +1,4 @@
-import type { TuiState } from "../state";
+import type { TuiState } from "../core/state";
 
 export const ACTIVITY_SPINNER_INTERVAL_MS = 140;
 export const ACTIVITY_SPINNER_FRAMES = [

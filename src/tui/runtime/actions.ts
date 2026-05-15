@@ -8,9 +8,9 @@ import {
   type TuiInputCommand,
 } from "../commands";
 import { buildHistoryTurnRows, historySelectionTargetId } from "../history";
-import { createTuiState, type TuiState } from "../state";
+import { createTuiState, type TuiState } from "../core/state";
 import { themeIndex, TUI_THEMES } from "../theme";
-import type { TuiMsg } from "../update";
+import type { TuiMsg } from "../core/update";
 import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
 import type { OpenTuiLayout } from "../widgets/layout";
 import { buildThreadRows } from "../widgets/resume-picker";

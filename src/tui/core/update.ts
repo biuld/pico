@@ -1,4 +1,4 @@
-import { slashQuery } from "./commands";
+import { slashQuery } from "../commands";
 import {
   closeFocusSurfaces,
   moveApprovalSelection,
@@ -26,8 +26,8 @@ import {
   type TuiState,
   type TurnStatus,
 } from "./state";
-import type { StatusLineItemId } from "./statusline";
-import type { ThemeName } from "./theme";
+import type { StatusLineItemId } from "../statusline";
+import type { ThemeName } from "../theme";
 
 export type TuiMsg =
   | { type: "inputChanged"; value: string }

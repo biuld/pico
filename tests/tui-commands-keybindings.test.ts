@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 import type { CliRenderer } from "@opentui/core";
 import { filterSlashCommands, parseTuiInput } from "../src/tui/commands";
 import { installOpenTuiKeybindings, type KeybindingRuntime } from "../src/tui/keybindings";
-import { createTuiState } from "../src/tui/state";
-import { updateTuiState } from "../src/tui/update";
+import { createTuiState } from "../src/tui/core/state";
+import { updateTuiState } from "../src/tui/core/update";
 import { createStore } from "./tui-test-helpers";
 
 test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () => {

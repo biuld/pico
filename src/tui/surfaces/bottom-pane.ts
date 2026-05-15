@@ -1,11 +1,11 @@
-import type { JSONRPCRequest } from "../codex/app-server";
-import type { SlashCommandSpec } from "./commands";
-import type { OverlayRowView } from "./overlay-model";
-import type { TuiState } from "./state";
-import type { TuiTheme } from "./theme";
+import type { JSONRPCRequest } from "../../codex/app-server";
+import type { SlashCommandSpec } from "../commands";
+import type { OverlayRowView } from "../core/overlay-model";
+import type { TuiState } from "../core/state";
+import type { TuiTheme } from "../theme";
 import {
   buildApprovalPanel,
-} from "./widgets/approval-panel";
+} from "../widgets/approval-panel";
 import {
   boundedBottomPanePanelHeight,
   bottomPanePanelMaxHeight,
@@ -13,25 +13,25 @@ import {
   type BottomPanePanelKind,
   type BottomPanePanelMode,
   type BottomPanePanelState,
-} from "./widgets/bottom-pane";
-import { OVERLAY_HINTS } from "./widgets/overlay-hints";
-import { selectedRowScrollY, selectableOverlayRow } from "./widgets/overlay-rows";
+} from "../widgets/bottom-pane";
+import { OVERLAY_HINTS } from "../widgets/overlay-hints";
+import { selectedRowScrollY, selectableOverlayRow } from "../widgets/overlay-rows";
 import {
   buildPendingInputPreview,
   type PendingInputPreviewMessage,
-} from "./widgets/pending-input-preview";
+} from "../widgets/pending-input-preview";
 import {
   buildSlashCommandRows,
   formatSlashCommandRow,
-} from "./widgets/slash-command-popup";
+} from "../widgets/slash-command-popup";
 import {
   formatStatusLineRow,
   type StatusLineRow,
-} from "./widgets/statusline-picker";
+} from "../widgets/statusline-picker";
 import {
   formatThemeRow,
   type ThemeRow,
-} from "./widgets/theme-picker";
+} from "../widgets/theme-picker";
 
 export interface BottomPanePanelInput {
   state: TuiState;

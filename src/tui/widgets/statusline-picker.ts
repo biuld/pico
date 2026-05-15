@@ -1,4 +1,4 @@
-import type { OverlayView } from "../overlay-model";
+import type { OverlayView } from "../core/overlay-model";
 import { statusLineItemPlaceholder, type StatusLineItemId } from "../statusline";
 import type { TuiTheme } from "../theme";
 import { OVERLAY_HINTS } from "./overlay-hints";

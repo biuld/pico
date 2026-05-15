@@ -9,7 +9,7 @@ import {
 import { render as renderSolid } from "@opentui/solid";
 import { createSignal, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import { emptyOverlay, type OverlayView } from "../overlay-model";
+import { emptyOverlay, type OverlayView } from "../core/overlay-model";
 import type { TuiTheme } from "../theme";
 import type { TranscriptCell } from "../transcript";
 import {

@@ -1,7 +1,7 @@
-import { picoConfig } from "../config";
-import type { PicoThreadStore } from "../thread/store";
-import { normalizeStatusLineItems, type StatusLineItemId } from "./statusline";
-import { DEFAULT_THEME_NAME, type ThemeName } from "./theme";
+import { picoConfig } from "../../config";
+import type { PicoThreadStore } from "../../thread/store";
+import { normalizeStatusLineItems, type StatusLineItemId } from "../statusline";
+import { DEFAULT_THEME_NAME, type ThemeName } from "../theme";
 
 export type BottomPaneViewKind =
   | "none"

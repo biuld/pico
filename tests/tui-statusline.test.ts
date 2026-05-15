@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createTuiState, setTurnStatus } from "../src/tui/state";
+import { createTuiState, setTurnStatus } from "../src/tui/core/state";
 import {
   buildStatusLineSegments,
   formatCodexStatusLine,
@@ -9,7 +9,7 @@ import {
   statusLineSegmentsText,
 } from "../src/tui/statusline";
 import { TUI_THEMES } from "../src/tui/theme";
-import { updateTuiState } from "../src/tui/update";
+import { updateTuiState } from "../src/tui/core/update";
 import { formatComposerStatus } from "../src/tui/widgets/composer";
 import {
   composerPlaceholderMode,

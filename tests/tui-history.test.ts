@@ -4,8 +4,8 @@ import {
   formatHistoryTurnRow,
   historySelectionTargetId,
 } from "../src/tui/history";
-import { createTuiState } from "../src/tui/state";
-import { updateTuiState } from "../src/tui/update";
+import { createTuiState } from "../src/tui/core/state";
+import { updateTuiState } from "../src/tui/core/update";
 import { createStore } from "./tui-test-helpers";
 
 test("history picker groups each turn as a tree node with an agent summary", async () => {

@@ -1,8 +1,8 @@
-import type { DraftAppState } from "../app/controller";
-import { emptyOverlay, type OverlayView } from "./overlay-model";
-import type { TuiState } from "./state";
-import { buildShortcutPagerOverlayView } from "./widgets/shortcut-overlay";
-import { buildTranscriptPagerOverlayView } from "./widgets/transcript-pager";
+import type { DraftAppState } from "../../app/controller";
+import { emptyOverlay, type OverlayView } from "../core/overlay-model";
+import type { TuiState } from "../core/state";
+import { buildShortcutPagerOverlayView } from "../widgets/shortcut-overlay";
+import { buildTranscriptPagerOverlayView } from "../widgets/transcript-pager";
 
 export type PagerOverlayView = OverlayView;
 

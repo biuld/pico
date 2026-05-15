@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { formatStatusLine } from "../src/tui/render";
-import { createTuiState, setTurnStatus } from "../src/tui/state";
+import { createTuiState, setTurnStatus } from "../src/tui/core/state";
 import {
   blockText,
   buildTranscriptCells,

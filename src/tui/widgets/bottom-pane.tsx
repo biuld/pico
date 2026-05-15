@@ -122,10 +122,16 @@ function BottomPanePanelView(props: {
       backgroundColor={props.theme.colors.background}
     >
       <box
-        id="pico-bottom-pane-panel-gutter"
+        id="pico-bottom-pane-panel-gutter-accent"
         width={1}
         height="100%"
         backgroundColor={props.theme.colors.status}
+      />
+      <box
+        id="pico-bottom-pane-panel-gutter-gap"
+        width={1}
+        height="100%"
+        backgroundColor={props.theme.colors.background}
       />
       <box
         id="pico-bottom-pane-panel-body"

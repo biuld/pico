@@ -6,7 +6,7 @@ import {
   type ThreadListParams,
   type ThreadListResponse,
 } from "../codex/app-server";
-import { loadPicoConfig, type PicoConfig } from "../config";
+import { picoConfig } from "../config";
 import { now } from "../thread/id";
 import { parseJsonl, writeJsonl } from "../thread/jsonl";
 import { threadDir, threadPath } from "../thread/paths";
@@ -24,7 +24,7 @@ export interface ImportCodexThreadsOptions {
   allCwd?: boolean;
   dryRun?: boolean;
   client?: CodexImportClient;
-  config?: PicoConfig;
+  config?: Record<string, unknown>;
   codexHome?: string;
 }
 
@@ -118,9 +118,8 @@ export async function importCodexThreads(
   options: ImportCodexThreadsOptions = {},
 ): Promise<ImportCodexThreadsResult> {
   const inputCwd = options.cwd || process.cwd();
-  const config = options.config || await loadPicoConfig(inputCwd);
-  const scopedCwd = config.cwd || inputCwd;
-  const client = options.client || new CodexAppServerClient({ binary: config.codexBinary });
+  const config = options.config || picoConfig.snapshot();
+  const client = options.client || new CodexAppServerClient({ binary: (config.codexBinary as string) || picoConfig.get<string>("codexBinary") });
   const ownsClient = !options.client;
   const dryRun = options.dryRun === true;
   const items: ImportCodexThreadItem[] = [];
@@ -130,11 +129,11 @@ export async function importCodexThreads(
   try {
     await client.start();
     const codexHome = options.codexHome || client.codexHome || defaultCodexHome();
-    const threads = await listAllCodexThreads(client, options.allCwd ? undefined : scopedCwd);
+    const threads = await listAllCodexThreads(client, options.allCwd ? undefined : inputCwd);
 
     for (const thread of threads) {
       const codexThreadId = thread.id;
-      const fallbackCwd = options.allCwd ? stringValue(thread.cwd) || scopedCwd : scopedCwd;
+      const fallbackCwd = options.allCwd ? stringValue(thread.cwd) || inputCwd : inputCwd;
 
       try {
         if (thread.ephemeral === true) {

@@ -1,5 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { PicoAppSession } from "../../app-session";
+import { picoConfig } from "../../config";
 import type { PicoThreadInfo } from "../../thread/store";
 import {
   filterSlashCommands,
@@ -77,9 +78,9 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     return true;
   };
 
-  const persistStatusLineItems = async (items: readonly string[]) => {
+  const persistConfig = async (key: string, value: unknown) => {
     try {
-      await host.appSession.updateStatusLineItems(items);
+      await picoConfig.set(key, value);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       host.dispatch({ type: "setTurnStatus", status: "failed", message });
@@ -196,6 +197,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const theme = TUI_THEMES[host.getState().themeSelection] || TUI_THEMES[0];
     host.dispatch({ type: "themeSelected", themeName: theme.name });
     host.layout.focusInput();
+    void persistConfig("theme", theme.name);
     host.render();
   };
 
@@ -203,7 +205,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     const item = STATUS_LINE_ITEMS[host.getState().statusLineSelection];
     if (!item) return;
     host.dispatch({ type: "toggleStatusLineItem", item: item.id });
-    void persistStatusLineItems(host.getState().statusLineItems);
+    void persistConfig("statusLineItems", host.getState().statusLineItems);
     host.render();
   };
 
@@ -270,10 +272,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       : await host.appSession.clearDraft();
     if (!didReset) return;
 
-    const nextApp = host.appSession.app;
-    host.setState(createTuiState(undefined, {
-      statusLineItems: nextApp.config.statusLineItems,
-    }));
+    host.setState(createTuiState(undefined));
     setInputValue("");
     host.dispatch({
       type: "setTurnStatus",
@@ -328,9 +327,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
 
     await host.appSession.resume(threadId);
     const nextApp = host.appSession.app;
-    host.setState(createTuiState(nextApp.store, {
-      statusLineItems: nextApp.config.statusLineItems,
-    }));
+    host.setState(createTuiState(nextApp.store));
     host.dispatch({ type: "resumeCompleted", threadId });
     setInputValue("");
     host.layout.focusInput();

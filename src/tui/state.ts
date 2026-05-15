@@ -1,3 +1,4 @@
+import { picoConfig } from "../config";
 import type { PicoThreadStore } from "../thread/store";
 import { normalizeStatusLineItems, type StatusLineItemId } from "./statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "./theme";
@@ -39,14 +40,7 @@ export interface TuiState {
   themeName: ThemeName;
 }
 
-export interface CreateTuiStateOptions {
-  statusLineItems?: readonly string[];
-}
-
-export function createTuiState(
-  store?: PicoThreadStore,
-  options: CreateTuiStateOptions = {},
-): TuiState {
+export function createTuiState(store?: PicoThreadStore): TuiState {
   return {
     selectedEntryId: store?.leafId || "",
     selectedThreadId: store?.id || "",
@@ -63,9 +57,9 @@ export function createTuiState(
     slashSelection: 0,
     themeSelection: 0,
     statusLineSelection: 0,
-    statusLineItems: normalizeStatusLineItems(options.statusLineItems),
+    statusLineItems: normalizeStatusLineItems(picoConfig.get<string[]>("statusLineItems")),
     approvalSelection: 0,
-    themeName: DEFAULT_THEME_NAME,
+    themeName: picoConfig.get<string>("theme") as ThemeName,
   };
 }
 

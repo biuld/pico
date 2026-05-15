@@ -1,20 +1,67 @@
 import { EventEmitter } from "events";
 import { CodexAppServerClient, normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
-import { loadPicoConfig, type PicoConfig } from "../config";
+import { picoConfig } from "../config";
 import { PicoThreadStore, type RawResponseItem, type RolloutEntry, type TurnOverrides } from "../thread/store";
+
+picoConfig.register({
+  key: "codexBinary",
+  default: "codex",
+  validate: (v) => typeof v === "string" ? undefined : "must be a string",
+  description: "Path to the Codex CLI binary",
+});
+
+picoConfig.register({
+  key: "model",
+  default: undefined,
+  validate: (v) => v === undefined || typeof v === "string" ? undefined : "must be a string",
+  description: "Default model to use for turns",
+});
+
+picoConfig.register({
+  key: "modelProvider",
+  default: undefined,
+  validate: (v) => v === undefined || typeof v === "string" ? undefined : "must be a string",
+  description: "Default model provider to use for turns",
+});
+
+picoConfig.register({
+  key: "approvalPolicy",
+  default: undefined,
+  validate: (v) => v === undefined || typeof v === "string" ? undefined : "must be a string",
+  description: "Approval policy override",
+});
+
+picoConfig.register({
+  key: "sandbox",
+  default: undefined,
+  validate: () => undefined,
+  description: "Sandbox configuration",
+});
+
+picoConfig.register({
+  key: "personality",
+  default: undefined,
+  validate: (v) => v === undefined || typeof v === "string" ? undefined : "must be a string",
+  description: "Developer personality override",
+});
+
+picoConfig.register({
+  key: "developerInstructions",
+  default: undefined,
+  validate: (v) => v === undefined || typeof v === "string" ? undefined : "must be a string",
+  description: "Custom developer instructions",
+});
 
 export interface AppState {
   store: PicoThreadStore;
   codex: CodexAppServerClient;
-  config: PicoConfig;
   cwd: string;
 }
 
 export interface DraftAppState {
   store?: PicoThreadStore;
   codex: CodexAppServerClient;
-  config: PicoConfig;
   cwd: string;
 }
 
@@ -89,8 +136,8 @@ export class PicoController extends EventEmitter {
     return this.state.codex;
   }
 
-  get config(): PicoConfig {
-    return this.state.config;
+  get config(): Record<string, unknown> {
+    return picoConfig.snapshot();
   }
 
   static async create(cwd: string = process.cwd()): Promise<PicoController> {
@@ -134,16 +181,15 @@ export async function createApp(cwd: string = process.cwd()): Promise<AppState> 
 }
 
 export async function createDraftApp(cwd: string = process.cwd()): Promise<DraftAppState> {
-  const config = await loadPicoConfig(cwd);
-  const appCwd = config.cwd || cwd;
-  const codex = await createCodexClient(config, appCwd);
-  return { codex, config, cwd: appCwd };
+  const codex = await createCodexClient(cwd);
+  return { codex, cwd };
 }
 
 export async function ensureAppThread(app: DraftAppState): Promise<AppState> {
   if (app.store) return app as AppState;
-  const { codexBinary: _codexBinary, ...configSnapshot } = app.config;
-  const store = await PicoThreadStore.create(app.config.cwd || app.cwd, {
+  const snapshot = picoConfig.snapshot();
+  const { codexBinary: _codexBinary, ...configSnapshot } = snapshot;
+  const store = await PicoThreadStore.create(app.cwd, {
     runtime: "codex app-server",
     storage: "pico-jsonl-v1",
     ...configSnapshot,
@@ -153,25 +199,23 @@ export async function ensureAppThread(app: DraftAppState): Promise<AppState> {
 }
 
 export async function loadApp(cwd: string, threadId: string): Promise<AppState> {
-  const config = await loadPicoConfig(cwd);
   const store = await PicoThreadStore.load(cwd, threadId);
-  const codex = await createCodexClient(config, store.cwd);
-  return { store, codex, config, cwd: store.cwd };
+  const codex = await createCodexClient(store.cwd);
+  return { store, codex, cwd: store.cwd };
 }
 
-async function createCodexClient(config: PicoConfig, cwd: string): Promise<CodexAppServerClient> {
-  const codex = new CodexAppServerClient({ binary: config.codexBinary });
+async function createCodexClient(cwd: string): Promise<CodexAppServerClient> {
+  const codex = new CodexAppServerClient({ binary: picoConfig.get<string>("codexBinary") });
   await codex.start();
-  await seedCodexStatus(codex, config, cwd);
+  await seedCodexStatus(codex, cwd);
   return codex;
 }
 
 async function seedCodexStatus(
   codex: CodexAppServerClient,
-  config: PicoConfig,
   cwd: string,
 ): Promise<void> {
-  const overrides = codexStatusOverrides(config);
+  const overrides = codexStatusOverrides();
   if (overrides) codex.applyConfigStatus(overrides);
 
   try {
@@ -181,12 +225,11 @@ async function seedCodexStatus(
   }
 }
 
-function codexStatusOverrides(config: PicoConfig) {
-  if (!config.model && !config.modelProvider) return undefined;
-  return {
-    model: config.model,
-    modelProvider: config.modelProvider,
-  };
+function codexStatusOverrides() {
+  const model = picoConfig.get<string | undefined>("model");
+  const modelProvider = picoConfig.get<string | undefined>("modelProvider");
+  if (!model && !modelProvider) return undefined;
+  return { model, modelProvider };
 }
 
 export async function runTurn(
@@ -202,7 +245,8 @@ export async function runTurn(
   const { askApproval, overrides = {} } = options;
   const emit = "emit" in options ? (options.emit as ControllerEventSink | undefined) : undefined;
   const { store, codex } = app;
-  const { codexBinary: _codexBinary, ...configOverrides } = app.config;
+  const snapshot = picoConfig.snapshot();
+  const { codexBinary: _codexBinary, ...configOverrides } = snapshot;
   const turnOverrides: TurnOverrides = { ...configOverrides, ...overrides };
 
   let threadId: string | undefined;

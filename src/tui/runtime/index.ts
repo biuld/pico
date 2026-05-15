@@ -8,6 +8,7 @@ import type {
 } from "../../app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../app-session";
 import type { PicoThreadInfo } from "../../thread/store";
+import "../config";
 import { installOpenTuiKeybindings } from "../keybindings";
 import { composerOwnsFocus, createTuiState, type TuiState } from "../state";
 import { updateTuiState, type TuiMsg } from "../update";
@@ -26,9 +27,7 @@ export function runOpenTuiRuntime(
   app: DraftAppState,
 ): Promise<void> {
   const appSession = new PicoAppSession(app);
-  let state: TuiState = createTuiState(appSession.app.store, {
-    statusLineItems: appSession.app.config.statusLineItems,
-  });
+  let state: TuiState = createTuiState(appSession.app.store);
   let threads: PicoThreadInfo[] = [];
   let closing = false;
   let render: () => void;
@@ -150,7 +149,6 @@ export function runOpenTuiRuntime(
   appSession.on(PICO_APP_SESSION_EVENTS.CODEX_STATUS, () => {
     if (!closing) render();
   });
-  appSession.on(PICO_APP_SESSION_EVENTS.CONFIG_CHANGED, render);
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_BUSY, () => {
     dispatch({ type: "setTurnStatus", status: state.bottomPane.turnStatus, message: "turn is running" });
     render();

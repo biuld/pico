@@ -15,7 +15,6 @@ import {
   type TurnStartedEvent,
 } from "../app/controller";
 import type { JSONRPCRequest } from "../codex/app-server";
-import { updateProjectPicoConfig } from "../config";
 import { PicoThreadStore, type PicoThreadInfo, type RawResponseItem } from "../thread/store";
 import {
   PICO_APP_SESSION_EVENTS,
@@ -119,20 +118,6 @@ export class PicoAppSession extends EventEmitter {
 
   static listThreads(cwd: string): Promise<PicoThreadInfo[]> {
     return PicoThreadStore.list(cwd);
-  }
-
-  async updateStatusLineItems(items: readonly string[]): Promise<void> {
-    const nextConfig = await updateProjectPicoConfig(this.currentApp.cwd, {
-      statusLineItems: [...items],
-    });
-    this.currentApp = {
-      ...this.currentApp,
-      config: {
-        ...this.currentApp.config,
-        statusLineItems: nextConfig.statusLineItems,
-      },
-    };
-    this.emitAppSession(PICO_APP_SESSION_EVENTS.CONFIG_CHANGED, this.currentApp.config);
   }
 
   async restore(entryId: string) {

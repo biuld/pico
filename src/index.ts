@@ -2,12 +2,14 @@
 
 import { formatCliHelp, parseCliArgs } from "./cli";
 import { createDraftApp, loadApp } from "./app/controller";
+import { picoConfig } from "./config";
 import { importCodexThreads } from "./import/codex-threads";
 import { PicoThreadStore } from "./thread/store";
 import { startOpenTui } from "./tui/opentui";
 
 async function main(): Promise<void> {
   const options = parseCliArgs(Bun.argv.slice(2));
+  await picoConfig.load();
 
   if (options.command === "help") {
     console.log(formatCliHelp(Bun.argv[1] || "pico"));

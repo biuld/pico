@@ -79,10 +79,7 @@ export function transcriptCellsForResponseItem(
   if (isToolCallType(type, item)) {
     const name = toolName(item);
     const label = name || "tool";
-    const diff = isApplyPatchTool(name)
-      ? patchTextFromValue(argumentValue(item)) || undefined
-      : undefined;
-    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item), callId(item), diff)];
+    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item), callId(item))];
   }
 
   return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];

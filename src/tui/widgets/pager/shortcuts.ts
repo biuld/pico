@@ -1,4 +1,4 @@
-import type { OverlayView } from "../core/overlay-model";
+import type { OverlayView } from "../../core/overlay-model";
 import { OVERLAY_HINTS } from "../overlay/hints";
 
 export function buildShortcutPagerOverlayView(): OverlayView {

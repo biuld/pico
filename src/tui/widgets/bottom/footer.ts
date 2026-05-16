@@ -1,5 +1,5 @@
-import type { PicoThreadStore } from "../../thread/store";
-import type { TuiState } from "../core/state";
+import type { PicoThreadStore } from "../../../thread/store";
+import type { TuiState } from "../../core/state";
 
 export type FooterMode =
   | "ComposerEmpty"

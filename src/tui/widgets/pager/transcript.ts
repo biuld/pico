@@ -1,6 +1,6 @@
-import type { DraftAppState } from "../../app/controller";
-import type { OverlayView } from "../core/overlay-model";
-import type { TuiState } from "../core/state";
+import type { DraftAppState } from "../../../app/controller";
+import type { OverlayView } from "../../core/overlay-model";
+import type { TuiState } from "../../core/state";
 import {
   blockText,
   buildTranscriptCellsWithLive,

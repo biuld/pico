@@ -15,7 +15,7 @@ import {
 import { getTheme, TUI_THEMES } from "../theme";
 import { buildTranscriptCellsWithLive } from "../transcript";
 import type { TuiMsg } from "../core/update";
-import { bottomPaneHeight } from "../widgets/bottom-pane";
+import { bottomPaneHeight } from "../widgets/bottom/pane";
 import { formatComposerStatus } from "../widgets/bottom/composer";
 import { formatComposerPlaceholder } from "../widgets/bottom/placeholder";
 import { formatTransientStatusLine } from "../widgets/bottom/footer";

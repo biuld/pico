@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { createEffect, For } from "solid-js";
 import type { ScrollBoxRenderable } from "@opentui/core";
-import type { OverlayRowView, OverlayView } from "../core/overlay-model";
+import type { OverlayRowView, OverlayView } from "../../core/overlay-model";
 import type { TuiTheme } from "../../theme";
 import { SolidText } from "../solid-text";
 

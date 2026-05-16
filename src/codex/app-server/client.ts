@@ -346,21 +346,6 @@ export class CodexAppServerClient extends EventEmitter {
     return response;
   }
 
-  async forkEphemeralThreadFromPath(
-    path: string,
-    params: Partial<Omit<ThreadForkParams, "path" | "ephemeral">> = {},
-  ): Promise<ThreadStartResponse> {
-    const response = await this.request<ThreadStartResponse>("thread/fork", {
-      ...params,
-      path,
-      ephemeral: true,
-      experimentalRawEvents: true,
-    });
-    this.status = updateCodexStatusFromThreadStart(this.status, response);
-    this.emit("status", this.statusSnapshot);
-    return response;
-  }
-
   async rollbackThread(threadId: string, turnId: string): Promise<ThreadRollbackResponse> {
     const params: ThreadRollbackParams = { threadId, turnId };
     return this.request<ThreadRollbackResponse>("thread/rollback", params);

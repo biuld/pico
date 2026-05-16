@@ -3,7 +3,6 @@
 import { formatCliHelp, parseCliArgs } from "./cli";
 import { createDraftApp, loadApp } from "./app/controller";
 import { picoConfig } from "./config";
-// import { importCodexThreads } from "./import/codex-threads";
 import { PicoThreadStore } from "./thread/store";
 import { startOpenTui } from "./tui/opentui";
 
@@ -25,17 +24,6 @@ async function main(): Promise<void> {
     }
     return;
   }
-
-  // TODO: re-enable after import module is updated for RolloutLine V3 format
-  // if (options.command === "import") {
-  //   const result = await importCodexThreads({
-  //     cwd: options.cwd,
-  //     allCwd: options.importAllCwd,
-  //     dryRun: options.importDryRun,
-  //   });
-  //   ...
-  //   return;
-  // }
 
   try {
     const app = options.resumeThreadId

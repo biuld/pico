@@ -1,3 +1,9 @@
+/**
+ * @deprecated Legacy Codex JSONL import/export adapter.
+ * Preserved for one-off import/export use outside the runtime hot path.
+ * Not used in the main TUI → Codex app-server flow.
+ * See docs/pico-product-direction.md for current architecture.
+ */
 import { mkdir } from "node:fs/promises";
 
 import {

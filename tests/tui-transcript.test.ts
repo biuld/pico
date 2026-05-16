@@ -18,12 +18,12 @@ import { createStore } from "./tui-test-helpers";
 
 test("transcript cells project Pico JSONL entries without changing thread storage", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Explain Pico");
+  const turn = await store.appendUserInput(store.leafId, "Explain Pico");
   const item = await store.appendResponseItem(turn.id, turn.id, {
     type: "message",
     content: [{ type: "output_text", text: "Pico stores raw Codex items." }],
   });
-  await store.appendTurnCompleted(item.id, turn.id);
+  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
 
   const state = setTurnStatus(createTuiState(store), "idle");
   const transcript = buildTranscriptCells(store);
@@ -47,7 +47,7 @@ test("transcript cells project Pico JSONL entries without changing thread storag
 
 test("transcript projects Codex item types into semantic cells", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Inspect the repo");
+  const turn = await store.appendUserInput(store.leafId, "Inspect the repo");
   let parentId = turn.id;
   const reasoningItem = await store.appendResponseItem(parentId, turn.id, {
     type: "reasoning",
@@ -109,7 +109,7 @@ test("transcript projects Codex item types into semantic cells", async () => {
     path: "src/index.ts",
     patch: "@@ changed",
   });
-  await store.appendTurnCompleted(fileItem.id, turn.id);
+  await store.appendEventMsg(fileItem.id, { type: "turn_completed", turnId: turn.id });
 
   const cells = buildTranscriptCells(store).slice(1);
 
@@ -141,7 +141,7 @@ test("transcript projects Codex item types into semantic cells", async () => {
 
 test("transcript groups tool outputs back into matching tool calls", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Fetch and search");
+  const turn = await store.appendUserInput(store.leafId, "Fetch and search");
   let parentId = turn.id;
   const fetchCall = await store.appendResponseItem(parentId, turn.id, {
     type: "function_call",
@@ -168,7 +168,7 @@ test("transcript groups tool outputs back into matching tool calls", async () =>
     call_id: "fetch-call",
     output: { body: [{ type: "text", text: "fetch result" }] },
   });
-  await store.appendTurnCompleted(fetchOutput.id, turn.id);
+  await store.appendEventMsg(fetchOutput.id, { type: "turn_completed", turnId: turn.id });
 
   const cells = buildTranscriptCells(store).slice(1);
 
@@ -179,7 +179,7 @@ test("transcript groups tool outputs back into matching tool calls", async () =>
 
 test("transcript decorates apply_patch calls and outputs", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Patch files");
+  const turn = await store.appendUserInput(store.leafId, "Patch files");
   const patch = [
     "*** Begin Patch",
     `*** Update File: ${process.cwd()}/src/cli.ts`,
@@ -208,7 +208,7 @@ test("transcript decorates apply_patch calls and outputs", async () => {
       metadata: { exit_code: 0, duration_seconds: 0.1 },
     }),
   });
-  await store.appendTurnCompleted(output.id, turn.id);
+  await store.appendEventMsg(output.id, { type: "turn_completed", turnId: turn.id });
 
   const cells = buildTranscriptCells(store).slice(1);
 
@@ -220,7 +220,7 @@ test("transcript decorates apply_patch calls and outputs", async () => {
 
 test("transcript strips shell wrapper metadata from command outputs", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Read file");
+  const turn = await store.appendUserInput(store.leafId, "Read file");
   const call = await store.appendResponseItem(turn.id, turn.id, {
     type: "function_call",
     call_id: "shell-call",
@@ -240,7 +240,7 @@ test("transcript strips shell wrapper metadata from command outputs", async () =
       "await main();",
     ].join("\n"),
   });
-  await store.appendTurnCompleted(output.id, turn.id);
+  await store.appendEventMsg(output.id, { type: "turn_completed", turnId: turn.id });
 
   const cells = buildTranscriptCells(store).slice(1);
 
@@ -252,13 +252,13 @@ test("transcript strips shell wrapper metadata from command outputs", async () =
 
 test("main transcript uses Codex-style mute strategies by cell type", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Inspect the repo");
+  const turn = await store.appendUserInput(store.leafId, "Inspect the repo");
   const item = await store.appendResponseItem(turn.id, turn.id, {
     type: "message",
     role: "assistant",
     content: [{ type: "output_text", text: "done" }],
   });
-  await store.appendTurnCompleted(item.id, turn.id);
+  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
 
   const cells = buildTranscriptCells(store);
   const liveCells = buildTranscriptCellsWithLive(
@@ -335,7 +335,7 @@ test("main transcript output previews keep head tail and transcript hint", () =>
 
 test("transcript only appends non-persisted live streaming cells", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Explain streaming");
+  const turn = await store.appendUserInput(store.leafId, "Explain streaming");
   const app = { store } as Parameters<typeof buildTranscriptCellsWithLive>[0];
 
   expect(buildTranscriptCellsWithLive(app, "", turn.id)).toEqual([

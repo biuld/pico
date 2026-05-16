@@ -29,12 +29,12 @@ test("TUI state helpers keep surface state immutable", async () => {
 
 test("selection helpers move through visible history turn ids and keep scroll in view", async () => {
   const store = await createStore();
-  const turnA = await store.appendTurn(store.leafId, "A");
+  const turnA = await store.appendUserInput(store.leafId, "A");
   const itemA = await store.appendResponseItem(turnA.id, turnA.id, { text: "first" });
-  const doneA = await store.appendTurnCompleted(itemA.id, turnA.id);
-  const turnB = await store.appendTurn(store.leafId, "B");
+  const doneA = await store.appendEventMsg(itemA.id, { type: "turn_completed", turnId: turnA.id });
+  const turnB = await store.appendUserInput(store.leafId, "B");
   const itemB = await store.appendResponseItem(turnB.id, turnB.id, { text: "second" });
-  const doneB = await store.appendTurnCompleted(itemB.id, turnB.id);
+  const doneB = await store.appendEventMsg(itemB.id, { type: "turn_completed", turnId: turnB.id });
 
   const ids = buildHistoryTurnRows(store).map((row) => row.id);
   let state = createTuiState(store);

@@ -10,7 +10,7 @@ import { createStore } from "./tui-test-helpers";
 
 test("history picker groups each turn as a tree node with an agent summary", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "Explain Pico history");
+  const turn = await store.appendUserInput(store.leafId, "Explain Pico history");
   await store.appendResponseItem(turn.id, turn.id, {
     type: "message",
     role: "developer",
@@ -21,7 +21,7 @@ test("history picker groups each turn as a tree node with an agent summary", asy
     role: "assistant",
     content: [{ type: "output_text", text: "Pico history is a turn tree." }],
   });
-  await store.appendTurnCompleted(item.id, turn.id);
+  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
 
   const rows = buildHistoryTurnRows(store, store.leafId);
   const formatted = formatHistoryTurnRow(rows[0]);
@@ -44,7 +44,7 @@ test("history picker groups each turn as a tree node with an agent summary", asy
 
 test("history agent summaries only keep the first characters", async () => {
   const store = await createStore();
-  const turn = await store.appendTurn(store.leafId, "What can you do?");
+  const turn = await store.appendUserInput(store.leafId, "What can you do?");
   const item = await store.appendResponseItem(turn.id, turn.id, {
     type: "message",
     role: "assistant",
@@ -53,7 +53,7 @@ test("history agent summaries only keep the first characters", async () => {
       text: "我可以在 Pico 项目里帮你做开发工作，比如：读代码、解释架构和数据流、实现功能或修 bug、重构 TUI。",
     }],
   });
-  await store.appendTurnCompleted(item.id, turn.id);
+  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
 
   const rows = buildHistoryTurnRows(store, store.leafId);
 
@@ -65,28 +65,28 @@ test("history agent summaries only keep the first characters", async () => {
 
 test("history keeps direct turn history as siblings and selection moves only across turns", async () => {
   const store = await createStore();
-  const rootTurn = await store.appendTurn(store.leafId, "root prompt");
+  const rootTurn = await store.appendUserInput(store.leafId, "root prompt");
   const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
     role: "assistant",
     text: "root answer",
   });
-  await store.appendTurnCompleted(rootItem.id, rootTurn.id);
+  await store.appendEventMsg(rootItem.id, { type: "turn_completed", turnId: rootTurn.id });
   const rootLeaf = store.leafId;
 
-  const leftTurn = await store.appendTurn(rootLeaf, "left prompt");
+  const leftTurn = await store.appendUserInput(rootLeaf, "left prompt");
   const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
     role: "assistant",
     text: "left answer",
   });
-  const leftDone = await store.appendTurnCompleted(leftItem.id, leftTurn.id);
+  const leftDone = await store.appendEventMsg(leftItem.id, { type: "turn_completed", turnId: leftTurn.id });
 
   store.backtrack(rootLeaf);
-  const rightTurn = await store.appendTurn(rootLeaf, "right prompt");
+  const rightTurn = await store.appendUserInput(rootLeaf, "right prompt");
   const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
     role: "assistant",
     text: "right answer",
   });
-  await store.appendTurnCompleted(rightItem.id, rightTurn.id);
+  await store.appendEventMsg(rightItem.id, { type: "turn_completed", turnId: rightTurn.id });
 
   const rows = buildHistoryTurnRows(store, store.leafId);
   const ids = rows.map((row) => row.id);

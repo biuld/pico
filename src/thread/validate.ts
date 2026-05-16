@@ -55,4 +55,3 @@ export function validatePicoLine(raw: unknown): PicoLine {
   throw new Error(`Unknown PicoLine type: ${String(type)} (id=${raw.id || "<no id>"})`);
 }
 
-// ── Backward‑compat validation for old‑format files ────────

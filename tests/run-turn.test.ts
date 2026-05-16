@@ -104,12 +104,12 @@ test("runTurn forks from a linearized branch path, filters raw items, and persis
   Bun.env.HOME = home;
 
   const store = await PicoThreadStore.create(cwd);
-  const previousTurn = await store.appendTurn(store.leafId, "previous");
+  const previousTurn = await store.appendUserInput(store.leafId, "previous");
   const previousItem = await store.appendResponseItem(previousTurn.id, previousTurn.id, {
     id: "previous-item",
     type: "message",
   });
-  await store.appendTurnCompleted(previousItem.id, previousTurn.id);
+  await store.appendEventMsg(previousItem.id, { type: "turn_completed", turnId: previousTurn.id });
 
   const codex = new FakeCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
@@ -135,27 +135,27 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
   Bun.env.HOME = home;
 
   const store = await PicoThreadStore.create(cwd);
-  const rootTurn = await store.appendTurn(store.leafId, "root");
+  const rootTurn = await store.appendUserInput(store.leafId, "root");
   const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
     id: "root-item",
     type: "message",
   });
-  const rootDone = await store.appendTurnCompleted(rootItem.id, rootTurn.id);
+  const rootDone = await store.appendEventMsg(rootItem.id, { type: "turn_completed", turnId: rootTurn.id });
 
-  const leftTurn = await store.appendTurn(rootDone.id, "left");
+  const leftTurn = await store.appendUserInput(rootDone.id, "left");
   const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
     id: "left-item",
     type: "message",
   });
-  await store.appendTurnCompleted(leftItem.id, leftTurn.id);
+  await store.appendEventMsg(leftItem.id, { type: "turn_completed", turnId: leftTurn.id });
 
   await store.appendBranch(rootDone.id);
-  const rightTurn = await store.appendTurn(store.leafId, "right");
+  const rightTurn = await store.appendUserInput(store.leafId, "right");
   const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
     id: "right-item",
     type: "message",
   });
-  await store.appendTurnCompleted(rightItem.id, rightTurn.id);
+  await store.appendEventMsg(rightItem.id, { type: "turn_completed", turnId: rightTurn.id });
 
   const loaded = await PicoThreadStore.load(cwd, store.id);
   const codex = new FakeCodex();

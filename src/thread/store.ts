@@ -261,23 +261,6 @@ export class PicoThreadStore {
     return line;
   }
 
-  /** @deprecated Use appendUserInput */
-  async appendTurn(
-    parentId: string,
-    userInput: string,
-    overrides: TurnOverrides = {},
-  ): Promise<RolloutLine> {
-    return this.appendUserInput(parentId, userInput, overrides);
-  }
-
-  async appendResponseItemForTurn(
-    parentId: string,
-    _turnId: string,
-    responseItem: ResponseItem,
-  ): Promise<RolloutLine> {
-    return this.appendResponseItem(parentId, responseItem);
-  }
-
   async appendEventMsg(parentId: string, payload: unknown): Promise<EventLine> {
     const line: EventLine = {
       id: uuidV7(),
@@ -289,45 +272,6 @@ export class PicoThreadStore {
     this.addLine(line);
     await appendJsonlLine(this.filePath, line);
     return line;
-  }
-
-  async appendTurnCompleted(
-    parentId: string,
-    turnId: string,
-    result?: unknown,
-  ): Promise<EventLine> {
-    return this.appendEventMsg(parentId, {
-      type: "turn_completed",
-      turnId,
-      result,
-      completedAt: now(),
-    });
-  }
-
-  async appendTurnFailed(
-    parentId: string,
-    turnId: string,
-    error: Error | string,
-  ): Promise<EventLine> {
-    return this.appendEventMsg(parentId, {
-      type: "turn_failed",
-      turnId,
-      error: error instanceof Error ? error.message : error,
-      failedAt: now(),
-    });
-  }
-
-  async appendTurnAborted(
-    parentId: string,
-    turnId: string,
-    reason?: string,
-  ): Promise<EventLine> {
-    return this.appendEventMsg(parentId, {
-      type: "turn_aborted",
-      turnId,
-      reason,
-      abortedAt: now(),
-    });
   }
 
   // ── Branching ──

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { PicoThreadStore } from "../../../src/thread/store";
+import { CodexThreadState } from "../../../src/app/codex-thread-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   assistantMessage,
@@ -46,7 +46,7 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
   ]);
 
   try {
-    const store = await PicoThreadStore.create(cwd);
+    const store = await CodexThreadState.create(cwd);
     const events: string[] = [];
     const result = await runTurn(
       { cwd, store, codex: fixture.client, config: {} } as AppState,

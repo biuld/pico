@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { PicoThreadStore } from "../../../src/thread/store";
+import { CodexThreadState } from "../../../src/app/codex-thread-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -36,7 +36,7 @@ test("runTurn resolves approval server requests over stdio", async () => {
   ]);
 
   try {
-    const store = await PicoThreadStore.create(cwd);
+    const store = await CodexThreadState.create(cwd);
     await runTurn(
       { cwd, store, codex: fixture.client, config: {} } as AppState,
       "needs approval",

@@ -1,15 +1,15 @@
 import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
-import type { PicoThreadStore, ResponseItem, TurnOverrides } from "../thread/store";
+import type { CodexThreadState, ResponseItem, TurnOverrides } from "./codex-thread-state";
 
 export interface AppState {
-  store: PicoThreadStore;
+  store: CodexThreadState;
   codex: CodexAppServerClient;
   cwd: string;
 }
 
 export interface DraftAppState {
-  store?: PicoThreadStore;
+  store?: CodexThreadState;
   codex: CodexAppServerClient;
   cwd: string;
 }

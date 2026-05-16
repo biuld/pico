@@ -1,4 +1,4 @@
-import type { PicoThreadStore } from "../../../thread/store";
+import type { CodexThreadState } from "../../../app/codex-thread-state";
 import type { TuiState } from "../../core/state";
 
 export type FooterMode =
@@ -39,7 +39,7 @@ export function formatTransientStatusLine(transientStatus = ""): string {
 }
 
 export function formatBottomStatusLine(
-  store: PicoThreadStore | undefined,
+  store: CodexThreadState | undefined,
   state: TuiState,
   statusText = "",
   width = 0,
@@ -47,6 +47,6 @@ export function formatBottomStatusLine(
   return statusText ? `  ${statusText}` : "";
 }
 
-export function formatFooterLine(store: PicoThreadStore | undefined, state: TuiState, width = 0): string {
+export function formatFooterLine(store: CodexThreadState | undefined, state: TuiState, width = 0): string {
   return formatBottomStatusLine(store, state, "", width);
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 import { CodexAppServerClient } from "../codex/app-server";
 import { picoConfig } from "../config";
-import { PicoThreadStore } from "../thread/store";
+import { CodexThreadState } from "./codex-thread-state";
 import type { AppState, RunTurnOptions, TurnObserver, TurnResult } from "./types";
 import { createApp, createDraftApp, ensureAppThread, loadApp } from "./factory";
 import { runTurn } from "./turn-runner";
@@ -43,7 +43,7 @@ export class PicoController extends EventEmitter {
     this.state.codex.on("stderr", (text) => this.emit("codex:stderr", text));
   }
 
-  get store(): PicoThreadStore {
+  get store(): CodexThreadState {
     return this.state.store;
   }
 

@@ -1,6 +1,6 @@
 import { CodexAppServerClient } from "../codex/app-server";
 import { picoConfig } from "../config";
-import { PicoThreadStore } from "../thread/store";
+import { CodexThreadState } from "./codex-thread-state";
 import type { AppState, DraftAppState } from "./types";
 
 export async function createApp(cwd: string = process.cwd()): Promise<AppState> {
@@ -14,20 +14,14 @@ export async function createDraftApp(cwd: string = process.cwd()): Promise<Draft
 
 export async function ensureAppThread(app: DraftAppState): Promise<AppState> {
   if (app.store) return app as AppState;
-  const snapshot = picoConfig.snapshot();
-  const { codexBinary: _codexBinary, ...configSnapshot } = snapshot;
-  const store = await PicoThreadStore.create(app.cwd, {
-    runtime: "codex app-server",
-    storage: "pico-jsonl-v1",
-    ...configSnapshot,
-  });
+  const store = await CodexThreadState.create(app.cwd, app.codex);
   app.store = store;
   return app as AppState;
 }
 
 export async function loadApp(cwd: string, threadId: string): Promise<AppState> {
-  const store = await PicoThreadStore.load(cwd, threadId);
-  const codex = await createCodexClient(store.cwd);
+  const codex = await createCodexClient(cwd);
+  const store = await CodexThreadState.load(cwd, threadId, codex);
   return { store, codex, cwd: store.cwd };
 }
 

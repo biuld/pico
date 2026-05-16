@@ -1,7 +1,7 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { DraftAppState } from "../../app/controller";
-import type { PicoThreadInfo } from "../../thread/store";
+import type { ThreadInfo } from "../../app/codex-thread-state";
 import { buildBottomPanePanel } from "../surfaces/bottom-pane";
 import { filterSlashCommands } from "../commands";
 import { buildHistoryTurnRows } from "../history";
@@ -32,7 +32,7 @@ export interface RuntimeViewInput {
   app: DraftAppState;
   getState(): TuiState;
   dispatch(msg: TuiMsg): void;
-  threads: readonly PicoThreadInfo[];
+  threads: readonly ThreadInfo[];
   inputValue: string;
   streamingText: string;
   liveLeafId?: string;

@@ -1,4 +1,4 @@
-import type { PicoThreadInfo } from "../../../thread/store";
+import type { ThreadInfo } from "../../../app/codex-thread-state";
 import type { OverlayRowView, OverlayView } from "../../core/overlay-model";
 import type { TuiState } from "../../core/state";
 import type { TuiTheme } from "../../theme";
@@ -43,7 +43,7 @@ export function buildResumePickerSurfaceView(
 }
 
 export function buildThreadRows(
-  threads: readonly PicoThreadInfo[],
+  threads: readonly ThreadInfo[],
   selectedThreadId: string,
   currentThreadId?: string,
 ): ThreadRow[] {

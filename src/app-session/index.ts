@@ -7,8 +7,8 @@ import type {
   TurnFailedEvent,
 } from "../app/types";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
-import type { JSONRPCRequest } from "../codex/app-server";
-import { PicoThreadStore, type PicoThreadInfo, type ResponseItem } from "../thread/store";
+import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
+import { CodexThreadState, type ThreadInfo, type ResponseItem } from "../app/codex-thread-state";
 import {
   PICO_APP_SESSION_EVENTS,
   type PicoAppSessionEventArgs,
@@ -112,8 +112,8 @@ export class PicoAppSession extends EventEmitter {
     return this.running || Boolean(this.pendingApproval);
   }
 
-  static listThreads(cwd: string): Promise<PicoThreadInfo[]> {
-    return PicoThreadStore.list(cwd);
+  static listThreads(cwd: string, codex?: CodexAppServerClient): Promise<ThreadInfo[]> {
+    return CodexThreadState.list(cwd, codex);
   }
 
   async restore(entryId: string) {
@@ -424,7 +424,7 @@ export class PicoAppSession extends EventEmitter {
     this.detachCodexStatus = () => app.codex.off("status", onStatus);
   }
 
-  private requireStore(): PicoThreadStore {
+  private requireStore(): CodexThreadState {
     if (!this.currentApp.store) throw new Error("no turns yet");
     return this.currentApp.store;
   }

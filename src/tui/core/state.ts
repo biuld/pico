@@ -1,5 +1,5 @@
 import { picoConfig } from "../../config";
-import type { PicoThreadStore } from "../../thread/store";
+import type { CodexThreadState } from "../../app/codex-thread-state";
 import { normalizeStatusLineItems, type StatusLineItemId } from "../statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "../theme";
 
@@ -40,7 +40,7 @@ export interface TuiState {
   themeName: ThemeName;
 }
 
-export function createTuiState(store?: PicoThreadStore): TuiState {
+export function createTuiState(store?: CodexThreadState): TuiState {
   return {
     selectedEntryId: store?.leafId || "",
     selectedThreadId: store?.id || "",

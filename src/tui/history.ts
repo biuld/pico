@@ -1,9 +1,9 @@
 import type {
-  PicoLine,
-  PicoThreadStore,
+  ThreadEntry,
+  CodexThreadState,
   ResponseItem,
-} from "../thread/store";
-import { entryUserText } from "../thread/store";
+} from "../app/codex-thread-state";
+import { entryUserText } from "../app/codex-thread-state";
 import { responseItemAgentText } from "./response-items";
 
 export interface HistoryTurnRow {
@@ -35,7 +35,7 @@ const USER_MARKER_WIDTH = 0;
 const AGENT_SUMMARY_MAX_LENGTH = 36;
 
 export function buildHistoryTurnRows(
-  store: PicoThreadStore,
+  store: CodexThreadState,
   selectedEntryId = store.leafId,
 ): HistoryTurnRow[] {
   const entries = [...store.lines];
@@ -130,7 +130,7 @@ export function buildHistoryTurnRows(
 }
 
 export function historySelectionTargetId(
-  store: PicoThreadStore,
+  store: CodexThreadState,
   entryId = store.leafId,
 ): string | undefined {
   const rows = buildHistoryTurnRows(store, entryId);
@@ -171,7 +171,7 @@ function stripMarkdown(value: string): string {
 }
 
 function nearestTurnAncestor(
-  entries: readonly PicoLine[],
+  entries: readonly ThreadEntry[],
   entryId: string | null,
 ): string | undefined {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
@@ -192,7 +192,7 @@ function nearestTurnAncestor(
 }
 
 function turnIdForEntry(
-  entries: readonly PicoLine[],
+  entries: readonly ThreadEntry[],
   entryId: string,
 ): string | undefined {
   const entry = entries.find((candidate) => candidate.id === entryId);
@@ -202,7 +202,7 @@ function turnIdForEntry(
 }
 
 function nearestTurnId(
-  path: readonly PicoLine[],
+  path: readonly ThreadEntry[],
   _entryToTurn: Map<string, string>,
 ): string | undefined {
   for (const entry of path.toReversed()) {

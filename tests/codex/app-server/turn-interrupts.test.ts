@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppState } from "../../../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../../src/app-session";
-import { PicoThreadStore } from "../../../src/thread/store";
+import { CodexThreadState } from "../../../src/app/codex-thread-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -42,7 +42,7 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
   ]);
 
   try {
-    const store = await PicoThreadStore.create(cwd);
+    const store = await CodexThreadState.create(cwd);
     const session = new PicoAppSession({
       cwd,
       store,

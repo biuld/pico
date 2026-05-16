@@ -1,4 +1,4 @@
-import type { ResponseItem } from "../thread/store";
+import type { ResponseItem } from "../app/codex-thread-state";
 
 export function responseItemText(item: ResponseItem): string {
   const direct = firstString(item, ["text", "output_text", "message", "summary"]);

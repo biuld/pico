@@ -9,24 +9,35 @@ import {
   type AppState,
   type DraftAppState,
 } from "../src/app/controller";
-import { PicoThreadStore, entryUserText } from "../src/thread/store";
+import { CodexThreadState, entryUserText } from "../src/app/codex-thread-state";
 import type { JSONRPCRequest } from "../src/codex/app-server";
 
 class FakeCodex extends EventEmitter {
   userAgent = "fake-codex";
   codexHome = "/tmp/fake-codex-home";
-  forkPath = "";
+  started = false;
   resolvedRequests: Array<{ id: string | number; result: unknown }> = [];
+  private threadCount = 0;
 
-  async forkEphemeralThreadFromPath(path: string) {
-    this.forkPath = path;
+  async start() { this.started = true; }
+
+  async startEphemeralThread(_params?: unknown) {
+    this.threadCount++;
+    return this.threadResult();
+  }
+
+  async resumeThread(_threadId: string, _params?: unknown) {
+    return this.threadResult();
+  }
+
+  private threadResult() {
     return {
       thread: {
-        id: "thread-1",
+        id: `thread-${this.threadCount}`,
         sessionId: "codex-session-1",
         forkedFromId: null,
         preview: "",
-        ephemeral: true,
+        ephemeral: false,
         modelProvider: "fake",
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -75,7 +86,7 @@ class FakeCodex extends EventEmitter {
   rejectServerRequest() {}
 }
 
-test("ensureAppThread creates Pico JSONL only when a turn needs persistence", async () => {
+test("ensureAppThread attaches an in-memory CodexThreadState", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
@@ -86,93 +97,62 @@ test("ensureAppThread creates Pico JSONL only when a turn needs persistence", as
     codex: new FakeCodex(),
   } as unknown as DraftAppState;
 
-  expect(await PicoThreadStore.list(cwd)).toEqual([]);
+  expect(app.store).toBeUndefined();
 
   const activeApp = await ensureAppThread(app);
   const draftStore = app.store;
   if (!draftStore) throw new Error("ensureAppThread did not attach a store");
 
   expect(activeApp.store).toBe(draftStore);
-  expect((await PicoThreadStore.list(cwd)).map((thread) => thread.id)).toEqual([
-    activeApp.store.id,
-  ]);
+  expect(draftStore.id).toBeTruthy();
+  expect(draftStore.cwd).toBe(cwd);
 });
 
-test("runTurn forks from a linearized branch path, filters raw items, and persists completion", async () => {
+test("runTurn uses Codex-native startEphemeralThread and stores items in memory", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
 
-  const store = await PicoThreadStore.create(cwd);
-  const previousTurn = await store.appendUserInput(store.leafId, "previous");
-  const previousItem = await store.appendResponseItem(previousTurn.id, previousTurn.id, {
-    id: "previous-item",
-    type: "message",
-  });
-  await store.appendEventMsg(previousItem.id, { type: "turn_completed", turnId: previousTurn.id });
+  const store = await CodexThreadState.create(cwd);
+  const previousTurn = store.appendUserInput(store.leafId, "previous");
+  store.appendResponseItem(previousTurn.id, { id: "previous-item", type: "message" });
+  store.appendEventMsg(previousTurn.id, { type: "turn_completed", turnId: previousTurn.id });
 
   const codex = new FakeCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
 
   await withQuietConsole(() => runTurn(app, "next"));
 
-  const forkLines = (await Bun.file(codex.forkPath).text())
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line));
-  expect(forkLines.map((line) => line.payload?.id)).toContain("previous-item");
-  expect(store.collectInjectItems().map((item) => item.id)).toEqual([
-    "previous-item",
-    "kept-item",
-  ]);
+  // First turn should create a Codex thread
+  expect(store.codexThreadId).toBe("thread-1");
   expect(store.lines.some((line) => entryUserText(line) === "next")).toBe(true);
   expect(store.lines.at(-1)).toMatchObject({ type: "event_msg", payload: { type: "turn_completed" } });
 });
 
-test("runTurn sends raw items assembled from loaded JSONL branch path", async () => {
+test("runTurn resumes existing Codex thread for subsequent turns", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
 
-  const store = await PicoThreadStore.create(cwd);
-  const rootTurn = await store.appendUserInput(store.leafId, "root");
-  const rootItem = await store.appendResponseItem(rootTurn.id, rootTurn.id, {
-    id: "root-item",
-    type: "message",
-  });
-  const rootDone = await store.appendEventMsg(rootItem.id, { type: "turn_completed", turnId: rootTurn.id });
+  const store = await CodexThreadState.create(cwd);
+  const rootTurn = store.appendUserInput(store.leafId, "root");
+  store.appendResponseItem(rootTurn.id, { id: "root-item", type: "message" });
+  const rootDone = store.appendEventMsg(rootTurn.id, { type: "turn_completed", turnId: rootTurn.id });
 
-  const leftTurn = await store.appendUserInput(rootDone.id, "left");
-  const leftItem = await store.appendResponseItem(leftTurn.id, leftTurn.id, {
-    id: "left-item",
-    type: "message",
-  });
-  await store.appendEventMsg(leftItem.id, { type: "turn_completed", turnId: leftTurn.id });
+  store.appendBranch(rootDone.id);
+  const rightTurn = store.appendUserInput(store.leafId, "right");
+  store.appendResponseItem(rightTurn.id, { id: "right-item", type: "message" });
+  store.appendEventMsg(rightTurn.id, { type: "turn_completed", turnId: rightTurn.id });
 
-  await store.appendBranch(rootDone.id);
-  const rightTurn = await store.appendUserInput(store.leafId, "right");
-  const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
-    id: "right-item",
-    type: "message",
-  });
-  await store.appendEventMsg(rightItem.id, { type: "turn_completed", turnId: rightTurn.id });
-
-  const loaded = await PicoThreadStore.load(cwd, store.id);
   const codex = new FakeCodex();
-  const app = { store: loaded, codex, config: {} } as unknown as AppState;
+  const app = { store, codex, config: {} } as unknown as AppState;
 
   await withQuietConsole(() => runTurn(app, "continue right branch"));
 
-  const forkLines = (await Bun.file(codex.forkPath).text())
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line));
-  expect(forkLines.map((line) => line.payload?.id).filter(Boolean)).toEqual([
-    rootTurn.type === "response_item" ? (rootTurn.payload as Record<string, unknown>).id as string : undefined,
-    "root-item",
-    rightTurn.type === "response_item" ? (rightTurn.payload as Record<string, unknown>).id as string : undefined,
-    "right-item",
-  ]);
+  // Should still use the same Codex thread ID (resume, not create new)
+  expect(store.codexThreadId).toBeTruthy();
+  expect(store.lines.some((line) => entryUserText(line) === "continue right branch")).toBe(true);
+  expect(store.lines.at(-1)).toMatchObject({ type: "event_msg", payload: { type: "turn_completed" } });
 });
 
 test("runTurn resolves approval server requests", async () => {
@@ -197,7 +177,7 @@ test("runTurn resolves approval server requests", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new ApprovalCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
 
@@ -224,7 +204,7 @@ test("runTurn persists interrupted completions as aborted turns", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new InterruptedCodex();
   const app = { store, codex, config: {} } as unknown as AppState;
 

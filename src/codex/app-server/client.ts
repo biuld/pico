@@ -65,7 +65,6 @@ import type {
   ThreadCompactStartResponse,
   ThreadForkParams,
   ThreadInjectItemsParams,
-  ThreadForkParams,
   ThreadListParams,
   ThreadListResponse,
   ThreadMetadataUpdateParams,
@@ -346,8 +345,8 @@ export class CodexAppServerClient extends EventEmitter {
     return response;
   }
 
-  async rollbackThread(threadId: string, turnId: string): Promise<ThreadRollbackResponse> {
-    const params: ThreadRollbackParams = { threadId, turnId };
+  async rollbackThread(threadId: string, numTurns: number): Promise<ThreadRollbackResponse> {
+    const params: ThreadRollbackParams = { threadId, numTurns };
     return this.request<ThreadRollbackResponse>("thread/rollback", params);
   }
 
@@ -450,7 +449,7 @@ export class CodexAppServerClient extends EventEmitter {
 
   // ── Account ──
 
-  async getAccount(params: GetAccountParams = {}): Promise<GetAccountResponse> {
+  async getAccount(params: Partial<GetAccountParams> = {}): Promise<GetAccountResponse> {
     return this.request<GetAccountResponse>("get_account", params);
   }
 

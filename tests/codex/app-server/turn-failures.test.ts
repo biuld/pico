@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { PicoThreadStore, entryUserText } from "../../../src/thread/store";
+import { CodexThreadState, entryUserText } from "../../../src/app/codex-thread-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -35,7 +35,7 @@ test("failed completion becomes a failed Pico turn", async () => {
   ]);
 
   try {
-    const store = await PicoThreadStore.create(cwd);
+    const store = await CodexThreadState.create(cwd);
     await expect(
       runTurn({ cwd, store, codex: fixture.client, config: {} } as AppState, "fail"),
     ).rejects.toThrow("mock failure");

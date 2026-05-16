@@ -7,7 +7,7 @@ import type {
   TurnFailedEvent,
 } from "../../app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../app-session";
-import type { PicoThreadInfo } from "../../thread/store";
+import type { ThreadInfo } from "../../app/codex-thread-state";
 import "../config";
 import { installOpenTuiKeybindings } from "../keybindings";
 import { composerOwnsFocus, createTuiState, type TuiState } from "../core/state";
@@ -28,7 +28,7 @@ export function runOpenTuiRuntime(
 ): Promise<void> {
   const appSession = new PicoAppSession(app);
   let state: TuiState = createTuiState(appSession.app.store);
-  let threads: PicoThreadInfo[] = [];
+  let threads: ThreadInfo[] = [];
   let closing = false;
   let render: () => void;
 

@@ -1,7 +1,7 @@
 import type { CliRenderer } from "@opentui/core";
 import { PicoAppSession } from "../../app-session";
 import { picoConfig } from "../../config";
-import type { PicoThreadInfo } from "../../thread/store";
+import type { ThreadInfo } from "../../app/codex-thread-state";
 import {
   filterSlashCommands,
   parseTuiInput,
@@ -50,8 +50,8 @@ export interface RuntimeActionHost {
   dispatch(msg: TuiMsg): void;
   render(): void;
   isBusy(): boolean;
-  getThreads(): readonly PicoThreadInfo[];
-  setThreads(threads: PicoThreadInfo[]): void;
+  getThreads(): readonly ThreadInfo[];
+  setThreads(threads: ThreadInfo[]): void;
   close(): Promise<void>;
 }
 

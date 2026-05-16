@@ -2,7 +2,7 @@ import { normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
 import type { ItemCompletedNotification, ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { picoConfig } from "../config";
-import type { EventLine, PicoThreadStore, ResponseItem, TurnOverrides } from "../thread/store";
+import type { CodexThreadState, ResponseItem, TurnOverrides } from "./codex-thread-state";
 import type {
   AppState,
   AssistantDeltaEvent,
@@ -38,25 +38,35 @@ export async function runTurn(
   let parentId = store.leafId;
 
   try {
-    const branchParentId = await store.ensureBranchForAppend();
+    const branchParentId = store.ensureBranchForAppend();
     if (branchParentId !== parentId) {
       observer?.onThreadChanged?.({ type: "branch", leafId: store.leafId, fromId: parentId });
       parentId = branchParentId;
     }
 
-    const rolloutPath = await store.writeLinearizedRolloutFile(parentId);
-    const thread = await codex.forkEphemeralThreadFromPath(rolloutPath, {
+    // Use Codex-native thread management instead of rollout→fork→inject
+    const codexThreadId = store.codexThreadId;
+    let thread: { thread: { id: string; status?: unknown }; model: string; modelProvider: string; cwd: string };
+
+    const threadParams = {
       cwd: turnOverrides.cwd || store.cwd,
-      model: turnOverrides.model,
-      modelProvider: turnOverrides.modelProvider,
-      approvalPolicy: turnOverrides.approvalPolicy,
-      sandbox: turnOverrides.sandbox as string | undefined,
-      personality: turnOverrides.personality,
+      model: turnOverrides.model ?? undefined,
+      modelProvider: turnOverrides.modelProvider ?? undefined,
+      approvalPolicy: turnOverrides.approvalPolicy ?? undefined,
+      sandbox: turnOverrides.sandbox,
+      personality: turnOverrides.personality ?? undefined,
       developerInstructions: turnOverrides.developerInstructions,
-    });
+    };
+
+    if (codexThreadId) {
+      thread = await codex.resumeThread(codexThreadId, threadParams as Record<string, unknown>);
+    } else {
+      thread = await codex.startEphemeralThread(threadParams as Record<string, unknown>);
+      store.codexThreadId = thread.thread.id;
+    }
     threadId = thread.thread.id;
 
-    const picoTurn = await store.appendUserInput(parentId, userInput, turnOverrides);
+    const picoTurn = store.appendUserInput(parentId, userInput, turnOverrides);
     picoTurnId = picoTurn.id;
     parentId = picoTurn.id;
     codexTurnId = picoTurn.id;
@@ -76,7 +86,7 @@ export async function runTurn(
 
     const queueRawItemWrite = (item: ResponseItem) => {
       pendingRawWrites = pendingRawWrites.then(async () => {
-        const entry = await store.appendResponseItem(parentId, item);
+        const entry = store.appendResponseItem(parentId, item);
         parentId = entry.id;
         rawItemCount += 1;
         observer?.onRawItemCompleted?.({
@@ -144,10 +154,10 @@ export async function runTurn(
 
       // Store structured fileChange diffs as event_msg entries
       if (item.type === "fileChange") {
-        const fileChanges = (item as { type: "fileChange"; changes: Array<{ path: string; kind: string; diff: string }> }).changes;
+        const fileChanges = (item as unknown as { type: "fileChange"; changes: Array<{ path: string; kind: string; diff: string }> }).changes;
         for (const change of fileChanges) {
           pendingRawWrites = pendingRawWrites.then(async () => {
-            const entry = await store.appendEventMsg(parentId, {
+            const entry = store.appendEventMsg(parentId, {
               type: "file_change",
               path: change.path,
               diff: change.diff,
@@ -168,8 +178,8 @@ export async function runTurn(
 
     try {
       const started = await codex.startTurn(threadId, userInput, {
-        model: turnOverrides.model,
-        modelProvider: turnOverrides.modelProvider,
+        model: turnOverrides.model ?? undefined,
+        modelProvider: turnOverrides.modelProvider ?? undefined,
         cwd: turnOverrides.cwd,
         approvalPolicy: turnOverrides.approvalPolicy,
         sandbox: turnOverrides.sandbox,
@@ -184,8 +194,8 @@ export async function runTurn(
         codexTurnId: turnId,
         userInput,
         threadStatus: normalizeCodexStatusValue(started.turn.status),
-        model: turnOverrides.model || thread.model,
-        modelProvider: turnOverrides.modelProvider || thread.modelProvider,
+        model: turnOverrides.model ?? thread.model ?? undefined,
+        modelProvider: turnOverrides.modelProvider ?? thread.modelProvider ?? undefined,
       } satisfies TurnStartedEvent);
 
       for (const item of bufferedRawItems) {
@@ -200,32 +210,37 @@ export async function runTurn(
       const terminalStatus = turnCompletionStatus(completed);
       if (terminalStatus === "interrupted" || terminalStatus === "aborted") {
         const reason = turnAbortedReason(completed);
-        const aborted = await appendTurnEvent(store, parentId, "turn_aborted", {
+        const aborted = appendTurnEvent(store, parentId, "turn_aborted", {
           turnId: picoTurn.id,
           reason,
           codexTurnId: turnId,
         });
         parentId = aborted.id;
         terminalEntryWritten = true;
-        const result = {
+        const result: TurnResult = {
           turnId: picoTurn.id,
           codexTurnId: turnId,
           status: "aborted",
           rawItemCount,
           leafId: store.leafId,
           completed,
-        } satisfies TurnResult;
+        };
         observer?.onTurnAborted?.({
           threadId,
-          ...result,
+          turnId: result.turnId,
+          codexTurnId: result.codexTurnId,
+          status: "aborted" as const,
+          rawItemCount: result.rawItemCount,
+          leafId: result.leafId,
+          completed: result.completed,
           reason,
-        } satisfies TurnAbortedEvent);
+        });
         observer?.onThreadChanged?.({ type: "turn", leafId: store.leafId });
         return result;
       }
       if (terminalStatus === "failed") {
         const error = turnFailureError(completed);
-        const failed = await appendTurnEvent(store, parentId, "turn_failed", {
+        const failed = appendTurnEvent(store, parentId, "turn_failed", {
           turnId: picoTurn.id,
           error: error.message,
           codexTurnId: turnId,
@@ -235,28 +250,36 @@ export async function runTurn(
         throw error;
       }
 
-      const completedEntry = await appendTurnEvent(store, parentId, "turn_completed", {
+      const completedEntry = appendTurnEvent(store, parentId, "turn_completed", {
         turnId: picoTurn.id,
         codexTurnId: turnId,
         completed,
       });
       parentId = completedEntry.id;
       terminalEntryWritten = true;
-      const result = {
+      const result: TurnResult = {
         turnId: picoTurn.id,
         codexTurnId: turnId,
         status: "completed",
         rawItemCount,
         leafId: store.leafId,
         completed,
-      } satisfies TurnResult;
-      observer?.onTurnCompleted?.({ threadId, ...result } satisfies TurnCompletedEvent);
+      };
+      observer?.onTurnCompleted?.({
+        threadId,
+        turnId: result.turnId,
+        codexTurnId: result.codexTurnId,
+        status: "completed" as const,
+        rawItemCount: result.rawItemCount,
+        leafId: result.leafId,
+        completed: result.completed,
+      });
       observer?.onThreadChanged?.({ type: "turn", leafId: store.leafId });
       return result;
     } catch (err) {
       await pendingRawWrites.catch(() => {});
       if (!terminalEntryWritten) {
-        await appendTurnEvent(store, parentId, "turn_failed", {
+        appendTurnEvent(store, parentId, "turn_failed", {
           turnId: picoTurn.id,
           error: err instanceof Error ? err.message : String(err),
           codexTurnId,
@@ -333,11 +356,11 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function appendTurnEvent(
-  store: PicoThreadStore,
+  store: CodexThreadState,
   parentId: string,
   type: "turn_completed" | "turn_failed" | "turn_aborted",
   payload: Record<string, unknown>,
-): Promise<EventLine> {
+) {
   return store.appendEventMsg(parentId, {
     type,
     ...payload,

@@ -1,4 +1,4 @@
-import type { ResponseItem } from "../../thread/store";
+import type { ResponseItem } from "../../app/codex-thread-state";
 import { responseItemText, shouldDisplayResponseItem } from "../response-items";
 import {
   formatCommandOutputSummary,

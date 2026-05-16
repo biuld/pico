@@ -1,6 +1,6 @@
 import type { DraftAppState } from "../../app/controller";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
-import { entryUserText, type PicoThreadStore } from "../../thread/store";
+import { entryUserText, type CodexThreadState } from "../../app/codex-thread-state";
 import {
   assistantMarkdownCell,
   fileChangeCell,
@@ -13,7 +13,7 @@ import { transcriptCellsForResponseItem } from "./response-item";
 import { threadItemToTranscriptCells } from "./thread-item";
 
 export function buildTranscriptCells(
-  store: PicoThreadStore,
+  store: CodexThreadState,
   leafId = store.leafId,
 ): TranscriptCell[] {
   const cells: TranscriptCell[] = [];

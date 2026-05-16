@@ -3,7 +3,8 @@
 import { formatCliHelp, parseCliArgs } from "./cli";
 import { createDraftApp, loadApp } from "./app/controller";
 import { picoConfig } from "./config";
-import { PicoThreadStore } from "./thread/store";
+import { CodexThreadState } from "./app/codex-thread-state";
+import { CodexAppServerClient } from "./codex/app-server";
 import { startOpenTui } from "./tui/opentui";
 
 async function main(): Promise<void> {
@@ -16,11 +17,17 @@ async function main(): Promise<void> {
   }
 
   if (options.command === "threads") {
-    const threads = await PicoThreadStore.list(options.cwd);
-    for (const thread of threads) {
-      console.log(
-        `${thread.id} leaf=${thread.leafId} turns=${thread.turnCount} items=${thread.responseItemCount}`,
-      );
+    const codex = new CodexAppServerClient({ binary: picoConfig.get<string>("codexBinary") });
+    await codex.start();
+    try {
+      const threads = await CodexThreadState.list(options.cwd, codex);
+      for (const thread of threads) {
+        console.log(
+          `${thread.id} leaf=${thread.leafId} turns=${thread.turnCount} items=${thread.responseItemCount}`,
+        );
+      }
+    } finally {
+      await codex.shutdown();
     }
     return;
   }

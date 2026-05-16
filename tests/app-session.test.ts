@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppState } from "../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../src/app-session";
-import { PicoThreadStore, entryUserText } from "../src/thread/store";
+import { CodexThreadState, entryUserText } from "../src/app/codex-thread-state";
 
 class SessionCodex extends EventEmitter {
   shutdownCount = 0;
@@ -80,7 +80,7 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
@@ -129,7 +129,7 @@ test("app session drains queued follow-up messages after a turn finishes", async
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
@@ -176,7 +176,7 @@ test("app session can restore the single queued follow-up message", async () => 
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
@@ -216,7 +216,7 @@ test("app session interrupts the active codex turn", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new InterruptibleCodex();
   const appSession = new PicoAppSession({
     cwd,
@@ -295,7 +295,7 @@ test("app session sends the queued follow-up after interrupting the active turn"
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new InterruptThenCompleteCodex();
   const appSession = new PicoAppSession({
     cwd,
@@ -333,7 +333,7 @@ test("new draft resets Pico-local session state without creating a store", async
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await PicoThreadStore.create(cwd);
+  const store = await CodexThreadState.create(cwd);
   const codex = new SessionCodex();
   const nextCodex = new SessionCodex();
   const appSession = new PicoAppSession({

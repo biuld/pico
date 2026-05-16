@@ -1,3 +1,4 @@
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type {
   AssistantDeltaEvent,
   DraftAppState,
@@ -31,6 +32,7 @@ export const PICO_APP_SESSION_EVENTS = {
   APPROVAL_RESOLVED: "approval:resolved",
   QUEUE_CHANGED: "queue:changed",
   DRAFT_RESET: "draft:reset",
+  THREAD_ITEM: "thread:item",
 } as const;
 
 export type PicoAppSessionEventName =
@@ -62,6 +64,7 @@ export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED]: { running: boolean };
   [PICO_APP_SESSION_EVENTS.QUEUE_CHANGED]: { queuedCount: number };
   [PICO_APP_SESSION_EVENTS.DRAFT_RESET]: { reason: "new" | "clear" };
+  [PICO_APP_SESSION_EVENTS.THREAD_ITEM]: ThreadItem;
 }
 
 export type PicoAppSessionEventArgs<Name extends PicoAppSessionEventName> =

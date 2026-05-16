@@ -1,4 +1,5 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { DraftAppState } from "../../app/controller";
 import type { PicoThreadInfo } from "../../thread/store";
 import { buildBottomPanePanel } from "../surfaces/bottom-pane";
@@ -38,6 +39,7 @@ export interface RuntimeViewInput {
   pendingApproval?: JSONRPCRequest;
   queuedMessages?: readonly PendingInputPreviewMessage[];
   running: boolean;
+  liveThreadItems?: readonly ThreadItem[];
   activityFrame?: number;
   activityElapsedMs?: number;
   placeholderFrame: number;
@@ -122,6 +124,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     input.app,
     input.streamingText,
     input.liveLeafId,
+    input.liveThreadItems,
   );
   const startupBannerVisible = transcriptCells.length === 0 &&
     !input.running &&

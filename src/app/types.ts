@@ -1,4 +1,5 @@
 import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { PicoThreadStore, ResponseItem, TurnOverrides } from "../thread/store";
 
 export interface AppState {
@@ -34,6 +35,7 @@ export interface TurnObserver {
   onApprovalRequested?(request: JSONRPCRequest): void;
   onApprovalResolved?(event: { request: JSONRPCRequest; result: unknown }): void;
   onApprovalRejected?(event: { request: JSONRPCRequest; error: string }): void;
+  onThreadItemCompleted?(item: ThreadItem): void;
 }
 
 export interface RunTurnOptions {

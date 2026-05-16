@@ -80,6 +80,7 @@ export function runOpenTuiRuntime(
       inputValue: layout.getInputValue(),
       streamingText: snapshot.streamingText,
       liveLeafId: snapshot.liveLeafId,
+      liveThreadItems: snapshot.liveThreadItems,
       pendingApproval: snapshot.pendingApproval,
       queuedMessages: snapshot.queuedMessages,
       running: snapshot.running,
@@ -200,6 +201,9 @@ export function runOpenTuiRuntime(
       status: "running",
       message: `stored ${event.entryId || "raw item"}`,
     });
+    render();
+  });
+  appSession.on(PICO_APP_SESSION_EVENTS.THREAD_ITEM, () => {
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, (event: TurnCompletedEvent) => {

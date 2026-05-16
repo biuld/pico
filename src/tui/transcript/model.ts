@@ -1,4 +1,5 @@
 import type { DraftAppState } from "../../app/controller";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { entryUserText, type PicoThreadStore } from "../../thread/store";
 import {
   assistantMarkdownCell,
@@ -9,6 +10,7 @@ import {
   type TranscriptToolBlock,
 } from "./cell";
 import { transcriptCellsForResponseItem } from "./response-item";
+import { threadItemToTranscriptCells } from "./thread-item";
 
 export function buildTranscriptCells(
   store: PicoThreadStore,
@@ -69,8 +71,14 @@ export function buildTranscriptCellsWithLive(
   app: DraftAppState,
   streamingText: string,
   liveLeafId?: string,
+  liveThreadItems?: readonly ThreadItem[],
 ): TranscriptCell[] {
   const cells = app.store ? buildTranscriptCells(app.store, liveLeafId || app.store.leafId) : [];
+  if (liveThreadItems) {
+    for (const item of liveThreadItems) {
+      cells.push(...threadItemToTranscriptCells(item.id, item));
+    }
+  }
   if (streamingText.length > 0) {
     cells.push(assistantMarkdownCell("live", streamingText, { streaming: true }));
   }

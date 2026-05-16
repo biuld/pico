@@ -138,18 +138,24 @@ export async function runTurn(
     const onItemCompleted = (params: ItemCompletedNotification) => {
       if (params.threadId !== threadId) return;
       const item = params.item as ThreadItem;
-      if (item.type !== "fileChange") return;
-      const fileChanges = (item as { type: "fileChange"; changes: Array<{ path: string; kind: string; diff: string }> }).changes;
-      for (const change of fileChanges) {
-        pendingRawWrites = pendingRawWrites.then(async () => {
-          const entry = await store.appendEventMsg(parentId, {
-            type: "file_change",
-            path: change.path,
-            diff: change.diff,
-            kind: change.kind,
+
+      // Pass to TUI for rendering
+      observer?.onThreadItemCompleted?.(item);
+
+      // Store structured fileChange diffs as event_msg entries
+      if (item.type === "fileChange") {
+        const fileChanges = (item as { type: "fileChange"; changes: Array<{ path: string; kind: string; diff: string }> }).changes;
+        for (const change of fileChanges) {
+          pendingRawWrites = pendingRawWrites.then(async () => {
+            const entry = await store.appendEventMsg(parentId, {
+              type: "file_change",
+              path: change.path,
+              diff: change.diff,
+              kind: change.kind,
+            });
+            parentId = entry.id;
           });
-          parentId = entry.id;
-        });
+        }
       }
     };
 

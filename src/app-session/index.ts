@@ -6,6 +6,7 @@ import type {
   DraftAppState,
   TurnFailedEvent,
 } from "../app/types";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { JSONRPCRequest } from "../codex/app-server";
 import { PicoThreadStore, type PicoThreadInfo, type ResponseItem } from "../thread/store";
 import {
@@ -32,6 +33,7 @@ export interface PicoAppSessionSnapshot {
   queuedMessages: readonly QueuedMessage[];
   activeCodexThreadId?: string;
   activeCodexTurnId?: string;
+  liveThreadItems: readonly ThreadItem[];
 }
 
 interface PendingApproval {
@@ -61,6 +63,7 @@ export class PicoAppSession extends EventEmitter {
   private activeCodexTurnId: string | undefined;
   private interruptRequested = false;
   private interrupting = false;
+  private liveThreadItems: ThreadItem[] = [];
   private detachCodexStatus: (() => void) | undefined;
   private readonly createDraftApp: (cwd: string) => Promise<DraftAppState>;
 
@@ -101,6 +104,7 @@ export class PicoAppSession extends EventEmitter {
       queuedMessages: [...this.queuedMessages],
       activeCodexThreadId: this.activeCodexThreadId,
       activeCodexTurnId: this.activeCodexTurnId,
+      liveThreadItems: [...this.liveThreadItems],
     };
   }
 
@@ -172,6 +176,7 @@ export class PicoAppSession extends EventEmitter {
 
     this.streamingText = "";
     this.liveLeafId = undefined;
+    this.liveThreadItems = [];
     this.running = true;
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_SUBMITTING);
 
@@ -300,6 +305,11 @@ export class PicoAppSession extends EventEmitter {
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, interrupted
               ? { ...event, error: "Turn interrupted" }
               : event);
+          },
+          onThreadItemCompleted: (item) => {
+            this.liveThreadItems.push(item);
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_ITEM, item);
+            this.liveLeafId = item.id;
           },
         },
       });

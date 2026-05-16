@@ -1,5 +1,6 @@
 import { normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
+import type { ItemCompletedNotification, ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { picoConfig } from "../config";
 import type { PicoThreadStore, RawResponseItem, RolloutEntry, TurnOverrides } from "../thread/store";
 import type {
@@ -134,9 +135,28 @@ export async function runTurn(
       queueRawItemWrite(value.item as RawResponseItem);
     };
 
+    const onItemCompleted = (params: ItemCompletedNotification) => {
+      if (params.threadId !== threadId) return;
+      const item = params.item as ThreadItem;
+      if (item.type !== "fileChange") return;
+      const fileChanges = (item as { type: "fileChange"; changes: Array<{ path: string; kind: string; diff: string }> }).changes;
+      for (const change of fileChanges) {
+        pendingRawWrites = pendingRawWrites.then(async () => {
+          const entry = await store.appendEventMsg(parentId, {
+            type: "file_change",
+            path: change.path,
+            diff: change.diff,
+            kind: change.kind,
+          });
+          parentId = entry.id;
+        });
+      }
+    };
+
     codex.on("item/agentMessage/delta", onDelta);
     codex.on("serverRequest", onServerRequest);
     codex.on("rawResponseItem/completed", onRawItem);
+    codex.on("item/completed", onItemCompleted);
 
     let terminalEntryWritten = false;
 
@@ -241,6 +261,7 @@ export async function runTurn(
       codex.off("item/agentMessage/delta", onDelta);
       codex.off("serverRequest", onServerRequest);
       codex.off("rawResponseItem/completed", onRawItem);
+      codex.off("item/completed", onItemCompleted);
     }
   } catch (err) {
     const error = err instanceof Error ? err : String(err);

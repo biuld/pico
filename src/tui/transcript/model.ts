@@ -2,6 +2,7 @@ import type { DraftAppState } from "../../app/controller";
 import { entryUserText, type PicoThreadStore } from "../../thread/store";
 import {
   assistantMarkdownCell,
+  fileChangeCell,
   systemNoticeCell,
   userMessageCell,
   type TranscriptCell,
@@ -51,6 +52,13 @@ export function buildTranscriptCells(
           cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "aborted" };
         }
         cells.push(systemNoticeCell(entry.id, String(event.reason || "Turn aborted"), "aborted"));
+      }
+      if (event.type === "file_change") {
+        const path = typeof event.path === "string" ? event.path : undefined;
+        const diff = typeof event.diff === "string" ? event.diff : undefined;
+        if (diff) {
+          cells.push(fileChangeCell(entry.id, { path, diff, summary: undefined }));
+        }
       }
     }
   }

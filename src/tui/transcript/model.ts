@@ -73,11 +73,28 @@ export function buildTranscriptCellsWithLive(
   liveLeafId?: string,
   liveThreadItems?: readonly ThreadItem[],
 ): TranscriptCell[] {
-  const cells = app.store ? buildTranscriptCells(app.store, liveLeafId || app.store.leafId) : [];
-  if (liveThreadItems) {
+  // Live turn: render from ThreadItem (from item/completed).
+  // Resume: render from store (ResponseItem via transcriptCellsForResponseItem).
+  const cells: TranscriptCell[] = [];
+  if (liveThreadItems && liveThreadItems.length > 0) {
+    // Collect user messages from the store (ThreadItem doesn't include user input)
+    if (app.store) {
+      for (const entry of app.store.getPathEntries(liveLeafId || app.store.leafId)) {
+        const userText = entryUserText(entry);
+        if (userText) {
+          const pico = entry.type === "response_item"
+            ? (entry.payload as Record<string, unknown> | undefined)?.pico as Record<string, unknown> | undefined
+            : undefined;
+          cells.push(userMessageCell(entry.id, userText, pico?.status === "started" ? "started" : "completed"));
+        }
+      }
+    }
+    // Render ThreadItem cells
     for (const item of liveThreadItems) {
       cells.push(...threadItemToTranscriptCells(item.id, item));
     }
+  } else if (app.store) {
+    cells.push(...buildTranscriptCells(app.store, liveLeafId || app.store.leafId));
   }
   if (streamingText.length > 0) {
     cells.push(assistantMarkdownCell("live", streamingText, { streaming: true }));

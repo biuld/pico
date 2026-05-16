@@ -141,11 +141,18 @@ test("runTurn resolves approval server requests", async () => {
   class ApprovalCodex extends FakeCodex {
     async startTurn() {
       setTimeout(() => {
-        this.emit("serverRequest", {
+        const req = {
           id: 99,
           method: "item/permissions/requestApproval",
           params: { reason: "test" },
-        } satisfies JSONRPCRequest);
+        } satisfies JSONRPCRequest;
+        this.emit("serverRequest", req);
+        this.emit("codex:event", {
+          type: "approval.requested",
+          request: req,
+          method: req.method,
+          reason: "test",
+        });
         this.emit("turn/completed", {
           threadId: "thread-1",
           turnId: "turn-approval",

@@ -72,7 +72,7 @@ export async function runTurn(
       modelProvider: thread.modelProvider,
     } satisfies TurnStartedEvent);
 
-    const onCodexEvent = (event: CodexEvent) => {
+    const onCodexEvent = async (event: CodexEvent) => {
       switch (event.type) {
         case "assistant.delta": {
           if (event.threadId !== threadId) return;
@@ -91,24 +91,24 @@ export async function runTurn(
           observer?.onThreadItemCompleted?.(item);
           break;
         }
-      }
-    };
-
-    const onServerRequest = async (request: JSONRPCRequest) => {
-      observer?.onApprovalRequested?.(request);
-      try {
-        const result = askApproval ? await askApproval(request) : defaultServerRequestResult(request);
-        codex.resolveServerRequest(request.id, result);
-        observer?.onApprovalResolved?.({ request, result });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        codex.rejectServerRequest(request.id, -32000, message);
-        observer?.onApprovalRejected?.({ request, error: message });
+        case "approval.requested": {
+          const request = event.request;
+          observer?.onApprovalRequested?.(request);
+          try {
+            const result = askApproval ? await askApproval(request) : defaultServerRequestResult(request);
+            codex.resolveServerRequest(request.id, result);
+            observer?.onApprovalResolved?.({ request, result });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            codex.rejectServerRequest(request.id, -32000, message);
+            observer?.onApprovalRejected?.({ request, error: message });
+          }
+          break;
+        }
       }
     };
 
     codex.on("codex:event", onCodexEvent);
-    codex.on("serverRequest", onServerRequest);
 
     try {
       const started = await codex.startTurn(threadId, userInput, {
@@ -194,7 +194,6 @@ export async function runTurn(
       throw err;
     } finally {
       codex.off("codex:event", onCodexEvent);
-      codex.off("serverRequest", onServerRequest);
     }
   } catch (err) {
     const error = err instanceof Error ? err : String(err);

@@ -178,3 +178,69 @@ test("CodexAppServerClient emits both codex:event and notification:error for raw
     await fixture.client.shutdown();
   }
 });
+
+test("CodexAppServerClient emits approval.requested for raw serverRequest", async () => {
+  const { cwd } = await createTempProject();
+  const fixture = await startMockCodexClient([
+    ...startupSteps(),
+    {
+      expectRequest: "thread/start",
+      params: {},
+      respond: threadStartResponse(cwd),
+    },
+    {
+      expectRequest: "turn/start",
+      params: {
+        threadId: "thread-1",
+        input: [{ type: "text", text: "approve me" }],
+      },
+      respond: { turn: { id: "turn-1", status: "inProgress" } },
+    },
+    { delay: 10 },
+    {
+      serverRequest: "item/permissions/requestApproval",
+      id: 41,
+      params: { reason: "file access", command: "cat /etc/hosts", cwd: "/app" },
+      expectResponse: { decision: "approve" },
+    },
+    { delay: 10 },
+    {
+      notify: "turn/completed",
+      params: { threadId: "thread-1", turnId: "turn-1", status: "completed" },
+    },
+  ]);
+
+  try {
+    const approvalSeen = new Promise<{ type: string; reason?: string; command?: string; cwd?: string }>((resolve) => {
+      fixture.client.on("codex:event", (event) => {
+        if (event.type === "approval.requested") resolve(event);
+      });
+    });
+    const legacySeen = new Promise<unknown>((resolve) => {
+      fixture.client.on("serverRequest", (req) => {
+        fixture.client.resolveServerRequest(req.id, { decision: "approve" });
+        resolve(req);
+      });
+    });
+
+    const thread = await fixture.client.startThread({});
+    const turn = await fixture.client.startTurn(thread.thread.id, "approve me");
+    const completed = fixture.client.waitForTurnCompleted(thread.thread.id, turn.turn.id);
+
+    const [ev, legacyRequest] = await Promise.all([approvalSeen, legacySeen]);
+    expect(ev.reason).toBe("file access");
+    expect(ev.command).toBe("cat /etc/hosts");
+    expect(ev.cwd).toBe("/app");
+    expect((legacyRequest as { id?: unknown }).id).toBe(41);
+    await expect(completed).resolves.toMatchObject({ status: "completed" });
+
+    const log = await fixture.readLog();
+    const response = log.find((entry) => {
+      const m = entry.message as Record<string, unknown> | undefined;
+      return entry.type === "received" && m?.id === 41 && "result" in m;
+    });
+    expect(response).toBeTruthy();
+  } finally {
+    await fixture.client.shutdown();
+  }
+});

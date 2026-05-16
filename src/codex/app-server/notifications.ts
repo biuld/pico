@@ -116,6 +116,12 @@ export interface CodexFileChangeDeltaEvent {
 export interface CodexApprovalRequestedEvent {
   type: "approval.requested";
   request: JSONRPCRequest;
+  /** Raw protocol method (e.g. "item/permissions/requestApproval"). Debug/routing only; UI must not display this. */
+  method?: string;
+  /** Normalized approval metadata. UI should use these, not raw request.params. */
+  reason?: string;
+  command?: string;
+  cwd?: string;
 }
 
 export interface CodexWarningEvent {
@@ -147,6 +153,22 @@ function stringValue(value: unknown, ...keys: string[]): string | undefined {
     if (typeof v === "string" && v.length > 0) return v;
   }
   return undefined;
+}
+
+/**
+ * Normalize a JSON-RPC server request into a semantic approval event.
+ * Extracts human-readable metadata so the UI never displays raw method names.
+ */
+export function normalizeServerRequest(request: JSONRPCRequest): CodexApprovalRequestedEvent {
+  const p = (request.params ?? {}) as Record<string, unknown>;
+  return {
+    type: "approval.requested",
+    request,
+    method: request.method,
+    reason: stringValue(p, "reason"),
+    command: stringValue(p, "command"),
+    cwd: stringValue(p, "cwd"),
+  };
 }
 
 /**

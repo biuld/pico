@@ -36,6 +36,7 @@ export type { CodexPersistentThread } from "./types";
 export {
   isCodexEvent,
   normalizeNotification,
+  normalizeServerRequest,
   type CodexApprovalRequestedEvent,
   type CodexAssistantDeltaEvent,
   type CodexCommandOutputDeltaEvent,

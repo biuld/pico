@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import { normalizeNotification, type CodexEvent } from "./notifications";
+import { normalizeNotification, normalizeServerRequest, type CodexEvent } from "./notifications";
 import {
   messageThreadId,
   messageTurnId,
@@ -121,8 +121,11 @@ export class CodexAppServerClient extends EventEmitter {
       this.emit("codex:event", event);
     });
     this.transport.on("serverRequest", (request: JSONRPCRequest) => {
+      // Legacy raw events (SDK tests/tools only)
       this.emit("serverRequest", request);
       this.emit(request.method, request.params, request.id);
+      // Semantic event (app/TUI surface)
+      this.emit("codex:event", normalizeServerRequest(request));
     });
     this.transport.on("stderr", (text) => this.emit("stderr", text));
     this.transport.on("exit", (code) => this.emit("exit", code));

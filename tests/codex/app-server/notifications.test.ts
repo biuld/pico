@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { normalizeNotification, isCodexEvent } from "../../../src/codex/app-server/notifications";
+import { normalizeNotification, normalizeServerRequest, isCodexEvent } from "../../../src/codex/app-server/notifications";
 
 test("normalizeNotification maps item/agentMessage/delta to assistant.delta", () => {
   const event = normalizeNotification({
@@ -118,4 +118,34 @@ test("normalizeNotification handles snake_case params", () => {
     expect(event.turnId).toBe("turn-2");
     expect(event.delta).toBe("snake");
   }
+});
+
+// ── normalizeServerRequest ──
+
+test("normalizeServerRequest maps server request to approval.requested", () => {
+  const event = normalizeServerRequest({
+    id: 1,
+    method: "item/permissions/requestApproval",
+    params: { reason: "needs file access", command: "cat file.txt", cwd: "/app" },
+  });
+
+  expect(event.type).toBe("approval.requested");
+  expect(event.request.id).toBe(1);
+  expect(event.method).toBe("item/permissions/requestApproval");
+  expect(event.reason).toBe("needs file access");
+  expect(event.command).toBe("cat file.txt");
+  expect(event.cwd).toBe("/app");
+});
+
+test("normalizeServerRequest handles missing params gracefully", () => {
+  const event = normalizeServerRequest({
+    id: 2,
+    method: "item/permissions/requestApproval",
+    params: {},
+  });
+
+  expect(event.type).toBe("approval.requested");
+  expect(event.reason).toBeUndefined();
+  expect(event.command).toBeUndefined();
+  expect(event.cwd).toBeUndefined();
 });

@@ -90,10 +90,14 @@ test("manual mock playbook can auto-complete a turn with sampled response items"
     const events: string[] = [];
     const deltas: string[] = [];
     const approvalRequests: JSONRPCRequest[] = [];
+    const semanticApprovals: string[] = [];
     fixture.client.on("serverRequest", (request: JSONRPCRequest) => {
       events.push("approval");
       approvalRequests.push(request);
       fixture.client.resolveServerRequest(request.id, { decision: "approve" });
+    });
+    fixture.client.on("codex:event", (event) => {
+      if (event.type === "approval.requested") semanticApprovals.push(event.method ?? "");
     });
     fixture.client.on("item/agentMessage/delta", (params) => {
       events.push("delta");
@@ -115,6 +119,8 @@ test("manual mock playbook can auto-complete a turn with sampled response items"
         source: "auto",
       },
     });
+    // Semantic event should match legacy
+    expect(semanticApprovals).toEqual(["item/permissions/requestApproval"]);
     expect(deltas.join("").length).toBeGreaterThan(0);
 
     await waitFor(async () => {

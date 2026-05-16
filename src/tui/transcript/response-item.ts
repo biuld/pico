@@ -5,7 +5,9 @@ import {
   formatStructuredPreview,
   formatToolArgumentSummary,
   formatToolOutputSummary,
+  isApplyPatchTool,
   normalizeJsonLike,
+  patchTextFromValue,
   summarizeFileChange,
 } from "./decorate";
 import {
@@ -77,7 +79,10 @@ export function transcriptCellsForResponseItem(
   if (isToolCallType(type, item)) {
     const name = toolName(item);
     const label = name || "tool";
-    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item), callId(item))];
+    const diff = isApplyPatchTool(name)
+      ? patchTextFromValue(argumentValue(item)) || undefined
+      : undefined;
+    return [toolCallCell(id, label, argumentPreview(item) || undefined, statusText(item), callId(item), diff)];
   }
 
   return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];

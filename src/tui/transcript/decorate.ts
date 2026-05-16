@@ -226,7 +226,7 @@ function trimBlankLines(lines: readonly string[]): string[] {
   return lines.slice(start, end);
 }
 
-function patchTextFromValue(value: unknown): string {
+export function patchTextFromValue(value: unknown): string {
   const normalized = normalizeJsonLike(value);
   if (typeof normalized === "string") return normalized;
   if (!isRecord(normalized)) return "";
@@ -262,7 +262,7 @@ function outputTextFromValue(value: unknown, depth = 0): string {
   return "";
 }
 
-function isApplyPatchTool(toolName: string | undefined): boolean {
+export function isApplyPatchTool(toolName: string | undefined): boolean {
   const normalized = toolName?.toLowerCase();
   return normalized === "apply_patch" || normalized?.endsWith(".apply_patch") || false;
 }

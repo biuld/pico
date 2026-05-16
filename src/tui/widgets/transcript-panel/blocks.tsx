@@ -104,7 +104,7 @@ function TranscriptBlockView(props: TranscriptBlockViewProps) {
     case "text":
       return <TextBlock id={id} cell={props.cell} block={props.block} theme={props.theme} />;
     case "tool":
-      return <ToolBlock id={id} block={props.block} theme={props.theme} strategy={strategy} />;
+      return <ToolBlock id={id} block={props.block} theme={props.theme} strategy={strategy} syntaxStyle={props.syntaxStyle} />;
     case "command":
       return (
         <CommandBlock
@@ -266,6 +266,7 @@ function ToolBlock(props: {
   block: TranscriptToolBlock;
   theme: TuiTheme;
   strategy: MainTranscriptMuteStrategy;
+  syntaxStyle?: SyntaxStyle;
 }) {
   const showDetail = props.strategy === "expanded" || props.strategy === "tool-call-summary";
   const header = [props.block.payload.label, showDetail ? props.block.payload.detail : undefined]
@@ -289,6 +290,15 @@ function ToolBlock(props: {
           fg={props.theme.colors.status}
           bg={groupBg}
           wrapMode="word"
+        />
+      ) : undefined}
+      {props.block.payload.diff &&
+      (props.strategy === "expanded" || props.strategy === "tool-call-summary") ? (
+        <PatchBlock
+          id={`${props.id}-diff`}
+          diff={props.block.payload.diff}
+          theme={props.theme}
+          syntaxStyle={props.syntaxStyle!}
         />
       ) : undefined}
       {props.block.payload.body && props.strategy === "expanded" ? (

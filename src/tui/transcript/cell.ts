@@ -64,6 +64,7 @@ export interface TranscriptToolBlock {
     label?: string;
     detail?: string;
     body?: string;
+    diff?: string;
     status?: string;
     output?: boolean;
     callId?: string;
@@ -154,12 +155,13 @@ export function toolCallCell(
   detail?: string,
   status?: string,
   callId?: string,
+  diff?: string,
 ): TranscriptCell {
   return {
     id,
     kind: "tool_call",
     status,
-    blocks: [{ type: "tool", payload: { label, detail, status, callId } }],
+    blocks: [{ type: "tool", payload: { label, detail, status, callId, diff } }],
   };
 }
 

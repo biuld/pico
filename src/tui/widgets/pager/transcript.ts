@@ -26,9 +26,23 @@ export function buildTranscriptPagerOverlayView(
 
 function transcriptPagerText(cells: readonly TranscriptCell[]): string {
   return cells
-    .map((cell) => `${cellPrefix(cell)} ${cell.blocks.map(blockText).filter(Boolean).join("\n")}`.trimEnd())
+    .map((cell) => {
+      const text = cell.blocks.map(blockText).filter(Boolean).join("\n");
+      return `${cellPrefix(cell)} ${stripMarkdown(text)}`.trimEnd();
+    })
     .filter(Boolean)
     .join("\n\n");
+}
+
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/```[\s\S]*?```/g, "[code]")
+    .replace(/`{1,2}([^`]+)`{1,2}/g, "$1")
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+    .replace(/_{1,3}([^_]+)_{1,3}/g, "$1")
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1");
 }
 
 function cellPrefix(cell: TranscriptCell): string {

@@ -303,7 +303,7 @@ test("main transcript uses Codex-style mute strategies by cell type", async () =
     id: "file",
     kind: "file_change",
     blocks: [{ type: "file_change", payload: { path: "a.ts", diff: "@@ changed" } }],
-  })).toBe("file-summary");
+  })).toBe("expanded");
   expect(isMainTranscriptCellExpandedByDefault(liveCells.at(-1)!)).toBe(true);
   expect(compactTranscriptPreview("one\n\n two   three", 12)).toBe("one two t...");
 });

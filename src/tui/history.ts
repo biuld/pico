@@ -4,7 +4,7 @@ import type {
   ResponseItem,
 } from "../thread/store";
 import { entryUserText } from "../thread/store";
-import { responseItemAgentText } from "./response-items";
+import { responseItemText } from "./response-items";
 
 export interface HistoryTurnRow {
   id: string;
@@ -76,7 +76,10 @@ export function buildHistoryTurnRows(
     if (!node) continue;
     node.endId = entry.id;
     if (entry.item.type === "response_item") {
-      const text = responseItemAgentText(entry.item.payload as ResponseItem);
+      const item = entry.item.payload as ResponseItem;
+      const role = typeof item.role === "string" ? item.role : undefined;
+      if (role === "user" || role === "developer") continue;
+      const text = responseItemText(item);
       if (text) node.agentParts.push(text);
     } else if (entry.item.type === "event_msg") {
       const event = entry.item.payload as Record<string, unknown> | undefined;
@@ -152,9 +155,22 @@ export function historyUserMarker(_row: Pick<HistoryTurnRow, "isSelected">): str
 function turnSummary(node: TurnNode): string {
   if (node.failure) return `agent: ${node.status}: ${truncate(node.failure)}`;
 
-  const text = node.agentParts.join(" ").replace(/\s+/g, " ").trim();
+  const text = stripMarkdown(node.agentParts.join(" ")).replace(/\s+/g, " ").trim();
   if (!text) return "agent: no assistant summary";
   return `agent: ${truncate(text, AGENT_SUMMARY_MAX_LENGTH)}`;
+}
+
+function stripMarkdown(value: string): string {
+  return value
+    .replace(/```[\s\S]*?```/g, "[code]")
+    .replace(/`{1,2}([^`]+)`{1,2}/g, "$1")
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+    .replace(/_{1,3}([^_]+)_{1,3}/g, "$1")
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\n{2,}/g, " ")
+    .trim();
 }
 
 function nearestTurnAncestor(

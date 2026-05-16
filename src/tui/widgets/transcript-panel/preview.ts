@@ -36,7 +36,7 @@ export function mainTranscriptMuteStrategyForCell(cell: TranscriptCell): MainTra
     case "command":
       return "command-output-preview";
     case "file_change":
-      return "file-summary";
+      return "expanded";
   }
 }
 

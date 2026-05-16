@@ -49,6 +49,8 @@ export function transcriptCellsForResponseItem(
     return fallbackText ? [assistantMarkdownCell(id, fallbackText)] : [];
   }
 
+  if (type.includes("compaction")) return [];
+
   if (isToolOutputType(type)) {
     const projectedOutput = toolOutputPreview(item);
     const body = projectedOutput !== undefined ? projectedOutput : fallbackText || previewValue(item.output);
@@ -90,6 +92,7 @@ function isToolCallType(type: string, item: ResponseItem): boolean {
   return (
     type.includes("function_call") ||
     type.includes("tool_call") ||
+    type.includes("tool_search_call") ||
     type.includes("mcp_call") ||
     type.includes("web_search") ||
     type.includes("image_generation") ||
@@ -101,6 +104,7 @@ function isToolOutputType(type: string): boolean {
   return (
     type.includes("function_call_output") ||
     type.includes("tool_call_output") ||
+    type.includes("tool_search_output") ||
     type.includes("tool_output") ||
     type.includes("custom_tool_call_output")
   );

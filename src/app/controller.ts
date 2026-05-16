@@ -90,6 +90,7 @@ export class PicoController extends EventEmitter {
       onApprovalRequested: (r) => this.emit("approval:requested", r),
       onApprovalResolved: (e) => this.emit("approval:resolved", e),
       onApprovalRejected: (e) => this.emit("approval:rejected", e),
+      onThreadItemCompleted: (item) => this.emit("thread-item:completed", item),
     };
   }
 

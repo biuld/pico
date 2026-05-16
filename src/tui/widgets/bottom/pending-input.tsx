@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { For } from "solid-js";
-import type { TuiTheme } from "../theme";
-import { SolidText } from "./solid-text";
+import type { TuiTheme } from "../../theme";
+import { SolidText } from "../solid-text";
 
 export interface PendingInputPreviewMessage {
   text: string;

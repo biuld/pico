@@ -5,8 +5,8 @@ import {
   blockText,
   buildTranscriptCellsWithLive,
   type TranscriptCell,
-} from "../transcript";
-import { OVERLAY_HINTS } from "./overlay-hints";
+} from "../../transcript";
+import { OVERLAY_HINTS } from "../overlay/hints";
 
 export function buildTranscriptPagerOverlayView(
   app: DraftAppState,

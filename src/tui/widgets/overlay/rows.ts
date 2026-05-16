@@ -1,5 +1,5 @@
 import type { OverlayRowView } from "../core/overlay-model";
-import type { TuiTheme } from "../theme";
+import type { TuiTheme } from "../../theme";
 
 export interface SelectableOverlayRowInput {
   id: string;

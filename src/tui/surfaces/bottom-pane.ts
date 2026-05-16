@@ -5,7 +5,7 @@ import type { TuiState } from "../core/state";
 import type { TuiTheme } from "../theme";
 import {
   buildApprovalPanel,
-} from "../widgets/approval-panel";
+} from "../widgets/bottom/approval";
 import {
   boundedBottomPanePanelHeight,
   bottomPanePanelMaxHeight,
@@ -13,25 +13,25 @@ import {
   type BottomPanePanelKind,
   type BottomPanePanelMode,
   type BottomPanePanelState,
-} from "../widgets/bottom-pane";
-import { OVERLAY_HINTS } from "../widgets/overlay-hints";
-import { selectedRowScrollY, selectableOverlayRow } from "../widgets/overlay-rows";
+} from "../widgets/bottom/pane";
+import { OVERLAY_HINTS } from "../widgets/overlay/hints";
+import { selectedRowScrollY, selectableOverlayRow } from "../widgets/overlay/rows";
 import {
   buildPendingInputPreview,
   type PendingInputPreviewMessage,
-} from "../widgets/pending-input-preview";
+} from "../widgets/bottom/pending-input";
 import {
   buildSlashCommandRows,
   formatSlashCommandRow,
-} from "../widgets/slash-command-popup";
+} from "../widgets/pickers/slash-command";
 import {
   formatStatusLineRow,
   type StatusLineRow,
-} from "../widgets/statusline-picker";
+} from "../widgets/pickers/statusline";
 import {
   formatThemeRow,
   type ThemeRow,
-} from "../widgets/theme-picker";
+} from "../widgets/pickers/theme";
 
 export interface BottomPanePanelInput {
   state: TuiState;

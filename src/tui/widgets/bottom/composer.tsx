@@ -1,8 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import type { InputRenderable, StyledText } from "@opentui/core";
-import type { TuiTheme } from "../theme";
-export { formatActivityStatus as formatComposerStatus } from "./activity-indicator";
-import { SolidText } from "./solid-text";
+import type { TuiTheme } from "../../theme";
+export { formatActivityStatus as formatComposerStatus } from "./activity";
+import { SolidText } from "../solid-text";
 
 export const COMPOSER_TRANSIENT_STATUS_HEIGHT = 1;
 export const COMPOSER_ROW_HEIGHT = 3;

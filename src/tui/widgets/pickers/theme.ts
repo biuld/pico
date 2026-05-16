@@ -1,7 +1,7 @@
 import type { OverlayView } from "../core/overlay-model";
-import type { TuiTheme } from "../theme";
-import { OVERLAY_HINTS } from "./overlay-hints";
-import { selectableOverlayRow, selectedRowScrollY } from "./overlay-rows";
+import type { TuiTheme } from "../../theme";
+import { OVERLAY_HINTS } from "../overlay/hints";
+import { selectableOverlayRow, selectedRowScrollY } from "../overlay/rows";
 
 export interface ThemeRow {
   name: string;

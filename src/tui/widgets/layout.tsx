@@ -17,9 +17,9 @@ import {
   BottomPaneView,
   emptyBottomPanePanel,
   type BottomPaneLayoutState,
-} from "./bottom-pane";
-import { PagerOverlaySurface } from "./overlay";
-import { PickerSurface } from "./picker-surface";
+} from "./bottom/pane";
+import { PagerOverlaySurface } from "./overlay/surface";
+import { PickerSurface } from "./overlay/picker-surface";
 import { StartupBannerView, type StartupBannerState } from "./startup-banner";
 import {
   TranscriptPanelView,

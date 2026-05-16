@@ -8,27 +8,27 @@ export {
   type ApprovalDecision,
   type ApprovalOption,
   type ApprovalPanelState,
-} from "./widgets/approval-panel";
+} from "./widgets/bottom/approval";
 export {
   footerMode,
   formatBottomStatusLine,
   formatFooterLine,
   formatTransientStatusLine,
   type FooterMode,
-} from "./widgets/footer";
+} from "./widgets/bottom/footer";
 export {
   composerPlaceholderMode,
   formatComposerPlaceholder,
   type ComposerPlaceholderMode,
-} from "./widgets/composer-placeholder";
+} from "./widgets/bottom/placeholder";
 export {
   buildThreadRows,
   formatThreadRow,
   type ThreadRow,
-} from "./widgets/resume-picker";
+} from "./widgets/pickers/resume";
 export {
   shortcutOverlayText,
-} from "./widgets/shortcut-overlay";
+} from "./widgets/pager/shortcuts";
 export {
   formatCodexStatusLine,
   formatCodexStatusLineStyled,
@@ -38,12 +38,12 @@ export {
   buildSlashCommandRows,
   formatSlashCommandRow,
   type SlashCommandRow,
-} from "./widgets/slash-command-popup";
+} from "./widgets/pickers/slash-command";
 export {
   buildThemeRows,
   formatThemeRow,
   type ThemeRow,
-} from "./widgets/theme-picker";
+} from "./widgets/pickers/theme";
 export {
   buildTranscriptCells,
   type TranscriptCell,

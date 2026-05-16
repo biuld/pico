@@ -1,6 +1,6 @@
 import type { CliRenderer } from "@opentui/core";
 import { filterSlashCommands } from "./commands";
-import { buildApprovalOptions, type ApprovalDecision } from "./widgets/approval-panel";
+import { buildApprovalOptions, type ApprovalDecision } from "./widgets/bottom/approval";
 import type { TuiState } from "./core/state";
 import type { TuiMsg } from "./core/update";
 

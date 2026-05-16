@@ -4,19 +4,19 @@ import { TUI_THEMES } from "../src/tui/theme";
 import { updateTuiState } from "../src/tui/core/update";
 import { SLASH_COMMANDS } from "../src/tui/commands";
 import { buildBottomPanePanel } from "../src/tui/surfaces/bottom-pane";
-import { buildApprovalPanel } from "../src/tui/widgets/approval-panel";
-import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/composer";
-import { footerMode } from "../src/tui/widgets/footer";
-import { buildHistoryPickerSurfaceView } from "../src/tui/widgets/history-picker";
-import { pagerOverlayFrame } from "../src/tui/widgets/overlay";
-import { buildPendingInputPreview } from "../src/tui/widgets/pending-input-preview";
+import { buildApprovalPanel } from "../src/tui/widgets/bottom/approval";
+import { COMPOSER_HEIGHT, COMPOSER_OVERLAY_INSET } from "../src/tui/widgets/bottom/composer";
+import { footerMode } from "../src/tui/widgets/bottom/footer";
+import { buildHistoryPickerSurfaceView } from "../src/tui/widgets/pickers/history";
+import { pagerOverlayFrame } from "../src/tui/widgets/overlay/surface";
+import { buildPendingInputPreview } from "../src/tui/widgets/bottom/pending-input";
 import {
   buildResumePickerSurfaceView,
   buildThreadRows,
   formatThreadRow,
-} from "../src/tui/widgets/resume-picker";
-import { buildStatusLineRows } from "../src/tui/widgets/statusline-picker";
-import { buildThemeRows } from "../src/tui/widgets/theme-picker";
+} from "../src/tui/widgets/pickers/resume";
+import { buildStatusLineRows } from "../src/tui/widgets/pickers/statusline";
+import { buildThemeRows } from "../src/tui/widgets/pickers/theme";
 import { createStore } from "./tui-test-helpers";
 
 test("pager overlay anchors above the bottom pane", () => {

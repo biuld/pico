@@ -10,23 +10,23 @@ import {
 } from "../src/tui/statusline";
 import { TUI_THEMES } from "../src/tui/theme";
 import { updateTuiState } from "../src/tui/core/update";
-import { formatComposerStatus } from "../src/tui/widgets/composer";
+import { formatComposerStatus } from "../src/tui/widgets/bottom/composer";
 import {
   composerPlaceholderMode,
   COMPOSER_PLACEHOLDER_INTERVAL_MS,
   formatComposerPlaceholder,
-} from "../src/tui/widgets/composer-placeholder";
+} from "../src/tui/widgets/bottom/placeholder";
 import {
   footerMode,
   formatBottomStatusLine,
   formatTransientStatusLine,
-} from "../src/tui/widgets/footer";
-import { OVERLAY_HINTS } from "../src/tui/widgets/overlay-hints";
+} from "../src/tui/widgets/bottom/footer";
+import { OVERLAY_HINTS } from "../src/tui/widgets/overlay/hints";
 import {
   buildStatusLinePickerView,
   buildStatusLineRows,
   formatStatusLineRow,
-} from "../src/tui/widgets/statusline-picker";
+} from "../src/tui/widgets/pickers/statusline";
 import { createStore } from "./tui-test-helpers";
 
 test("bottom statusline renders an unsaved thread before first submit", () => {

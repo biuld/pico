@@ -11,10 +11,10 @@ import { buildHistoryTurnRows, historySelectionTargetId } from "../history";
 import { createTuiState, type TuiState } from "../core/state";
 import { themeIndex, TUI_THEMES } from "../theme";
 import type { TuiMsg } from "../core/update";
-import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
+import { HISTORY_ROW_HEIGHT } from "../widgets/pickers/history";
 import type { OpenTuiLayout } from "../widgets/layout";
-import { buildThreadRows } from "../widgets/resume-picker";
-import { STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
+import { buildThreadRows } from "../widgets/pickers/resume";
+import { STATUS_LINE_ITEMS } from "../widgets/pickers/statusline";
 import { surfaceListViewportHeight } from "./view";
 
 export interface RuntimeActions {

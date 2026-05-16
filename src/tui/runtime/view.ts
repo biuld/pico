@@ -16,16 +16,16 @@ import { getTheme, TUI_THEMES } from "../theme";
 import { buildTranscriptCellsWithLive } from "../transcript";
 import type { TuiMsg } from "../core/update";
 import { bottomPaneHeight } from "../widgets/bottom-pane";
-import { formatComposerStatus } from "../widgets/composer";
-import { formatComposerPlaceholder } from "../widgets/composer-placeholder";
-import { formatTransientStatusLine } from "../widgets/footer";
-import { HISTORY_ROW_HEIGHT } from "../widgets/history-picker";
+import { formatComposerStatus } from "../widgets/bottom/composer";
+import { formatComposerPlaceholder } from "../widgets/bottom/placeholder";
+import { formatTransientStatusLine } from "../widgets/bottom/footer";
+import { HISTORY_ROW_HEIGHT } from "../widgets/pickers/history";
 import type { OpenTuiLayoutUpdate } from "../widgets/layout";
-import type { PendingInputPreviewMessage } from "../widgets/pending-input-preview";
-import { buildThreadRows } from "../widgets/resume-picker";
+import type { PendingInputPreviewMessage } from "../widgets/bottom/pending-input";
+import { buildThreadRows } from "../widgets/pickers/resume";
 import { buildStartupBannerState } from "../widgets/startup-banner";
-import { buildStatusLineRows, STATUS_LINE_ITEMS } from "../widgets/statusline-picker";
-import { buildThemeRows } from "../widgets/theme-picker";
+import { buildStatusLineRows, STATUS_LINE_ITEMS } from "../widgets/pickers/statusline";
+import { buildThemeRows } from "../widgets/pickers/theme";
 
 export interface RuntimeViewInput {
   app: DraftAppState;

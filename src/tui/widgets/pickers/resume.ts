@@ -1,9 +1,9 @@
 import type { PicoThreadInfo } from "../../thread/store";
 import type { OverlayRowView, OverlayView } from "../core/overlay-model";
 import type { TuiState } from "../core/state";
-import type { TuiTheme } from "../theme";
-import { OVERLAY_HINTS } from "./overlay-hints";
-import { selectableOverlayRow } from "./overlay-rows";
+import type { TuiTheme } from "../../theme";
+import { OVERLAY_HINTS } from "../overlay/hints";
+import { selectableOverlayRow } from "../overlay/rows";
 
 export interface ThreadRow {
   id: string;

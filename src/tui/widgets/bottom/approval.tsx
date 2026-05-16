@@ -1,8 +1,8 @@
 /** @jsxImportSource @opentui/solid */
 import { For } from "solid-js";
 import type { JSONRPCRequest } from "../../codex/app-server";
-import type { TuiTheme } from "../theme";
-import { SolidText } from "./solid-text";
+import type { TuiTheme } from "../../theme";
+import { SolidText } from "../solid-text";
 
 export type ApprovalDecision = "accept" | "acceptForSession" | "decline";
 

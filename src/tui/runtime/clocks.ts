@@ -1,8 +1,8 @@
-import { ACTIVITY_SPINNER_INTERVAL_MS } from "../widgets/activity-indicator";
+import { ACTIVITY_SPINNER_INTERVAL_MS } from "../widgets/bottom/activity";
 import {
   COMPOSER_PLACEHOLDER_INTERVAL_MS,
   type ComposerPlaceholderMode,
-} from "../widgets/composer-placeholder";
+} from "../widgets/bottom/placeholder";
 
 export interface RuntimeClockSnapshot {
   activityFrame?: number;

@@ -1,9 +1,9 @@
-import { historyUserMarker, type HistoryTurnRow } from "../history";
+import { historyUserMarker, type HistoryTurnRow } from "../../history";
 import type { OverlayView } from "../core/overlay-model";
 import type { TuiState } from "../core/state";
-import type { TuiTheme } from "../theme";
-import { OVERLAY_HINTS } from "./overlay-hints";
-import { selectableOverlayRow } from "./overlay-rows";
+import type { TuiTheme } from "../../theme";
+import { OVERLAY_HINTS } from "../overlay/hints";
+import { selectableOverlayRow } from "../overlay/rows";
 
 export const HISTORY_ROW_HEIGHT = 2;
 

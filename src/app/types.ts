@@ -1,5 +1,5 @@
 import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
-import type { PicoThreadStore, RawResponseItem, TurnOverrides } from "../thread/store";
+import type { PicoThreadStore, ResponseItem, TurnOverrides } from "../thread/store";
 
 export interface AppState {
   store: PicoThreadStore;
@@ -51,7 +51,7 @@ export interface AssistantDeltaEvent {
 export interface RawItemEvent {
   threadId: string;
   turnId: string;
-  item: RawResponseItem;
+  item: ResponseItem;
   entryId?: string;
 }
 

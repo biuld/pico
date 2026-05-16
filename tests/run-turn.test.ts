@@ -125,8 +125,8 @@ test("runTurn forks from a linearized branch path, filters raw items, and persis
     "previous-item",
     "kept-item",
   ]);
-  expect(store.allEntries.some((entry) => entryUserText(entry) === "next")).toBe(true);
-  expect(store.allEntries.at(-1)?.item).toMatchObject({ type: "event_msg", payload: { type: "turn_completed" } });
+  expect(store.lines.some((line) => entryUserText(line) === "next")).toBe(true);
+  expect(store.lines.at(-1)).toMatchObject({ type: "event_msg", payload: { type: "turn_completed" } });
 });
 
 test("runTurn sends raw items assembled from loaded JSONL branch path", async () => {
@@ -149,7 +149,7 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
   });
   await store.appendTurnCompleted(leftItem.id, leftTurn.id);
 
-  await store.appendBranch(rootDone.id, "back to root");
+  await store.appendBranch(rootDone.id);
   const rightTurn = await store.appendTurn(store.leafId, "right");
   const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
     id: "right-item",
@@ -168,9 +168,9 @@ test("runTurn sends raw items assembled from loaded JSONL branch path", async ()
     .split("\n")
     .map((line) => JSON.parse(line));
   expect(forkLines.map((line) => line.payload?.id).filter(Boolean)).toEqual([
-    rootTurn.item.type === "response_item" ? rootTurn.item.payload.id : undefined,
+    rootTurn.type === "response_item" ? (rootTurn.payload as Record<string, unknown>).id as string : undefined,
     "root-item",
-    rightTurn.item.type === "response_item" ? rightTurn.item.payload.id : undefined,
+    rightTurn.type === "response_item" ? (rightTurn.payload as Record<string, unknown>).id as string : undefined,
     "right-item",
   ]);
 });
@@ -231,8 +231,8 @@ test("runTurn persists interrupted completions as aborted turns", async () => {
   const result = await withQuietConsole(() => runTurn(app, "interrupt me"));
 
   expect(result.status).toBe("aborted");
-  expect(store.allEntries.some((entry) => entryUserText(entry) === "interrupt me")).toBe(true);
-  expect(store.allEntries.at(-1)?.item).toMatchObject({
+  expect(store.lines.some((line) => entryUserText(line) === "interrupt me")).toBe(true);
+  expect(store.lines.at(-1)).toMatchObject({
     type: "event_msg",
     payload: { type: "turn_aborted", reason: "interrupted by user" },
   });

@@ -21,21 +21,21 @@ export function buildTranscriptCells(
     const userText = entryUserText(entry);
     if (userText) {
       pendingCalls.clear();
-      const pico = entry.item.type === "response_item"
-        ? entry.item.payload.pico as Record<string, unknown> | undefined
+      const pico = entry.type === "response_item"
+        ? (entry.payload as Record<string, unknown> | undefined)?.pico as Record<string, unknown> | undefined
         : undefined;
       const status = pico?.status === "started" ? "started" : "completed";
       cells.push(userMessageCell(entry.id, userText, status));
       currentUserCellIndex = cells.length - 1;
       continue;
     }
-    if (entry.item.type === "branch_out") continue;
-    if (entry.item.type === "response_item") {
-      appendTranscriptCells(cells, pendingCalls, transcriptCellsForResponseItem(entry.id, entry.item.payload));
+    if (entry.type === "branch_out") continue;
+    if (entry.type === "response_item") {
+      appendTranscriptCells(cells, pendingCalls, transcriptCellsForResponseItem(entry.id, entry.payload as Record<string, unknown>));
       continue;
     }
-    if (entry.item.type === "event_msg" && entry.item.payload && typeof entry.item.payload === "object") {
-      const event = entry.item.payload as Record<string, unknown>;
+    if (entry.type === "event_msg" && entry.payload && typeof entry.payload === "object") {
+      const event = entry.payload as Record<string, unknown>;
       if (event.type === "turn_completed" && currentUserCellIndex !== undefined) {
         cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "completed" };
         continue;

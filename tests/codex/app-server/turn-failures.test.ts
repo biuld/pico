@@ -40,8 +40,8 @@ test("failed completion becomes a failed Pico turn", async () => {
       runTurn({ cwd, store, codex: fixture.client, config: {} } as AppState, "fail"),
     ).rejects.toThrow("mock failure");
 
-    expect(store.allEntries.some((entry) => entryUserText(entry) === "fail")).toBe(true);
-    expect(store.allEntries.at(-1)?.item).toMatchObject({
+    expect(store.lines.some((line) => entryUserText(line) === "fail")).toBe(true);
+    expect(store.lines.at(-1)).toMatchObject({
       type: "event_msg",
       payload: { type: "turn_failed", error: "mock failure" },
     });

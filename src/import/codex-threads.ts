@@ -13,11 +13,27 @@ import { threadDir, threadPath } from "../thread/paths";
 import { userInputResponseItem } from "../thread/store";
 import type {
   PicoConfigSnapshot,
-  PicoThreadEntry,
-  PicoThreadHeader,
-  RawResponseItem,
   TurnOverrides,
 } from "../thread/types";
+
+// Local types for the Codex import pipeline (uses legacy flat-entry format).
+interface PicoThreadEntry {
+  id: string;
+  parentId: string;
+  timestamp: string;
+  item: { type: string; payload?: unknown };
+}
+
+interface PicoThreadHeader {
+  type: "thread";
+  version: number;
+  id: string;
+  createdAt: string;
+  cwd: string;
+  config: PicoConfigSnapshot;
+}
+
+type RawResponseItem = Record<string, unknown>;
 
 export interface ImportCodexThreadsOptions {
   cwd?: string;
@@ -435,12 +451,12 @@ export function convertCodexRollout(
 
 function isImportedUserTurn(entry: PicoThreadEntry): boolean {
   if (entry.item.type !== "response_item") return false;
-  return entry.item.payload.role === "user";
+  return (entry.item.payload as Record<string, unknown>)?.role === "user";
 }
 
 function applyUserInputOverrides(entry: PicoThreadEntry, overrides: TurnOverrides): void {
   if (entry.item.type !== "response_item") return;
-  const payload = entry.item.payload;
+  const payload = entry.item.payload as Record<string, unknown>;
   const pico = payload.pico;
   if (!pico || typeof pico !== "object" || Array.isArray(pico)) return;
   (pico as Record<string, unknown>).overrides = overrides;

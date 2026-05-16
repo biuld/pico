@@ -1,5 +1,5 @@
 import type {
-  PicoThreadEntry,
+  PicoLine,
   PicoThreadStore,
   ResponseItem,
 } from "../thread/store";
@@ -38,7 +38,7 @@ export function buildHistoryTurnRows(
   store: PicoThreadStore,
   selectedEntryId = store.leafId,
 ): HistoryTurnRow[] {
-  const entries = [...store.allEntries];
+  const entries = [...store.lines];
   const nodes = new Map<string, TurnNode>();
   const entryToTurn = new Map<string, string>();
   const children = new Map<string, string[]>();
@@ -48,7 +48,7 @@ export function buildHistoryTurnRows(
     const userText = entryUserText(entry);
     if (!userText) continue;
 
-    const parentTurnId = nearestTurnAncestor(entries, entry.parentId);
+    const parentTurnId = nearestTurnAncestor(entries, entry.parent ?? null);
     const parentKey = parentTurnId || ROOT;
     nodes.set(entry.id, {
       id: entry.id,
@@ -69,17 +69,17 @@ export function buildHistoryTurnRows(
       currentTurnId = entry.id;
       continue;
     }
-    const turnId = nearestTurnAncestor(entries, entry.parentId) || currentTurnId;
+    const turnId = nearestTurnAncestor(entries, entry.parent ?? null) || currentTurnId;
     if (!turnId) continue;
     entryToTurn.set(entry.id, turnId);
     const node = nodes.get(turnId);
     if (!node) continue;
     node.endId = entry.id;
-    if (entry.item.type === "response_item") {
-      const text = responseItemAgentText(entry.item.payload as ResponseItem);
+    if (entry.type === "response_item") {
+      const text = responseItemAgentText(entry.payload as ResponseItem);
       if (text) node.agentParts.push(text);
-    } else if (entry.item.type === "event_msg") {
-      const event = entry.item.payload as Record<string, unknown> | undefined;
+    } else if (entry.type === "event_msg") {
+      const event = entry.payload as Record<string, unknown> | undefined;
       if (event?.type === "turn_failed") {
         node.status = "failed";
         node.failure = typeof event.error === "string" ? event.error : "failed";
@@ -171,7 +171,7 @@ function stripMarkdown(value: string): string {
 }
 
 function nearestTurnAncestor(
-  entries: readonly PicoThreadEntry[],
+  entries: readonly PicoLine[],
   entryId: string | null,
 ): string | undefined {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
@@ -185,24 +185,24 @@ function nearestTurnAncestor(
     const entry = byId.get(current);
     if (!entry) return undefined;
     if (entryUserText(entry)) return entry.id;
-    current = entry.parentId;
+    current = entry.parent ?? null;
   }
 
   return undefined;
 }
 
 function turnIdForEntry(
-  entries: readonly PicoThreadEntry[],
+  entries: readonly PicoLine[],
   entryId: string,
 ): string | undefined {
   const entry = entries.find((candidate) => candidate.id === entryId);
   if (!entry) return undefined;
   if (entryUserText(entry)) return entry.id;
-  return nearestTurnAncestor(entries, entry.parentId);
+  return nearestTurnAncestor(entries, entry.parent ?? null);
 }
 
 function nearestTurnId(
-  path: readonly PicoThreadEntry[],
+  path: readonly PicoLine[],
   _entryToTurn: Map<string, string>,
 ): string | undefined {
   for (const entry of path.toReversed()) {

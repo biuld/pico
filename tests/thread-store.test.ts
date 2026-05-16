@@ -64,11 +64,11 @@ test("backtrack then append creates exactly one branch_out entry", async () => {
   const parent = await store.ensureBranchForAppend();
   const right = await store.appendUserInput(parent, "right");
 
-  const branchEntries = store.allEntries.filter((entry) => entry.item.type === "branch_out");
+  const branchEntries = store.lines.filter((entry) => entry.type === "branch_out");
   expect(branchEntries).toHaveLength(1);
-  expect(branchEntries[0]).toMatchObject({ parentId: root.id, item: { type: "branch_out" } });
-  expect(right.parentId).toBe(branchEntries[0].id);
-  expect(left.parentId).toBe(root.id);
+  expect(branchEntries[0]).toMatchObject({ parent: root.id, type: "branch_out" });
+  expect(right.parent).toBe(branchEntries[0].id);
+  expect(left.parent).toBe(root.id);
 });
 
 test("empty branch_out remains appendable and is not duplicated", async () => {
@@ -78,14 +78,14 @@ test("empty branch_out remains appendable and is not duplicated", async () => {
 
   store.backtrack(root.id);
   const branch = await store.ensureBranchForAppend();
-  expect(store.allEntries.at(-1)?.item.type).toBe("branch_out");
+  expect(store.lines.at(-1)?.type).toBe("branch_out");
   const parent = await store.ensureBranchForAppend();
   const right = await store.appendUserInput(parent, "right");
 
   expect(parent).toBe(branch);
-  expect(right.parentId).toBe(branch);
-  expect(store.allEntries.filter((entry) => entry.item.type === "branch_out")).toHaveLength(1);
-  expect(left.parentId).toBe(root.id);
+  expect(right.parent).toBe(branch);
+  expect(store.lines.filter((entry) => entry.type === "branch_out")).toHaveLength(1);
+  expect(left.parent).toBe(root.id);
 });
 
 test("linearizeForCodex skips branch_out and preserves selected path rollout items", async () => {
@@ -107,9 +107,9 @@ test("linearizeForCodex skips branch_out and preserves selected path rollout ite
     "response_item",
   ]);
   expect(linearized.map((line) => line.payload?.id).filter(Boolean)).toEqual([
-    root.item.type === "response_item" ? root.item.payload.id : undefined,
+    root.type === "response_item" ? (root.payload as Record<string, unknown>).id as string : undefined,
     "root-item",
-    right.item.type === "response_item" ? right.item.payload.id : undefined,
+    right.type === "response_item" ? (right.payload as Record<string, unknown>).id as string : undefined,
     "right-item",
   ]);
   expect(linearized.some((line) => line.type === "branch_out")).toBe(false);
@@ -145,7 +145,7 @@ test("collectInjectItems returns assistant items only from the selected branch p
   await store.appendResponseItem(right.id, { id: "right-item", type: "message" });
 
   expect(store.collectInjectItems().map((item) => item.id)).toEqual(["root-item", "right-item"]);
-  expect(store.getPathEntries().map((entry) => entryUserText(entry)).filter(Boolean)).toEqual([
+  expect(store.getPathEntries().map((line) => entryUserText(line)).filter(Boolean)).toEqual([
     "root",
     "right",
   ]);

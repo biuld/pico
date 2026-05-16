@@ -2,7 +2,7 @@ import { normalizeCodexStatusValue } from "../codex/app-server";
 import type { CodexRawResponseItemCompletedNotification, JSONRPCRequest } from "../codex/app-server";
 import type { ItemCompletedNotification, ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { picoConfig } from "../config";
-import type { PicoThreadStore, RawResponseItem, RolloutEntry, TurnOverrides } from "../thread/store";
+import type { EventLine, PicoThreadStore, ResponseItem, TurnOverrides } from "../thread/store";
 import type {
   AppState,
   AssistantDeltaEvent,
@@ -70,11 +70,11 @@ export async function runTurn(
     } satisfies TurnStartedEvent);
 
     let rawItemCount = 0;
-    const bufferedRawItems: RawResponseItem[] = [];
+    const bufferedRawItems: ResponseItem[] = [];
     let pendingRawWrites = Promise.resolve();
     let rawItemError: Error | undefined;
 
-    const queueRawItemWrite = (item: RawResponseItem) => {
+    const queueRawItemWrite = (item: ResponseItem) => {
       pendingRawWrites = pendingRawWrites.then(async () => {
         const entry = await store.appendResponseItem(parentId, item);
         parentId = entry.id;
@@ -129,10 +129,10 @@ export async function runTurn(
         return;
       }
       if (codexTurnId === picoTurn.id) {
-        bufferedRawItems.push(value.item as RawResponseItem);
+        bufferedRawItems.push(value.item as ResponseItem);
         return;
       }
-      queueRawItemWrite(value.item as RawResponseItem);
+      queueRawItemWrite(value.item as ResponseItem);
     };
 
     const onItemCompleted = (params: ItemCompletedNotification) => {
@@ -331,7 +331,7 @@ function appendTurnEvent(
   parentId: string,
   type: "turn_completed" | "turn_failed" | "turn_aborted",
   payload: Record<string, unknown>,
-): Promise<RolloutEntry> {
+): Promise<EventLine> {
   return store.appendEventMsg(parentId, {
     type,
     ...payload,

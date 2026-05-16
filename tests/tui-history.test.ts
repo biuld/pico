@@ -80,7 +80,7 @@ test("history keeps direct turn history as siblings and selection moves only acr
   });
   const leftDone = await store.appendTurnCompleted(leftItem.id, leftTurn.id);
 
-  store.checkout(rootLeaf);
+  store.backtrack(rootLeaf);
   const rightTurn = await store.appendTurn(rootLeaf, "right prompt");
   const rightItem = await store.appendResponseItem(rightTurn.id, rightTurn.id, {
     role: "assistant",

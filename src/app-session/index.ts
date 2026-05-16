@@ -7,7 +7,7 @@ import type {
   TurnFailedEvent,
 } from "../app/types";
 import type { JSONRPCRequest } from "../codex/app-server";
-import { PicoThreadStore, type PicoThreadInfo, type RawResponseItem } from "../thread/store";
+import { PicoThreadStore, type PicoThreadInfo, type ResponseItem } from "../thread/store";
 import {
   PICO_APP_SESSION_EVENTS,
   type PicoAppSessionEventArgs,
@@ -427,7 +427,7 @@ export class PicoAppSession extends EventEmitter {
   }
 }
 
-function rawResponseItemHasOutputText(item: RawResponseItem): boolean {
+function rawResponseItemHasOutputText(item: ResponseItem): boolean {
   if (item.type !== "message") return false;
   const content = item.content;
   return Array.isArray(content) && content.some((part) => {

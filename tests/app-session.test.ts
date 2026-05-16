@@ -166,8 +166,8 @@ test("app session drains queued follow-up messages after a turn finishes", async
   expect(queueCounts).toEqual([1, 1, 0]);
   expect(appSession.snapshot.queuedMessages).toEqual([]);
   expect(
-    store.allEntries
-      .map((entry) => entryUserText(entry))
+    store.lines
+      .map((line) => entryUserText(line))
       .filter(Boolean),
   ).toEqual(["first", "third"]);
 });
@@ -245,7 +245,7 @@ test("app session interrupts the active codex turn", async () => {
     { threadId: "thread-1", turnId: "codex-turn-interrupt" },
   ]);
   expect(appSession.snapshot.running).toBe(false);
-  expect(store.allEntries.at(-1)?.item).toMatchObject({
+  expect(store.lines.at(-1)).toMatchObject({
     type: "event_msg",
     payload: { type: "turn_aborted" },
   });
@@ -323,8 +323,8 @@ test("app session sends the queued follow-up after interrupting the active turn"
 
   expect(appSession.snapshot.queuedMessages).toEqual([]);
   expect(
-    store.allEntries
-      .map((entry) => entryUserText(entry))
+    store.lines
+      .map((line) => entryUserText(line))
       .filter(Boolean),
   ).toEqual(["first", "queued"]);
 });

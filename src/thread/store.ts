@@ -20,7 +20,6 @@ import type {
   PicoConfigSnapshot,
   PicoLine,
   PicoThreadInfo,
-  RolloutEntry,
   RolloutLine,
   SessionMeta,
   TurnOverrides,
@@ -33,43 +32,18 @@ import {
 
 // ── Re-exported types ──────────────────────────────────────
 export type {
+  BranchOut,
+  EventLine,
   PicoConfigSnapshot,
-  PicoThreadEntry,
-  PicoThreadHeader,
+  PicoLine,
   PicoThreadInfo,
-  RawResponseItem,
-  RolloutEntry,
-  RolloutItem,
+  RolloutLine,
   TurnOverrides,
   TurnStatus,
   UserInputResponseItem,
 } from "./types";
-/** Loose type for backward compat — consumers access arbitrary properties on items. */
+/** Loose type for consumers that access arbitrary properties on items. */
 export type ResponseItem = Record<string, unknown>;
-
-// ── PicoLine → backward‑compat RolloutEntry ────────────────
-
-function toCompatEntry(line: PicoLine): RolloutEntry {
-  if (line.type === "branch_out") {
-    return {
-      id: line.id,
-      parentId: line.parent,
-      timestamp: "",
-      item: { type: "branch_out", payload: undefined as unknown },
-    };
-  }
-  // RolloutLine (session_meta / response_item) or EventLine (event_msg)
-  const parentId = "parent" in line ? (line.parent ?? null) : null;
-  return {
-    id: line.id,
-    parentId,
-    timestamp: line.timestamp,
-    item: {
-      type: line.type,
-      payload: ("payload" in line ? line.payload : undefined) as unknown,
-    },
-  };
-}
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -89,7 +63,6 @@ export class PicoThreadStore {
   sessionMeta!: SessionMeta;
   private _leafId = "";
   private filePath = "";
-  private _entriesCache: RolloutEntry[] | null = null;
 
   // ── private constructor ──
 
@@ -235,26 +208,11 @@ export class PicoThreadStore {
     return this.filePath;
   }
 
-  /**
-   * Returns all lines converted to the backward‑compat RolloutEntry format
-   * used by consumer modules (history, transcript, etc.).
-   */
-  get allEntries(): readonly RolloutEntry[] {
-    if (!this._entriesCache) {
-      this._entriesCache = this.lines.map(toCompatEntry);
-    }
-    return this._entriesCache;
-  }
-
   // ── Navigation ──
 
   backtrack(lineId: string): void {
     if (!this.lineIds.has(lineId)) throw new Error(`Line not found: ${lineId}`);
     this._leafId = lineId;
-  }
-
-  checkout(entryId: string): void {
-    this.backtrack(entryId);
   }
 
   // ── Append operations ──
@@ -263,7 +221,7 @@ export class PicoThreadStore {
     parentId: string,
     responseItem: ResponseItem | string,
     maybeResponseItem?: ResponseItem,
-  ): Promise<RolloutEntry> {
+  ): Promise<RolloutLine> {
     const payload = maybeResponseItem || responseItem;
     if (typeof payload === "string") {
       throw new Error("Invalid response_item payload");
@@ -277,14 +235,14 @@ export class PicoThreadStore {
     };
     this.addLine(line);
     await appendJsonlLine(this.filePath, line);
-    return toCompatEntry(line);
+    return line;
   }
 
   async appendUserInput(
     parentId: string,
     text: string,
     overrides: TurnOverrides = {},
-  ): Promise<RolloutEntry> {
+  ): Promise<RolloutLine> {
     const id = uuidV7();
     const timestamp = now();
     const payload = userInputResponseItem(id, text, timestamp, {
@@ -300,7 +258,7 @@ export class PicoThreadStore {
     };
     this.addLine(line);
     await appendJsonlLine(this.filePath, line);
-    return toCompatEntry(line);
+    return line;
   }
 
   /** @deprecated Use appendUserInput */
@@ -308,7 +266,7 @@ export class PicoThreadStore {
     parentId: string,
     userInput: string,
     overrides: TurnOverrides = {},
-  ): Promise<RolloutEntry> {
+  ): Promise<RolloutLine> {
     return this.appendUserInput(parentId, userInput, overrides);
   }
 
@@ -316,11 +274,11 @@ export class PicoThreadStore {
     parentId: string,
     _turnId: string,
     responseItem: ResponseItem,
-  ): Promise<RolloutEntry> {
+  ): Promise<RolloutLine> {
     return this.appendResponseItem(parentId, responseItem);
   }
 
-  async appendEventMsg(parentId: string, payload: unknown): Promise<RolloutEntry> {
+  async appendEventMsg(parentId: string, payload: unknown): Promise<EventLine> {
     const line: EventLine = {
       id: uuidV7(),
       parent: parentId,
@@ -330,14 +288,14 @@ export class PicoThreadStore {
     };
     this.addLine(line);
     await appendJsonlLine(this.filePath, line);
-    return toCompatEntry(line);
+    return line;
   }
 
   async appendTurnCompleted(
     parentId: string,
     turnId: string,
     result?: unknown,
-  ): Promise<RolloutEntry> {
+  ): Promise<EventLine> {
     return this.appendEventMsg(parentId, {
       type: "turn_completed",
       turnId,
@@ -350,7 +308,7 @@ export class PicoThreadStore {
     parentId: string,
     turnId: string,
     error: Error | string,
-  ): Promise<RolloutEntry> {
+  ): Promise<EventLine> {
     return this.appendEventMsg(parentId, {
       type: "turn_failed",
       turnId,
@@ -363,7 +321,7 @@ export class PicoThreadStore {
     parentId: string,
     turnId: string,
     reason?: string,
-  ): Promise<RolloutEntry> {
+  ): Promise<EventLine> {
     return this.appendEventMsg(parentId, {
       type: "turn_aborted",
       turnId,
@@ -409,16 +367,15 @@ export class PicoThreadStore {
     return branch.id;
   }
 
-  async appendBranch(targetId: string): Promise<RolloutEntry> {
+  async appendBranch(targetId: string): Promise<BranchOut> {
     this.backtrack(targetId);
-    const branch = await this.appendBranchOut(targetId);
-    return toCompatEntry(branch);
+    return this.appendBranchOut(targetId);
   }
 
   // ── Path operations ──
 
-  getPathEntries(leafId: string = this._leafId): RolloutEntry[] {
-    return threadGetPathEntries(this.sessionMeta.id, this.lines, leafId).map(toCompatEntry);
+  getPathEntries(leafId: string = this._leafId): PicoLine[] {
+    return threadGetPathEntries(this.sessionMeta.id, this.lines, leafId);
   }
 
   linearizeForCodex(leafId: string = this._leafId): unknown[] {
@@ -434,8 +391,8 @@ export class PicoThreadStore {
 
   // ── Query ──
 
-  childrenOf(parentId: string): RolloutEntry[] {
-    return threadChildrenOf(this.lines, parentId).map(toCompatEntry);
+  childrenOf(parentId: string): PicoLine[] {
+    return threadChildrenOf(this.lines, parentId);
   }
 
   collectInjectItems(leafId: string = this._leafId): ResponseItem[] {
@@ -461,7 +418,6 @@ export class PicoThreadStore {
     this.lineIds.add(line.id);
     this.lines.push(line);
     this._leafId = line.id;
-    this._entriesCache = null;
   }
 
   private lineById(id: string): PicoLine | undefined {
@@ -508,12 +464,12 @@ export function userTextFromResponseItem(item: ResponseItem): string | undefined
 }
 
 /**
- * Extract user text from a backward‑compat RolloutEntry.
- * Returns undefined if the entry is not a user input.
+ * Extract user text from a PicoLine.
+ * Returns undefined if the line is not a user input.
  */
-export function entryUserText(entry: RolloutEntry): string | undefined {
-  if (entry.item.type !== "response_item") return undefined;
-  const payload = entry.item.payload;
+export function entryUserText(line: PicoLine): string | undefined {
+  if (line.type !== "response_item") return undefined;
+  const payload = line.payload;
   if (!payload || typeof payload !== "object") return undefined;
   const obj = payload as Record<string, unknown>;
   const isUser =

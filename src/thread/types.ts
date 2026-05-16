@@ -82,21 +82,4 @@ export interface UserInputResponseItem {
   pico?: { kind: "user_input"; status?: TurnStatus; overrides?: TurnOverrides; cwd?: string };
 }
 
-// === Backward-compat types (compiled against by import code, history, etc.) ===
-
-export type RolloutEntryItem =
-  | { type: "response_item"; payload: any }
-  | { type: "branch_out" }
-  | { type: "event_msg"; payload: any }
-  | { type: string; payload?: any };
-
-export interface RolloutEntry {
-  id: string;
-  parentId: string | null;
-  timestamp: string;
-  item: RolloutEntryItem;
-}
-
-export type PicoThreadEntry = RolloutEntry;
-export type RawResponseItem = ResponseItem;
 

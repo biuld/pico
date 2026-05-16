@@ -61,7 +61,7 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
     await finished;
 
     expect(session.snapshot.running).toBe(false);
-    expect(store.allEntries.at(-1)?.item).toMatchObject({
+    expect(store.lines.at(-1)).toMatchObject({
       type: "event_msg",
       payload: { type: "turn_aborted", reason: "interrupted by test" },
     });

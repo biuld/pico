@@ -8,7 +8,6 @@ import type {
   TurnStartedEvent,
 } from "../app/types";
 import type { CodexStatusSnapshot, JSONRPCRequest } from "../codex/app-server";
-import type { RolloutEntry } from "../thread/store";
 
 export const PICO_APP_SESSION_EVENTS = {
   APP_CHANGED: "app:changed",
@@ -40,7 +39,7 @@ export type PicoAppSessionEventName =
 export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.APP_CHANGED]: DraftAppState;
   [PICO_APP_SESSION_EVENTS.CODEX_STATUS]: CodexStatusSnapshot;
-  [PICO_APP_SESSION_EVENTS.THREAD_BRANCHED]: RolloutEntry | { id: string; targetId: string };
+  [PICO_APP_SESSION_EVENTS.THREAD_BRANCHED]: { id: string; targetId: string } | { id: string; parentId: string | null; timestamp: string; item: Record<string, unknown> };
   [PICO_APP_SESSION_EVENTS.THREAD_LOADED]: { threadId: string };
   [PICO_APP_SESSION_EVENTS.TURN_BUSY]: void;
   [PICO_APP_SESSION_EVENTS.TURN_SUBMITTING]: void;

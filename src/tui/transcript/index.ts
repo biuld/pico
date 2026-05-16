@@ -27,6 +27,3 @@ export {
   buildTranscriptCells,
   buildTranscriptCellsWithLive,
 } from "./model";
-export {
-  transcriptCellsForResponseItem,
-} from "./response-item";

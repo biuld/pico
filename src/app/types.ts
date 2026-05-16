@@ -1,15 +1,15 @@
 import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
-import type { CodexThreadState, ResponseItem, TurnOverrides } from "./codex-thread-state";
+import type { CodexThreadViewState, TurnOverrides } from "./codex-thread-view-state";
 
 export interface AppState {
-  store: CodexThreadState;
+  viewState: CodexThreadViewState;
   codex: CodexAppServerClient;
   cwd: string;
 }
 
 export interface DraftAppState {
-  store?: CodexThreadState;
+  viewState?: CodexThreadViewState;
   codex: CodexAppServerClient;
   cwd: string;
 }
@@ -18,17 +18,13 @@ export interface TurnResult {
   turnId: string;
   codexTurnId: string;
   status: "completed" | "aborted";
-  rawItemCount: number;
-  leafId: string;
   completed: unknown;
 }
 
 export interface TurnObserver {
-  onThreadChanged?(event: { type: string; leafId: string; [key: string]: unknown }): void;
   onTurnStarted?(event: TurnStartedEvent): void;
   onCodexTurnStarted?(event: TurnStartedEvent): void;
   onAssistantDelta?(event: AssistantDeltaEvent): void;
-  onRawItemCompleted?(event: RawItemEvent): void;
   onTurnCompleted?(event: TurnCompletedEvent): void;
   onTurnAborted?(event: TurnAbortedEvent): void;
   onTurnFailed?(event: TurnFailedEvent): void;
@@ -48,13 +44,6 @@ export interface AssistantDeltaEvent {
   threadId: string;
   turnId?: string;
   delta: string;
-}
-
-export interface RawItemEvent {
-  threadId: string;
-  turnId: string;
-  item: ResponseItem;
-  entryId?: string;
 }
 
 export interface TurnStartedEvent {

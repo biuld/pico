@@ -17,7 +17,7 @@ import {
 } from "../src/tui/widgets/pickers/resume";
 import { buildStatusLineRows } from "../src/tui/widgets/pickers/statusline";
 import { buildThemeRows } from "../src/tui/widgets/pickers/theme";
-import { createStore } from "./tui-test-helpers";
+import { createViewState } from "./tui-test-helpers";
 
 test("pager overlay anchors above the bottom pane", () => {
   expect(COMPOSER_OVERLAY_INSET).toBe(COMPOSER_HEIGHT);
@@ -123,8 +123,8 @@ test("bottom pane renders passive queued input and active approval content", () 
 });
 
 test("theme picker is a bottom-pane view", async () => {
-  const store = await createStore();
-  let state = createTuiState(store);
+  const viewState = await createViewState();
+  let state = createTuiState(viewState);
 
   state = updateTuiState(state, { type: "openTheme" });
   expect(state.bottomPane.activeView).toBe("themePicker");
@@ -140,25 +140,23 @@ test("theme picker is a bottom-pane view", async () => {
 });
 
 test("resume picker surface selects saved threads", async () => {
-  const store = await createStore();
+  const viewState = await createViewState();
   const threads = [
     {
-      id: store.id,
-      leafId: store.leafId,
-      cwd: store.cwd,
+      id: viewState.id,
+      cwd: viewState.cwd,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       preview: "hello",
       turnCount: 0,
-      responseItemCount: 0,
-    },
+          },
   ];
-  const rows = buildThreadRows(threads, store.id, store.id);
-  let state = createTuiState(store);
+  const rows = buildThreadRows(threads, viewState.id, viewState.id);
+  let state = createTuiState(viewState);
 
-  expect(rows.some((row) => row.id === store.id && row.isCurrent)).toBe(true);
+  expect(rows.some((row) => row.id === viewState.id && row.isCurrent)).toBe(true);
 
-  state = updateTuiState(state, { type: "openThreads", threadId: store.id });
+  state = updateTuiState(state, { type: "openThreads", threadId: viewState.id });
   expect(state.pickerSurface).toBe("resume");
 
   state = updateTuiState(state, {
@@ -166,7 +164,7 @@ test("resume picker surface selects saved threads", async () => {
     threadIds: rows.map((row) => row.id),
     viewportHeight: 4,
   });
-  expect(state.selectedThreadId).toBe(store.id);
+  expect(state.selectedThreadId).toBe(viewState.id);
 });
 
 test("resume picker keeps thread rows single-line and width bounded", () => {
@@ -179,8 +177,7 @@ test("resume picker keeps thread rows single-line and width bounded", () => {
     updatedAt: "2026-05-10T12:18:18.000Z",
     preview: "fallback",
     turnCount: 4,
-    responseItemCount: 192,
-  };
+      };
 
   const line = formatThreadRow(row, 72);
 
@@ -215,8 +212,7 @@ test("resume picker applies renderer width to rows", () => {
         updatedAt: "2026-05-10T12:18:18.000Z",
         preview: "fallback",
         turnCount: 4,
-        responseItemCount: 192,
-      },
+              },
     ],
     state,
     TUI_THEMES[0],
@@ -241,8 +237,7 @@ test("resume picker uses themed alternating row backgrounds", () => {
     updatedAt: "2026-05-10T12:18:18.000Z",
     preview: "fallback",
     turnCount: index,
-    responseItemCount: index + 10,
-  }));
+      }));
   const theme = TUI_THEMES[0];
 
   const view = buildResumePickerSurfaceView(rows, state, theme, 4, 80);
@@ -277,18 +272,14 @@ test("navigable bottom-pane and picker surfaces render rows without textual sele
       updatedAt: "2026-05-10T12:18:18.000Z",
       preview: "fallback",
       turnCount: 1,
-      responseItemCount: 2,
-    },
+          },
   ];
   const historyRows = [
     {
-      id: "entry-1",
-      turnId: "turn-1",
-      depth: 0,
+      id: "turn-1",
+      turnIndex: 0,
       isActive: true,
       isSelected: true,
-      userPrefix: "└── ",
-      summaryPrefix: "    ",
       userText: "restore this turn",
       agentSummary: "agent: summary",
       status: "completed" as const,

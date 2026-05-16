@@ -9,15 +9,15 @@ import {
   updateInput,
 } from "../src/tui/core/state";
 import { updateTuiState } from "../src/tui/core/update";
-import { createStore } from "./tui-test-helpers";
+import { createViewState, setMockTurns, mockUserMessageItem, mockAgentMessageItem } from "./tui-test-helpers";
 
 test("TUI state helpers keep surface state immutable", async () => {
-  const store = await createStore();
-  const state = createTuiState(store);
+  const viewState = await createViewState();
+  const state = createTuiState(viewState);
   const withInput = updateInput(state, "hello");
   const running = setTurnStatus(withInput, "running", "streaming");
   const scrolled = scrollTranscript(running, -10);
-  const inHistory = updateTuiState(scrolled, { type: "openHistory", leafId: store.leafId });
+  const inHistory = updateTuiState(scrolled, { type: "openHistory" });
 
   expect(state.bottomPane.draft).toBe("");
   expect(state.pickerSurface).toBe("none");
@@ -27,26 +27,39 @@ test("TUI state helpers keep surface state immutable", async () => {
   expect(inHistory.pickerSurface).toBe("history");
 });
 
-test("selection helpers move through visible history turn ids and keep scroll in view", async () => {
-  const store = await createStore();
-  const turnA = await store.appendUserInput(store.leafId, "A");
-  const itemA = await store.appendResponseItem(turnA.id, turnA.id, { text: "first" });
-  const doneA = await store.appendEventMsg(itemA.id, { type: "turn_completed", turnId: turnA.id });
-  const turnB = await store.appendUserInput(store.leafId, "B");
-  const itemB = await store.appendResponseItem(turnB.id, turnB.id, { text: "second" });
-  const doneB = await store.appendEventMsg(itemB.id, { type: "turn_completed", turnId: turnB.id });
+test("selection helpers move through flat turn list and keep scroll in view", async () => {
+  const viewState = await createViewState();
+  setMockTurns(viewState, [
+    {
+      id: "turn-1",
+      status: "completed",
+      items: [
+        mockUserMessageItem("u1", "A"),
+        mockAgentMessageItem("a1", "first"),
+      ],
+    },
+    {
+      id: "turn-2",
+      status: "completed",
+      items: [
+        mockUserMessageItem("u2", "B"),
+        mockAgentMessageItem("a2", "second"),
+      ],
+    },
+  ]);
 
-  const ids = buildHistoryTurnRows(store).map((row) => row.id);
-  let state = createTuiState(store);
-  state = moveSelection(state, ids, -100);
-  expect(state.selectedEntryId).toBe(doneA.id);
+  const total = buildHistoryTurnRows(viewState).length;
+  let state = createTuiState(viewState);
 
-  state = moveSelection(state, ids, 1);
-  expect(state.selectedEntryId).toBe(doneB.id);
+  state = moveSelection(state, total, -100);
+  expect(state.selectedTurnIndex).toBe(0);
 
-  state = moveSelection(state, ids, 100);
-  expect(state.selectedEntryId).toBe(doneB.id);
+  state = moveSelection(state, total, 1);
+  expect(state.selectedTurnIndex).toBe(1);
 
-  state = syncListScroll(state, ids, 1);
+  state = moveSelection(state, total, 100);
+  expect(state.selectedTurnIndex).toBe(1);
+
+  state = syncListScroll(state, total, 1);
   expect(state.historyScroll).toBeGreaterThan(0);
 });

@@ -1,4 +1,4 @@
-import type { CodexThreadState } from "../app/codex-thread-state";
+import type { CodexThreadViewState } from "../app/codex-thread-view-state";
 import type { TuiState } from "./core/state";
 
 export {
@@ -49,10 +49,11 @@ export {
   type TranscriptCell,
 } from "./transcript";
 
-export function formatStatusLine(store: CodexThreadState, state: TuiState): string {
-  const selected = state.selectedEntryId === store.leafId ? "leaf" : shortId(state.selectedEntryId);
+export function formatStatusLine(viewState: CodexThreadViewState, state: TuiState): string {
+  const turns = viewState.turns;
+  const selected = turns.length > 0 ? `turn ${state.selectedTurnIndex + 1}/${turns.length}` : "no turns";
   const message = state.bottomPane.statusMessage ? ` ${state.bottomPane.statusMessage}` : "";
-  return `pico ${shortId(store.id)} | ${state.bottomPane.turnStatus} | branch ${selected}${message}`;
+  return `pico ${shortId(viewState.id)} | ${state.bottomPane.turnStatus} | ${selected}${message}`;
 }
 
 function shortId(id: string): string {

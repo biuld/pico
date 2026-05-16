@@ -1,7 +1,7 @@
 import type { JSONRPCRequest } from "../../codex/app-server";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { DraftAppState } from "../../app/controller";
-import type { ThreadInfo } from "../../app/codex-thread-state";
+import type { ThreadInfo } from "../../app/codex-thread-view-state";
 import { buildBottomPanePanel } from "../surfaces/bottom-pane";
 import { filterSlashCommands } from "../commands";
 import { buildHistoryTurnRows } from "../history";
@@ -35,7 +35,6 @@ export interface RuntimeViewInput {
   threads: readonly ThreadInfo[];
   inputValue: string;
   streamingText: string;
-  liveLeafId?: string;
   pendingApproval?: JSONRPCRequest;
   queuedMessages?: readonly PendingInputPreviewMessage[];
   running: boolean;
@@ -56,17 +55,17 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   input.dispatch({ type: "syncStatusLine", total: STATUS_LINE_ITEMS.length });
 
   state = input.getState();
-  const store = input.app.store;
+  const viewState = input.app.viewState;
   const codexStatus = input.app.codex.statusSnapshot;
   const themeRows = buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection);
   const statusLineRows = buildStatusLineRows(
     state.statusLineItems,
     state.statusLineSelection,
-    (item) => statusLineItemValue(item, codexStatus, store),
+    (item) => statusLineItemValue(item, codexStatus, viewState),
   );
   const statusLinePreview = formatConfiguredStatusPreviewText(
     codexStatus,
-    store,
+    viewState,
     state.statusLineItems,
   );
   let bottomPanePanel = buildBottomPanePanel({
@@ -85,16 +84,15 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   const pickerViewportHeight = pickerSurfaceListViewportHeight(input.rendererHeight, bottomInset);
   const historyViewportHeight = Math.max(1, Math.floor(pickerViewportHeight / HISTORY_ROW_HEIGHT));
 
-  const selectedEntryId = state.selectedEntryId || store?.leafId || "";
-  const historyRows = store ? buildHistoryTurnRows(store, selectedEntryId) : [];
+  const historyRows = viewState ? buildHistoryTurnRows(viewState, state.selectedTurnIndex) : [];
   input.dispatch({
     type: "syncHistory",
-    entryIds: historyRows.map((row) => row.id),
+    total: historyRows.length,
     viewportHeight: historyViewportHeight,
   });
 
   state = input.getState();
-  const threadRows = buildThreadRows(input.threads, state.selectedThreadId, store?.id);
+  const threadRows = buildThreadRows(input.threads, state.selectedThreadId, viewState?.id ?? "");
   input.dispatch({
     type: "syncThreads",
     threadIds: threadRows.map((row) => row.id),
@@ -112,7 +110,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     statusLineRows: buildStatusLineRows(
       state.statusLineItems,
       state.statusLineSelection,
-      (item) => statusLineItemValue(item, codexStatus, store),
+      (item) => statusLineItemValue(item, codexStatus, viewState),
     ),
     statusLinePreview,
     rendererWidth: input.rendererWidth,
@@ -123,7 +121,6 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
   const transcriptCells = buildTranscriptCellsWithLive(
     input.app,
     input.streamingText,
-    input.liveLeafId,
     input.liveThreadItems,
   );
   const startupBannerVisible = transcriptCells.length === 0 &&
@@ -146,7 +143,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     startupBanner: buildStartupBannerState({
       visible: startupBannerVisible,
       codex: codexStatus,
-      cwd: store?.cwd || input.app.cwd,
+      cwd: viewState?.cwd || input.app.cwd,
       rendererWidth: input.rendererWidth,
     }),
     bottomPane: {
@@ -154,7 +151,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       transientStatus: formatTransientStatusLine(statusText),
       placeholder: formatComposerPlaceholder(state, input.placeholderFrame),
       statusLine: formatCodexStatusLineStyled({
-        store,
+        viewState,
         state,
         codex: codexStatus,
         items: state.statusLineItems,
@@ -174,7 +171,6 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
       app: input.app,
       state,
       streamingText: input.streamingText,
-      liveLeafId: input.liveLeafId,
     }),
   };
 }

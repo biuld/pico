@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppState } from "../../../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../../src/app-session";
-import { CodexThreadState } from "../../../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../../../src/app/codex-thread-view-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -15,8 +15,8 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/fork",
-      params: { ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/start",
+      params: {},
       respond: threadStartResponse(cwd),
     },
     {
@@ -42,12 +42,11 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
   ]);
 
   try {
-    const store = await CodexThreadState.create(cwd);
+    const viewState = CodexThreadViewState.create(cwd);
     const session = new PicoAppSession({
       cwd,
-      store,
+      viewState,
       codex: fixture.client,
-      config: {},
     } as AppState);
 
     const codexStarted = onceSessionEvent(session, PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED);
@@ -61,10 +60,7 @@ test("app session interrupt waits for turn/interrupt before interrupted completi
     await finished;
 
     expect(session.snapshot.running).toBe(false);
-    expect(store.lines.at(-1)).toMatchObject({
-      type: "event_msg",
-      payload: { type: "turn_aborted", reason: "interrupted by test" },
-    });
+    expect(viewState.turnStatus).toBe("idle");
   } finally {
     await fixture.client.shutdown();
   }

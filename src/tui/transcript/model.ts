@@ -1,200 +1,72 @@
 import type { DraftAppState } from "../../app/controller";
-import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
-import { entryUserText, type CodexThreadState } from "../../app/codex-thread-state";
+import type { ThreadItem, Turn } from "@pico/codex-app-server-protocol/v2";
+import { CodexThreadViewState } from "../../app/codex-thread-view-state";
 import {
   assistantMarkdownCell,
-  fileChangeCell,
-  systemNoticeCell,
   userMessageCell,
   type TranscriptCell,
-  type TranscriptToolBlock,
 } from "./cell";
-import { transcriptCellsForResponseItem } from "./response-item";
 import { threadItemToTranscriptCells } from "./thread-item";
 
 export function buildTranscriptCells(
-  store: CodexThreadState,
-  leafId = store.leafId,
+  viewState: CodexThreadViewState,
+  turnIndex?: number,
 ): TranscriptCell[] {
   const cells: TranscriptCell[] = [];
-  const pendingCalls = new Map<string, number>();
-  let currentUserCellIndex: number | undefined;
-  for (const entry of store.getPathEntries(leafId)) {
-    const userText = entryUserText(entry);
-    if (userText) {
-      pendingCalls.clear();
-      const pico = entry.type === "response_item"
-        ? (entry.payload as Record<string, unknown> | undefined)?.pico as Record<string, unknown> | undefined
-        : undefined;
-      const status = pico?.status === "started" ? "started" : "completed";
-      cells.push(userMessageCell(entry.id, userText, status));
-      currentUserCellIndex = cells.length - 1;
-      continue;
-    }
-    if (entry.type === "branch_out") continue;
-    if (entry.type === "response_item") {
-      appendTranscriptCells(cells, pendingCalls, transcriptCellsForResponseItem(entry.id, entry.payload as Record<string, unknown>));
-      continue;
-    }
-    if (entry.type === "event_msg" && entry.payload && typeof entry.payload === "object") {
-      const event = entry.payload as Record<string, unknown>;
-      if (event.type === "turn_completed" && currentUserCellIndex !== undefined) {
-        cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "completed" };
-        continue;
-      }
-      if (event.type === "turn_failed") {
-        if (currentUserCellIndex !== undefined) {
-          cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "failed" };
-        }
-        cells.push(systemNoticeCell(entry.id, String(event.error || "Turn failed"), "failed"));
-        continue;
-      }
-      if (event.type === "turn_aborted") {
-        if (currentUserCellIndex !== undefined) {
-          cells[currentUserCellIndex] = { ...cells[currentUserCellIndex], status: "aborted" };
-        }
-        cells.push(systemNoticeCell(entry.id, String(event.reason || "Turn aborted"), "aborted"));
-      }
-      if (event.type === "file_change") {
-        const path = typeof event.path === "string" ? event.path : undefined;
-        const diff = typeof event.diff === "string" ? event.diff : undefined;
-        if (diff) {
-          cells.push(fileChangeCell(entry.id, { path, diff, summary: undefined }));
-        }
-      }
+
+  // Always render cached turns first
+  const turns = viewState.turns;
+  const startIdx = turnIndex !== undefined ? turnIndex : 0;
+  const endIdx = turnIndex !== undefined ? turnIndex + 1 : turns.length;
+
+  for (let i = startIdx; i < endIdx && i < turns.length; i++) {
+    const turn = turns[i];
+    for (const item of turn.items) {
+      cells.push(...threadItemToTranscriptCells(item.id, item));
     }
   }
+
+  // Append live user input first (before live items and streaming)
+  if (viewState.liveUserInput) {
+    cells.push(userMessageCell("live-user", viewState.liveUserInput, "started"));
+  }
+
+  // Append live turn items
+  for (const item of viewState.liveTurnItems) {
+    cells.push(...threadItemToTranscriptCells(item.id, item));
+  }
+
+  // Append streaming text
+  if (viewState.streamingText) {
+    cells.push(assistantMarkdownCell("live", viewState.streamingText, { streaming: true }));
+  }
+
   return cells;
 }
 
 export function buildTranscriptCellsWithLive(
   app: DraftAppState,
   streamingText: string,
-  liveLeafId?: string,
   liveThreadItems?: readonly ThreadItem[],
 ): TranscriptCell[] {
-  // Live turn: render from ThreadItem (from item/completed).
-  // Resume: render from store (ResponseItem via transcriptCellsForResponseItem).
-  const cells: TranscriptCell[] = [];
-  if (liveThreadItems && liveThreadItems.length > 0) {
-    // Collect user messages from the store (ThreadItem doesn't include user input)
-    if (app.store) {
-      for (const entry of app.store.getPathEntries(liveLeafId || app.store.leafId)) {
-        const userText = entryUserText(entry);
-        if (userText) {
-          const pico = entry.type === "response_item"
-            ? (entry.payload as Record<string, unknown> | undefined)?.pico as Record<string, unknown> | undefined
-            : undefined;
-          cells.push(userMessageCell(entry.id, userText, pico?.status === "started" ? "started" : "completed"));
-        }
-      }
-    }
-    // Render ThreadItem cells
+  const viewState = app.viewState;
+  if (!viewState) return [];
+
+  // buildTranscriptCells handles everything: cached turns + live items + streaming
+  // liveThreadItems is kept for backward compat during migration
+  if (liveThreadItems && liveThreadItems.length > 0 && viewState.liveTurnItems.length === 0) {
+    // Migration path: live items from external source
     for (const item of liveThreadItems) {
-      cells.push(...threadItemToTranscriptCells(item.id, item));
+      viewState.addLiveItem(item);
     }
-  } else if (app.store) {
-    cells.push(...buildTranscriptCells(app.store, liveLeafId || app.store.leafId));
   }
-  if (streamingText.length > 0) {
+
+  const cells = buildTranscriptCells(viewState);
+
+  // Ensure streaming text is appended if not already handled
+  if (streamingText.length > 0 && !viewState.streamingText) {
     cells.push(assistantMarkdownCell("live", streamingText, { streaming: true }));
   }
+
   return cells;
-}
-
-function appendTranscriptCells(
-  cells: TranscriptCell[],
-  pendingCalls: Map<string, number>,
-  nextCells: readonly TranscriptCell[],
-): void {
-  for (const cell of nextCells) {
-    if (mergeToolOutputCell(cells, pendingCalls, cell)) continue;
-
-    const callId = pendingCallId(cell);
-    if (callId) pendingCalls.set(callId, cells.length);
-    cells.push(cell);
-  }
-}
-
-function mergeToolOutputCell(
-  cells: TranscriptCell[],
-  pendingCalls: Map<string, number>,
-  cell: TranscriptCell,
-): boolean {
-  if (cell.kind !== "tool_output") return false;
-
-  const outputBlock = cell.blocks.find((block): block is TranscriptToolBlock => block.type === "tool");
-  const callId = outputBlock?.payload.callId;
-  if (!callId) return false;
-
-  const targetIndex = pendingCalls.get(callId);
-  if (targetIndex === undefined) return false;
-
-  const target = cells[targetIndex];
-  const merged = mergeOutputIntoCell(target, outputBlock.payload.body, outputBlock.payload.status || cell.status);
-  if (!merged) return false;
-
-  cells[targetIndex] = merged;
-  return true;
-}
-
-function mergeOutputIntoCell(
-  cell: TranscriptCell,
-  output: string | undefined,
-  status: string | undefined,
-): TranscriptCell | undefined {
-  if (!output) return undefined;
-  const [firstBlock, ...restBlocks] = cell.blocks;
-  if (!firstBlock) return undefined;
-
-  if (firstBlock.type === "tool") {
-    return {
-      ...cell,
-      status: status || cell.status,
-      blocks: [
-        {
-          ...firstBlock,
-          payload: {
-            ...firstBlock.payload,
-            body: appendText(firstBlock.payload.body, output),
-            output: true,
-            status: status || firstBlock.payload.status,
-          },
-        },
-        ...restBlocks,
-      ],
-    };
-  }
-
-  if (firstBlock.type === "command") {
-    return {
-      ...cell,
-      status: status || cell.status,
-      blocks: [
-        {
-          ...firstBlock,
-          payload: {
-            ...firstBlock.payload,
-            output: appendText(firstBlock.payload.output, output),
-            status: status || firstBlock.payload.status,
-          },
-        },
-        ...restBlocks,
-      ],
-    };
-  }
-
-  return undefined;
-}
-
-function pendingCallId(cell: TranscriptCell): string | undefined {
-  const block = cell.blocks[0];
-  if (!block) return undefined;
-  if (cell.kind === "tool_call" && block.type === "tool") return block.payload.callId;
-  if (cell.kind === "command" && block.type === "command") return block.payload.callId;
-  return undefined;
-}
-
-function appendText(existing: string | undefined, next: string): string {
-  return existing ? `${existing}\n${next}` : next;
 }

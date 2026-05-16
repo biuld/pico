@@ -5,10 +5,7 @@ import {
   sendManualMockCommand,
   startManualMockCodexClient,
 } from "../../../tools/codex-app-server/test-client";
-import {
-  assistantMessage,
-  createTempProject,
-} from "./scenario-helpers";
+import { createTempProject } from "./scenario-helpers";
 
 test("manual mock control API can drive an active turn to completion", async () => {
   const { cwd } = await createTempProject();
@@ -16,17 +13,12 @@ test("manual mock control API can drive an active turn to completion", async () 
 
   try {
     const deltas: string[] = [];
-    const rawItems: unknown[] = [];
     fixture.client.on("item/agentMessage/delta", (params) => {
       const value = params as Record<string, unknown>;
       if (typeof value.delta === "string") deltas.push(value.delta);
     });
-    fixture.client.on("rawResponseItem/completed", (params) => {
-      const value = params as Record<string, unknown>;
-      rawItems.push(value.item);
-    });
 
-    const thread = await fixture.client.startEphemeralThread({ cwd });
+    const thread = await fixture.client.startThread({ cwd });
     const turn = await fixture.client.startTurn(thread.thread.id, "manual");
     const completed = fixture.client.waitForTurnCompleted(thread.thread.id, turn.turn.id);
 
@@ -42,7 +34,6 @@ test("manual mock control API can drive an active turn to completion", async () 
       status: "completed",
     });
     expect(deltas).toEqual(["manual hello"]);
-    expect(rawItems).toEqual([assistantMessage("manual-output", "manual hello")]);
   } finally {
     await fixture.client.shutdown();
   }
@@ -93,7 +84,6 @@ test("manual mock playbook can auto-complete a turn with sampled response items"
   try {
     const events: string[] = [];
     const deltas: string[] = [];
-    const rawItems: Array<Record<string, unknown>> = [];
     const approvalRequests: JSONRPCRequest[] = [];
     fixture.client.on("serverRequest", (request: JSONRPCRequest) => {
       events.push("approval");
@@ -105,15 +95,7 @@ test("manual mock playbook can auto-complete a turn with sampled response items"
       const value = params as Record<string, unknown>;
       if (typeof value.delta === "string") deltas.push(value.delta);
     });
-    fixture.client.on("rawResponseItem/completed", (params) => {
-      events.push("raw");
-      const value = params as Record<string, unknown>;
-      if (value.item && typeof value.item === "object") {
-        rawItems.push(value.item as Record<string, unknown>);
-      }
-    });
-
-    const thread = await fixture.client.startEphemeralThread({ cwd });
+    const thread = await fixture.client.startThread({ cwd });
     const turn = await fixture.client.startTurn(thread.thread.id, "sample a mock answer");
     await expect(fixture.client.waitForTurnCompleted(thread.thread.id, turn.turn.id))
       .resolves.toMatchObject({ status: "completed" });
@@ -129,7 +111,6 @@ test("manual mock playbook can auto-complete a turn with sampled response items"
       },
     });
     expect(deltas.join("").length).toBeGreaterThan(0);
-    expect(rawItems.some((item) => item.type === "message")).toBe(true);
 
     await waitFor(async () => {
       const state = await readManualMockState(fixture.control);
@@ -155,11 +136,7 @@ test("manual mock playbook stops when approval is declined", async () => {
     fixture.client.on("item/agentMessage/delta", () => {
       events.push("delta");
     });
-    fixture.client.on("rawResponseItem/completed", () => {
-      events.push("raw");
-    });
-
-    const thread = await fixture.client.startEphemeralThread({ cwd });
+    const thread = await fixture.client.startThread({ cwd });
     const turn = await fixture.client.startTurn(thread.thread.id, "sample a mock answer");
     await expect(fixture.client.waitForTurnCompleted(thread.thread.id, turn.turn.id))
       .resolves.toMatchObject({

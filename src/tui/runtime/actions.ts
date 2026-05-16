@@ -1,7 +1,7 @@
 import type { CliRenderer } from "@opentui/core";
 import { PicoAppSession } from "../../app-session";
 import { picoConfig } from "../../config";
-import type { ThreadInfo } from "../../app/codex-thread-state";
+import type { ThreadInfo } from "../../app/codex-thread-view-state";
 import {
   filterSlashCommands,
   parseTuiInput,
@@ -35,7 +35,7 @@ export interface RuntimeActions {
   queueDraft(text: string): void;
   recallQueuedDraft(): void;
   interruptTurn(): void;
-  restoreSelected(): Promise<void>;
+  selectHistoryTurn(): Promise<void>;
   resumeSelected(): Promise<void>;
   handleLocalCommand(command: TuiInputCommand): Promise<boolean>;
   acceptSlashSelection(): Promise<void>;
@@ -89,27 +89,16 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
   };
 
   const showHistory = () => {
-    const app = host.appSession.app;
-    if (!app.store) {
-      host.dispatch({ type: "openHistory", leafId: "" });
-      host.layout.blurInput();
-      host.render();
-      return;
-    }
-
-    host.dispatch({
-      type: "openHistory",
-      leafId: historySelectionTargetId(app.store) || app.store.id,
-    });
+    host.dispatch({ type: "openHistory" });
     host.layout.blurInput();
     host.render();
   };
 
   const showThreads = async () => {
     const app = host.appSession.app;
-    const threads = await PicoAppSession.listThreads(app.store?.cwd || app.cwd);
+    const threads = await PicoAppSession.listThreads(app.viewState?.cwd || app.cwd);
     host.setThreads(threads);
-    host.dispatch({ type: "openThreads", threadId: app.store?.id || threads[0]?.id || "" });
+    host.dispatch({ type: "openThreads", threadId: app.viewState?.id || threads[0]?.id || "" });
     host.layout.blurInput();
     host.render();
   };
@@ -147,7 +136,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
   const moveHistorySelection = (delta: number) => {
     const app = host.appSession.app;
     const state = host.getState();
-    if (!app.store) {
+    if (!app.viewState?.turns.length) {
       host.dispatch({
         type: "setTurnStatus",
         status: state.bottomPane.turnStatus,
@@ -157,10 +146,10 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       return;
     }
 
-    const rows = buildHistoryTurnRows(app.store, state.selectedEntryId);
+    const rows = buildHistoryTurnRows(app.viewState!, state.selectedTurnIndex);
     host.dispatch({
       type: "moveHistory",
-      entryIds: rows.map((row) => row.id),
+      total: rows.length,
       delta,
       viewportHeight: Math.max(
         1,
@@ -173,7 +162,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
   const moveThreadSelection = (delta: number) => {
     const app = host.appSession.app;
     const state = host.getState();
-    const rows = buildThreadRows(host.getThreads(), state.selectedThreadId, app.store?.id);
+    const rows = buildThreadRows(host.getThreads(), state.selectedThreadId, app.viewState?.id);
     host.dispatch({
       type: "moveThread",
       threadIds: rows.map((row) => row.id),
@@ -283,36 +272,16 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     host.render();
   };
 
-  const restoreSelected = async () => {
-    if (busyGuard()) return;
-
-    const app = host.appSession.app;
-    const state = host.getState();
-    if (!app.store) {
-      host.dispatch({
-        type: "setTurnStatus",
-        status: state.bottomPane.turnStatus,
-        message: "no turns yet",
-      });
-      host.render();
-      return;
-    }
-
-    const rows = buildHistoryTurnRows(app.store, state.selectedEntryId);
-    const selected = rows.find((row) => row.id === state.selectedEntryId);
-    if (!selected) {
-      host.dispatch({
-        type: "setTurnStatus",
-        status: state.bottomPane.turnStatus,
-        message: "no turns yet",
-      });
-      host.render();
-      return;
-    }
-
-    const branch = await host.appSession.restore(selected.id);
-    host.dispatch({ type: "restoreCompleted", branchId: branch.id, targetId: branch.targetId });
+  const selectHistoryTurn = async () => {
+    // History is read-only — selecting a turn changes what's displayed,
+    // not the execution context. Next input always appends to current thread.
+    host.dispatch({
+      type: "setTurnStatus",
+      status: "idle",
+      message: `viewing turn ${host.getState().selectedTurnIndex + 1}`,
+    });
     setComposerFocus();
+    host.render();
   };
 
   const resumeSelected = async () => {
@@ -320,14 +289,14 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
 
     const app = host.appSession.app;
     const threadId = host.getState().selectedThreadId;
-    if (!threadId || threadId === app.store?.id) {
+    if (!threadId || threadId === app.viewState?.id) {
       setComposerFocus();
       return;
     }
 
     await host.appSession.resume(threadId);
     const nextApp = host.appSession.app;
-    host.setState(createTuiState(nextApp.store));
+    host.setState(createTuiState(nextApp.viewState));
     host.dispatch({ type: "resumeCompleted", threadId });
     setInputValue("");
     host.layout.focusInput();
@@ -362,8 +331,8 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       host.dispatch({
         type: "setTurnStatus",
         status: host.getState().bottomPane.turnStatus,
-        message: app.store
-          ? `thread ${shortId(app.store.id)} leaf ${shortId(app.store.leafId)}`
+        message: app.viewState
+          ? `thread ${shortId(app.viewState.id)}`
           : "thread new",
       });
       host.render();
@@ -429,7 +398,7 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
     queueDraft,
     recallQueuedDraft,
     interruptTurn,
-    restoreSelected,
+    selectHistoryTurn,
     resumeSelected,
     handleLocalCommand,
     acceptSlashSelection,

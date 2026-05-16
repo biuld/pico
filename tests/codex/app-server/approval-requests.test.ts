@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { CodexThreadState } from "../../../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../../../src/app/codex-thread-view-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -13,8 +13,8 @@ test("runTurn resolves approval server requests over stdio", async () => {
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/fork",
-      params: { ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/start",
+      params: {},
       respond: threadStartResponse(cwd),
     },
     {
@@ -36,9 +36,9 @@ test("runTurn resolves approval server requests over stdio", async () => {
   ]);
 
   try {
-    const store = await CodexThreadState.create(cwd);
+    const viewState = CodexThreadViewState.create(cwd);
     await runTurn(
-      { cwd, store, codex: fixture.client, config: {} } as AppState,
+      { cwd, viewState, codex: fixture.client } as AppState,
       "needs approval",
       async () => ({ decision: "approve" }),
     );

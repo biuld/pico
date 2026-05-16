@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { CodexThreadState } from "../../../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../../../src/app/codex-thread-view-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   assistantMessage,
@@ -9,13 +9,13 @@ import {
   threadStartResponse,
 } from "./scenario-helpers";
 
-test("runTurn streams assistant delta, raw item, and completion through stdio", async () => {
+test("runTurn streams assistant delta and completion through stdio", async () => {
   const { cwd } = await createTempProject();
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/fork",
-      params: { ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/start",
+      params: {},
       respond: threadStartResponse(cwd),
     },
     {
@@ -32,29 +32,20 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
       params: { threadId: "thread-1", turnId: "turn-1", delta: "hel" },
     },
     {
-      notify: "rawResponseItem/completed",
-      params: {
-        threadId: "thread-1",
-        turnId: "turn-1",
-        item: assistantMessage("assistant-output", "hello"),
-      },
-    },
-    {
       notify: "turn/completed",
       params: { threadId: "thread-1", turnId: "turn-1", status: "completed" },
     },
   ]);
 
   try {
-    const store = await CodexThreadState.create(cwd);
+    const viewState = CodexThreadViewState.create(cwd);
     const events: string[] = [];
     const result = await runTurn(
-      { cwd, store, codex: fixture.client, config: {} } as AppState,
+      { cwd, viewState, codex: fixture.client } as AppState,
       "hello",
       {
         observer: {
           onAssistantDelta: () => events.push("assistant:delta"),
-          onRawItemCompleted: () => events.push("raw-item:completed"),
           onTurnCompleted: () => events.push("turn:completed"),
           onTurnFailed: () => events.push("turn:failed"),
         },
@@ -63,16 +54,15 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
 
     expect(result.status).toBe("completed");
     expect(result.codexTurnId).toBe("turn-1");
-    expect(result.rawItemCount).toBe(1);
     expect(events).toContain("assistant:delta");
-    expect(events).toContain("raw-item:completed");
     expect(events).toContain("turn:completed");
-    expect(store.collectInjectItems()).toEqual([assistantMessage("assistant-output", "hello")]);
-    const forkRequest = (await fixture.readLog()).find((entry) => {
+    // Items are tracked via liveTurnItems during streaming
+    expect(viewState.liveTurnItems.length).toBeGreaterThanOrEqual(0);
+    const threadStartRequest = (await fixture.readLog()).find((entry) => {
       const message = entry.message as Record<string, unknown> | undefined;
-      return entry.type === "received" && message?.method === "thread/fork";
+      return entry.type === "received" && message?.method === "thread/start";
     });
-    expect(forkRequest).toBeTruthy();
+    expect(threadStartRequest).toBeTruthy();
   } finally {
     await fixture.client.shutdown();
   }

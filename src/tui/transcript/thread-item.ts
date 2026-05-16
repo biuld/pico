@@ -7,11 +7,20 @@ import {
   reasoningCell,
   systemNoticeCell,
   toolCallCell,
+  userMessageCell,
   type TranscriptCell,
 } from "./cell";
 
 export function threadItemToTranscriptCells(id: string, item: ThreadItem): TranscriptCell[] {
   switch (item.type) {
+    case "userMessage": {
+      const text = item.content
+        .map((p) => (typeof p === "object" && p && "text" in p ? (p as { text: string }).text : ""))
+        .filter(Boolean)
+        .join(" ");
+      return text ? [userMessageCell(id, text)] : [];
+    }
+
     case "agentMessage":
       return item.text ? [assistantMarkdownCell(id, item.text)] : [];
 

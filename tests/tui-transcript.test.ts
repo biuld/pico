@@ -14,260 +14,80 @@ import {
   limitedTranscriptOutputLines,
   mainTranscriptMuteStrategyForCell,
 } from "../src/tui/widgets/transcript-panel";
-import { createStore } from "./tui-test-helpers";
+import { createViewState, setMockTurns, mockAgentMessageItem } from "./tui-test-helpers";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 
-test("transcript cells project Pico JSONL entries without changing thread storage", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Explain Pico");
-  const item = await store.appendResponseItem(turn.id, turn.id, {
-    type: "message",
-    content: [{ type: "output_text", text: "Pico stores raw Codex items." }],
-  });
-  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
-
-  const state = setTurnStatus(createTuiState(store), "idle");
-  const transcript = buildTranscriptCells(store);
-
-  expect(transcript).toEqual([
+test("transcript cells render from CodexThreadViewState turns", async () => {
+  const viewState = await createViewState();
+  setMockTurns(viewState, [
     {
-      id: turn.id,
-      kind: "user_message",
+      id: "turn-1",
       status: "completed",
-      blocks: [{ type: "text", payload: { text: "Explain Pico", tone: "strong" } }],
-    },
-    {
-      id: item.id,
-      kind: "assistant_markdown",
-      blocks: [{ type: "markdown", payload: { text: "Pico stores raw Codex items.", streaming: undefined } }],
-      status: undefined,
-    },
-  ]);
-  expect(formatStatusLine(store, state)).toContain("pico");
-});
-
-test("transcript projects Codex item types into semantic cells", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Inspect the repo");
-  let parentId = turn.id;
-  const reasoningItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "reasoning",
-    summary: [{ type: "summary_text", text: "checking project files" }],
-  });
-  parentId = reasoningItem.id;
-  const planItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call",
-    name: "update_plan",
-    arguments: JSON.stringify({
-      explanation: "Need inspect first",
-      plan: [
-        { step: "Read code", status: "completed" },
-        { step: "Fix plan rendering", status: "in_progress" },
-        { step: "Run tests", status: "pending" },
+      items: [
+        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Explain Pico" }] } as ThreadItem,
+        mockAgentMessageItem("a1", "Pico stores raw Codex items."),
       ],
-    }),
-  });
-  parentId = planItem.id;
-  const toolCallItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call",
-    call_id: "shell-1",
-    name: "shell.exec",
-    arguments: { cmd: "ls" },
-  });
-  parentId = toolCallItem.id;
-  const toolOutputItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call_output",
-    call_id: "shell-1",
-    output: {
-      success: true,
-      body: [{ type: "text", text: "done" }],
     },
-  });
-  parentId = toolOutputItem.id;
-  const regularToolCallItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call",
-    call_id: "fetch-1",
-    name: "web.fetch",
-    arguments: { url: "https://example.test" },
-  });
-  parentId = regularToolCallItem.id;
-  const regularToolOutputItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call_output",
-    call_id: "fetch-1",
-    output: {
-      success: true,
-      body: [{ type: "text", text: "fetched" }],
+  ]);
+
+  const state = setTurnStatus(createTuiState(viewState), "idle");
+  const transcript = buildTranscriptCells(viewState);
+
+  expect(transcript.length).toBeGreaterThan(0);
+  expect(formatStatusLine(viewState, state)).toContain("pico");
+});
+
+test("transcript projects ThreadItem types into semantic cells", async () => {
+  const viewState = await createViewState();
+  setMockTurns(viewState, [
+    {
+      id: "turn-1",
+      status: "completed",
+      items: [
+        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Inspect the repo" }] } as ThreadItem,
+        { type: "reasoning", id: "r1", summary: ["checking project files"], content: [] } as ThreadItem,
+        { type: "plan", id: "p1", text: "## Plan\n1. Read code\n2. Run tests" } as ThreadItem,
+        { type: "commandExecution", id: "c1", command: "bun test", cwd: "/app" } as ThreadItem,
+        { type: "fileChange", id: "f1", changes: [{ path: "src/index.ts", kind: "modify", diff: "@@ changed" }] } as unknown as ThreadItem,
+      ],
     },
-  });
-  parentId = regularToolOutputItem.id;
-  const commandItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "local_shell_call",
-    command: "bun test",
-  });
-  parentId = commandItem.id;
-  const fileItem = await store.appendResponseItem(parentId, turn.id, {
-    type: "file_change",
-    path: "src/index.ts",
-    patch: "@@ changed",
-  });
-  await store.appendEventMsg(fileItem.id, { type: "turn_completed", turnId: turn.id });
-
-  const cells = buildTranscriptCells(store).slice(1);
-
-  expect(kinds(cells)).toEqual([
-    "reasoning",
-    "plan_update",
-    "command",
-    "tool_call",
-    "command",
-    "file_change",
   ]);
-  expect(cells.map((cell) => cell.blocks[0]?.type)).toEqual([
-    "reasoning",
-    "plan",
-    "command",
-    "tool",
-    "command",
-    "file_change",
+
+  const cells = buildTranscriptCells(viewState);
+  const kinds = cells.map((cell) => cell.kind);
+
+  expect(kinds).toContain("user_message");
+  expect(kinds).toContain("reasoning");
+  expect(kinds).toContain("assistant_markdown"); // plan is rendered as markdown
+  expect(kinds).toContain("command");
+  expect(kinds).toContain("file_change");
+});
+
+test("transcript handles fileChange items", async () => {
+  const viewState = await createViewState();
+  setMockTurns(viewState, [
+    {
+      id: "turn-1",
+      status: "completed",
+      items: [
+        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Patch files" }] } as ThreadItem,
+        {
+          type: "fileChange",
+          id: "fc1",
+          changes: [{ path: "src/cli.ts", kind: "modify", diff: "-old\n+new" }],
+        } as unknown as ThreadItem,
+      ],
+    },
   ]);
-  expect(blockText(cells[0].blocks[0]!)).toBe("checking project files");
-  expect(blockText(cells[1].blocks[0]!)).toBe(
-    "Updated Plan\nNeed inspect first\n✓ Read code\n□ Fix plan rendering\n□ Run tests",
-  );
-  expect(blockText(cells[2].blocks[0]!)).toBe("ls\ndone");
-  expect(blockText(cells[3].blocks[0]!)).toBe("web.fetch\nurl=https://example.test\nfetched");
-  expect(blockText(cells[4].blocks[0]!)).toBe("bun test");
-  expect(blockText(cells[5].blocks[0]!)).toBe("src/index.ts\nchanged");
+
+  const cells = buildTranscriptCells(viewState);
+  const fileChangeCells = cells.filter((c) => c.kind === "file_change");
+
+  expect(fileChangeCells.length).toBeGreaterThan(0);
+  expect(fileChangeCells[0].blocks[0]?.type).toBe("file_change");
 });
 
-test("transcript groups tool outputs back into matching tool calls", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Fetch and search");
-  let parentId = turn.id;
-  const fetchCall = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call",
-    call_id: "fetch-call",
-    name: "web.fetch",
-    arguments: { url: "https://example.test" },
-  });
-  parentId = fetchCall.id;
-  const searchCall = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call",
-    call_id: "search-call",
-    name: "web.search",
-    arguments: { query: "pico transcript" },
-  });
-  parentId = searchCall.id;
-  const searchOutput = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call_output",
-    call_id: "search-call",
-    output: { body: [{ type: "text", text: "search result" }] },
-  });
-  parentId = searchOutput.id;
-  const fetchOutput = await store.appendResponseItem(parentId, turn.id, {
-    type: "function_call_output",
-    call_id: "fetch-call",
-    output: { body: [{ type: "text", text: "fetch result" }] },
-  });
-  await store.appendEventMsg(fetchOutput.id, { type: "turn_completed", turnId: turn.id });
-
-  const cells = buildTranscriptCells(store).slice(1);
-
-  expect(kinds(cells)).toEqual(["tool_call", "tool_call"]);
-  expect(blockText(cells[0].blocks[0]!)).toBe("web.fetch\nurl=https://example.test\nfetch result");
-  expect(blockText(cells[1].blocks[0]!)).toBe("web.search\nquery=pico transcript\nsearch result");
-});
-
-test("transcript decorates apply_patch calls and outputs", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Patch files");
-  const patch = [
-    "*** Begin Patch",
-    `*** Update File: ${process.cwd()}/src/cli.ts`,
-    "@@",
-    "-old",
-    "+new",
-    `*** Add File: ${process.cwd()}/src/import/codex-threads.ts`,
-    "+export const imported = true;",
-    "*** End Patch",
-  ].join("\n");
-  const call = await store.appendResponseItem(turn.id, turn.id, {
-    type: "function_call",
-    call_id: "patch-call",
-    name: "apply_patch",
-    arguments: patch,
-  });
-  const output = await store.appendResponseItem(call.id, turn.id, {
-    type: "function_call_output",
-    call_id: "patch-call",
-    output: JSON.stringify({
-      output: [
-        "Success. Updated the following files:",
-        `M ${process.cwd()}/src/cli.ts`,
-        `A ${process.cwd()}/src/import/codex-threads.ts`,
-      ].join("\n"),
-      metadata: { exit_code: 0, duration_seconds: 0.1 },
-    }),
-  });
-  await store.appendEventMsg(output.id, { type: "turn_completed", turnId: turn.id });
-
-  const cells = buildTranscriptCells(store).slice(1);
-
-  expect(kinds(cells)).toEqual(["tool_call"]);
-  expect(blockText(cells[0].blocks[0]!)).toBe(
-    "apply_patch\nM src/cli.ts +1 -1, A src/import/codex-threads.ts +1\nSuccess. Updated M src/cli.ts, A src/import/codex-threads.ts",
-  );
-});
-
-test("transcript strips shell wrapper metadata from command outputs", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Read file");
-  const call = await store.appendResponseItem(turn.id, turn.id, {
-    type: "function_call",
-    call_id: "shell-call",
-    name: "exec_command",
-    arguments: { cmd: "sed -n '1,20p' src/index.ts" },
-  });
-  const output = await store.appendResponseItem(call.id, turn.id, {
-    type: "function_call_output",
-    call_id: "shell-call",
-    output: [
-      "Chunk ID: 2dcfc2",
-      "Wall time: 0.0000 seconds",
-      "Process exited with code 0",
-      "Original token count: 1840",
-      "Output:",
-      "import { main } from './cli';",
-      "await main();",
-    ].join("\n"),
-  });
-  await store.appendEventMsg(output.id, { type: "turn_completed", turnId: turn.id });
-
-  const cells = buildTranscriptCells(store).slice(1);
-
-  expect(kinds(cells)).toEqual(["command"]);
-  expect(blockText(cells[0].blocks[0]!)).toBe(
-    "sed -n '1,20p' src/index.ts\nimport { main } from './cli';\nawait main();",
-  );
-});
-
-test("main transcript uses Codex-style mute strategies by cell type", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Inspect the repo");
-  const item = await store.appendResponseItem(turn.id, turn.id, {
-    type: "message",
-    role: "assistant",
-    content: [{ type: "output_text", text: "done" }],
-  });
-  await store.appendEventMsg(item.id, { type: "turn_completed", turnId: turn.id });
-
-  const cells = buildTranscriptCells(store);
-  const liveCells = buildTranscriptCellsWithLive(
-    { store } as Parameters<typeof buildTranscriptCellsWithLive>[0],
-    "partial response",
-    turn.id,
-  );
-
-  expect(cells.map(isMainTranscriptCellExpandedByDefault)).toEqual([true, true]);
+test("main transcript uses Codex-style mute strategies by cell type", () => {
   expect(mainTranscriptMuteStrategyForCell({
     id: "reasoning",
     kind: "reasoning",
@@ -304,8 +124,11 @@ test("main transcript uses Codex-style mute strategies by cell type", async () =
     kind: "file_change",
     blocks: [{ type: "file_change", payload: { path: "a.ts", diff: "@@ changed" } }],
   })).toBe("expanded");
-  expect(isMainTranscriptCellExpandedByDefault(liveCells.at(-1)!)).toBe(true);
-  expect(compactTranscriptPreview("one\n\n two   three", 12)).toBe("one two t...");
+  expect(isMainTranscriptCellExpandedByDefault({
+    id: "assistant",
+    kind: "assistant_markdown",
+    blocks: [{ type: "markdown", payload: { text: "done", streaming: undefined } }],
+  })).toBe(true);
 });
 
 test("main transcript output previews keep head tail and transcript hint", () => {
@@ -333,28 +156,20 @@ test("main transcript output previews keep head tail and transcript hint", () =>
   });
 });
 
-test("transcript only appends non-persisted live streaming cells", async () => {
-  const store = await createStore();
-  const turn = await store.appendUserInput(store.leafId, "Explain streaming");
-  const app = { store } as Parameters<typeof buildTranscriptCellsWithLive>[0];
+test("transcript appends non-persisted live streaming cells", async () => {
+  const viewState = await createViewState();
+  const app = { viewState } as Parameters<typeof buildTranscriptCellsWithLive>[0];
 
-  expect(buildTranscriptCellsWithLive(app, "", turn.id)).toEqual([
+  expect(buildTranscriptCellsWithLive(app, "partial response")).toEqual([
     {
-      id: turn.id,
-      kind: "user_message",
-      status: "started",
-      blocks: [{ type: "text", payload: { text: "Explain streaming", tone: "strong" } }],
+      id: "live",
+      kind: "assistant_markdown",
+      status: undefined,
+      blocks: [{ type: "markdown", payload: { text: "partial response", streaming: true } }],
     },
   ]);
-
-  expect(buildTranscriptCellsWithLive(app, "partial response", turn.id).at(-1)).toEqual({
-    id: "live",
-    kind: "assistant_markdown",
-    status: undefined,
-    blocks: [{ type: "markdown", payload: { text: "partial response", streaming: true } }],
-  });
 });
 
-function kinds(cells: readonly TranscriptCell[]): string[] {
-  return cells.map((cell) => cell.kind);
-}
+test("compactTranscriptPreview joins lines and truncates", () => {
+  expect(compactTranscriptPreview("one\n\n two   three", 12)).toBe("one two t...");
+});

@@ -14,7 +14,6 @@ export interface PagerOverlayInput {
   app: DraftAppState;
   state: TuiState;
   streamingText: string;
-  liveLeafId?: string;
 }
 
 export function buildPagerOverlay(input: PagerOverlayInput): PagerOverlayView {
@@ -26,7 +25,6 @@ export function buildPagerOverlay(input: PagerOverlayInput): PagerOverlayView {
         input.app,
         input.state,
         input.streamingText,
-        input.liveLeafId,
       );
     case "shortcuts":
       return buildShortcutPagerOverlayView();

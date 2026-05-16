@@ -2,11 +2,48 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../src/tui/config";
-import { CodexThreadState } from "../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../src/app/codex-thread-view-state";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 
-export async function createStore(): Promise<CodexThreadState> {
+export async function createViewState(): Promise<CodexThreadViewState> {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  return CodexThreadState.create(cwd);
+  return CodexThreadViewState.create(cwd);
+}
+
+export function setMockTurns(
+  viewState: CodexThreadViewState,
+  turns: Array<{ id: string; items: ThreadItem[]; status?: string }>,
+): void {
+  viewState.cachedThread = {
+    id: viewState.codexThreadId ?? "mock-thread",
+    turns,
+  } as unknown as Parameters<typeof viewState.finishTurn>[0];
+}
+
+export function mockUserMessageItem(id: string, text: string): ThreadItem {
+  return {
+    type: "userMessage",
+    id,
+    content: [{ type: "text", text }],
+  } as unknown as ThreadItem;
+}
+
+export function mockAgentMessageItem(id: string, text: string): ThreadItem {
+  return {
+    type: "agentMessage",
+    id,
+    text,
+    phase: null,
+    memoryCitation: null,
+  } as ThreadItem;
+}
+
+export function mockFileChangeItem(id: string, path: string, diff: string): ThreadItem {
+  return {
+    type: "fileChange",
+    id,
+    changes: [{ path, kind: "modify", diff }],
+  } as unknown as ThreadItem;
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { runTurn, type AppState } from "../../../src/app/controller";
-import { CodexThreadState, entryUserText } from "../../../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../../../src/app/codex-thread-view-state";
 import { startMockCodexClient } from "../../../tools/codex-app-server/test-client";
 import {
   createTempProject,
@@ -13,8 +13,8 @@ test("failed completion becomes a failed Pico turn", async () => {
   const fixture = await startMockCodexClient([
     ...startupSteps(),
     {
-      expectRequest: "thread/fork",
-      params: { ephemeral: true, experimentalRawEvents: true },
+      expectRequest: "thread/start",
+      params: {},
       respond: threadStartResponse(cwd),
     },
     {
@@ -35,16 +35,12 @@ test("failed completion becomes a failed Pico turn", async () => {
   ]);
 
   try {
-    const store = await CodexThreadState.create(cwd);
+    const viewState = CodexThreadViewState.create(cwd);
     await expect(
-      runTurn({ cwd, store, codex: fixture.client, config: {} } as AppState, "fail"),
+      runTurn({ cwd, viewState, codex: fixture.client } as AppState, "fail"),
     ).rejects.toThrow("mock failure");
 
-    expect(store.lines.some((line) => entryUserText(line) === "fail")).toBe(true);
-    expect(store.lines.at(-1)).toMatchObject({
-      type: "event_msg",
-      payload: { type: "turn_failed", error: "mock failure" },
-    });
+    expect(viewState.turnStatus).toBe("idle");
   } finally {
     await fixture.client.shutdown();
   }

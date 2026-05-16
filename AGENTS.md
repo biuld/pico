@@ -1,142 +1,168 @@
 # Pico — Development Guide
 
-## Project Context
+## Project Positioning
 
-Pico is a terminal tool that "rides" on Codex's harness. It does NOT fork Codex — it uses the official `codex app-server` binary as a stateless execution engine via JSON-RPC over stdio, while owning all persistence, branching, and context management itself.
+Pico is a **Better Codex TUI**: a richer terminal client for the official `codex app-server`. It connects via JSON-RPC over stdio and provides better reading, display, interaction, and review experience on top of Codex's execution engine.
 
-Key architectural decisions are documented in `../codex-rs/docs/pico.md` (Chinese, the canonical boundary design doc).
+**Pico is a UI client, not a Codex runtime replacement.** Codex owns all runtime capabilities: model execution, tools, sandbox, approvals, hooks/skills/MCP, thread persistence, compact, resume, fork, rollback, and token/context management. Pico calls these through the official API and renders the results better.
+
+See `docs/pico-product-direction.md` for full product direction and roadmap.
+
+## One Rule
+
+**Every Codex app-server interaction goes through `src/codex/app-server`.** Do not scatter raw JSON-RPC method strings or parse notifications in TUI/runtime code. Add typed SDK methods, status projection, or event normalization there first, then consume the clean semantic surface from the UI layer.
 
 ## Runtime
 
 - **Bun** (not Node). `bun run src/index.ts` for dev.
 - No tsconfig — Bun handles TypeScript natively.
-- No pi runtime dependency in the core path. Do not import from `@mariozechner/pi-ai`, `@mariozechner/pi-tui`, or `@mariozechner/pi-coding-agent` unless building an explicit import/export adapter or a separately approved UI experiment.
-- `src/translate/converter.ts` is reserved for future import/export adapters. It is not part of replay.
+- No pi runtime dependency in the core path. Do not import from `@mariozechner/pi-ai`, `@mariozechner/pi-tui`, or `@mariozechner/pi-coding-agent`.
 
 ## Project Structure
 
 ```
 pico/
 ├── src/
-│   ├── index.ts              # CLI entry point
+│   ├── index.ts                    # CLI entry point
+│   ├── cli.ts                      # CLI argument parsing
+│   ├── config.ts                   # Configuration loading
+│   ├── app/
+│   │   ├── controller.ts           # App lifecycle controller
+│   │   ├── factory.ts              # App factory and wiring
+│   │   ├── turn-runner.ts          # Turn orchestration (startThread/resumeThread/runTurn)
+│   │   ├── codex-thread-view-state.ts  # Read-only Codex thread view cache
+│   │   ├── config.ts               # App-level config types
+│   │   └── types.ts                # App-level shared types
+│   ├── app-session/
+│   │   ├── index.ts                # Session-level wire-up
+│   │   └── events.ts               # App-session event definitions
 │   ├── codex/
-│   │   └── app-server/       # Internal SDK for codex app-server
-│   │       ├── index.ts      # Public SDK exports
-│   │       ├── client.ts     # High-level app-server client façade
-│   │       ├── transport.ts  # JSON-RPC stdio transport
-│   │       ├── status.ts     # Real Codex status projection
-│   │       ├── events.ts     # Notification/event helpers
-│   │       └── types.ts      # Minimal protocol types used by Pico
-│   ├── thread/
-│   │   ├── store.ts          # Pico JSONL v1 thread tree persistence
-│   │   └── types.ts          # Pico thread protocol ADT
-│   ├── translate/
-│   │   └── converter.ts      # Future import/export adapters only
+│   │   └── app-server/             # Typed SDK for codex app-server
+│   │       ├── index.ts            # Public SDK exports
+│   │       ├── client.ts           # High-level client (EventEmitter)
+│   │       ├── transport.ts        # JSON-RPC stdio transport
+│   │       ├── status.ts           # Real Codex status projection
+│   │       ├── events.ts           # Notification/event helpers
+│   │       ├── notifications.ts    # Notification normalizer (raw → semantic events)
+│   │       └── types.ts            # Protocol types used by Pico
 │   └── tui/
-│       ├── opentui.ts        # OpenTUI bootstrap only
-│       ├── bottom-pane.ts    # Bottom-pane panel projection
-│       ├── pager-overlays.ts # Transcript/help pager overlay routing
-│       ├── picker-surfaces.ts # History/resume large picker routing
-│       ├── overlay-model.ts  # Shared surface view shape
-│       ├── render.ts         # Legacy/shared compatibility exports only
-│       ├── state.ts          # UI state helpers
-│       ├── update.ts         # Elm-style state transitions
-│       ├── keybindings.ts    # Key dispatch only
-│       ├── app.ts            # Compatibility exports
-│       ├── runtime/          # OpenTUI runtime wiring and event loop
-│       └── widgets/           # Codex-style UI surfaces
-│           ├── layout.tsx
-│           ├── bottom-pane.tsx
-│           ├── composer.tsx
-│           ├── footer.ts
-│           ├── transcript-panel.ts
-│           ├── overlay.tsx
-│           ├── picker-surface.tsx
-│           ├── approval-panel.tsx
-│           ├── pending-input-preview.tsx
-│           ├── slash-command-popup.ts
-│           ├── history-picker.ts
-│           ├── resume-picker.ts
-│           ├── theme-picker.ts
-│           ├── statusline-picker.ts
-│           ├── transcript-pager.ts
-│           └── shortcut-overlay.ts
+│       ├── opentui.ts              # OpenTUI bootstrap only
+│       ├── app.ts                  # TUI app glue
+│       ├── commands.ts             # Slash command handling
+│       ├── config.ts               # TUI config helpers
+│       ├── history.ts              # History navigation helpers
+│       ├── keybindings.ts          # Key dispatch
+│       ├── render.ts               # Shared rendering helpers
+│       ├── statusline.ts           # Status line formatting
+│       ├── theme.ts                # Theme support
+│       ├── core/
+│       │   ├── state.ts            # Elm-style UI state
+│       │   ├── update.ts           # Elm-style state transitions
+│       │   └── overlay-model.ts    # Shared overlay view shape
+│       ├── runtime/
+│       │   ├── index.ts            # OpenTUI runtime wiring and event loop
+│       │   ├── actions.ts          # Action dispatch
+│       │   ├── clocks.ts           # Re-render clock
+│       │   ├── clipboard.ts        # Clipboard integration
+│       │   ├── submit.ts           # Turn submission
+│       │   └── view.ts             # View projection
+│       ├── surfaces/
+│       │   ├── bottom-pane.ts      # Bottom-pane routing
+│       │   ├── pager-overlays.ts   # Pager overlay routing
+│       │   └── picker-surfaces.ts  # Picker surface routing
+│       ├── transcript/
+│       │   ├── index.ts            # Public façade
+│       │   ├── model.ts            # Codex thread → transcript cells
+│       │   ├── thread-item.ts      # ThreadItem → transcript cells (primary path)
+│       │   ├── cell.ts             # Rows → cells and block types
+│       │   └── decorate.ts         # Cell decoration
+│       └── widgets/
+│           ├── layout.tsx          # Top-level widget composition
+│           ├── solid-text.tsx      # Solid text widget
+│           ├── startup-banner.tsx  # Startup banner
+│           ├── bottom/
+│           │   ├── pane.tsx        # Bottom pane container
+│           │   ├── composer.tsx    # Composer widget
+│           │   ├── approval.tsx    # Approval panel
+│           │   ├── activity.ts     # Activity view
+│           │   ├── footer.ts       # Footer derivation
+│           │   ├── pending-input.tsx  # Pending input preview
+│           │   └── placeholder.ts  # Placeholder text
+│           ├── overlay/
+│           │   ├── surface.tsx     # Overlay container
+│           │   ├── picker-surface.tsx  # Picker container
+│           │   ├── rows.ts         # Overlay row builders
+│           │   └── hints.ts        # Keybinding hints
+│           ├── pager/
+│           │   ├── transcript.ts   # Transcript pager
+│           │   └── shortcuts.ts    # Shortcut overlay
+│           ├── pickers/
+│           │   ├── history.ts      # History picker
+│           │   ├── resume.ts       # Resume picker
+│           │   ├── slash-command.ts  # Slash command popup
+│           │   ├── statusline.ts   # Statusline picker
+│           │   └── theme.ts        # Theme picker
+│           └── transcript-panel/
+│               ├── index.ts        # Transcript panel public API
+│               ├── widget.tsx      # Transcript panel widget
+│               ├── blocks.tsx      # Block renderers
+│               ├── preview.ts      # Preview helpers
+│               ├── syntax.ts       # Syntax highlighting
+│               └── types.ts        # Panel types
 ├── tests/
-│   ├── codex/
-│   │   └── app-server/        # Scripted stdio app-server protocol integration tests
+│   └── codex/
+│       └── app-server/             # Scripted stdio protocol integration tests
 └── tools/
     └── codex-app-server/
-        ├── mock-codex-app-server.ts        # Executable scripted stdio app-server mock
-        ├── manual-mock-codex-app-server.ts # Interactive stdio app-server mock with JSONL control inbox
-        ├── manual-mock-control.ts          # CLI for appending manual mock control commands
-        ├── playbook.ts                     # Randomized manual mock response choreography
-        ├── start-manual-mock-pico.ts       # Launch Pico with the manual mock without editing config
-        └── test-client.ts                  # Test launcher utilities that point at these mock executables
+        ├── mock-codex-app-server.ts        # Scripted mock
+        ├── manual-mock-codex-app-server.ts # Interactive mock
+        ├── manual-mock-control.ts          # Control CLI
+        ├── playbook.ts                     # Mock choreography
+        ├── start-manual-mock-pico.ts       # Launch with manual mock
+        └── test-client.ts                  # Test launcher utilities
 ```
 
 ## Key Design Rules
 
-1. **Server is stateless.** Always `ephemeral: true` for threads. All persistence is client-side JSONL.
-2. **Branching via JSONL tree, not server-side persistence.** `parentId` in JSONL entries defines Pico's tree. Codex `thread/fork` is used only to create an ephemeral execution context from a temporary linear rollout file.
-3. **Pico JSONL v1 thread format.** Thread entries use Pico's own tree metadata plus a unified rollout-compatible `RolloutItem` ADT.
-4. **Codex app-server access goes through `src/codex/app-server`.** Do not parse JSON-RPC notifications or call app-server methods from TUI code. Add SDK methods/status projection there first, then consume semantic state from `app`/`tui`. Keep protocol types minimal: define only the app-server capabilities Pico currently uses.
-5. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`. Our PicoThreadStore is self-contained.
-6. **Rollout item round-trip.** `response_item`, `event_msg`, and `compacted` are Codex rollout-compatible variants; Pico's current persisted variant is only `branch_out`.
-7. **Execution context from temporary rollout.** Before normal prompts, `!cmd`, or `/compact`, Pico linearizes the selected branch path, skips `branch_out`, writes a temporary rollout JSONL file, then calls `thread/fork { path, ephemeral: true }`.
-8. **Current branch primitives.** `backtrack(entryId)` is an in-memory current-leaf action and is not persisted. `branch_out` is persisted automatically before appending from an older history node. Labels, rename, branch deletion, and branch names are out of scope.
-7. **Every app-server call has protocol coverage.** When adding a new Codex app-server request, notification handler, or server-request response path, add or update a scripted mock scenario test under `tests/codex/app-server/` using `tools/codex-app-server/mock-codex-app-server.ts`. The test must assert the JSON-RPC method and the meaningful params Pico sends or handles.
-
-## Code Conventions
-
-- TypeScript with Bun-native APIs (`Bun.spawn`, `Bun.file`, `Bun.write`, `Bun.Glob`)
-- No classes unless state + behavior naturally couple (e.g. `CodexAppServerClient`, `CodexAppServerTransport`, `PicoThreadStore`)
-- Prefer `async`/`await` over callbacks
-- EventEmitter for notification streams (`CodexAppServerClient` extends EventEmitter)
+1. **Codex owns execution and persistence.** Pico calls `thread/start`, `thread/resume`, `thread/list`, `turn/run` etc. as a client. It does not implement its own persistence, compact, fork, or replay semantics.
+2. **App-server access is always through the SDK.** Do not parse JSON-RPC notifications or call app-server methods from TUI code. Add SDK methods, status projection, and event normalization in `src/codex/app-server/` first.
+3. **Notification normalization.** Raw JSON-RPC notifications are normalized to semantic events (`thread.started`, `turn.completed`, `assistant.delta`, `approval.requested`, etc.) via `src/codex/app-server/notifications.ts`. The TUI consumes these semantic events, not raw notifications.
+4. **No branch/backtrack.** Pico does not implement branch, backtrack, or history restore. The history overlay is read-only turn browsing. Selecting a past turn does not change execution context — the next input always appends to the current Codex thread.
+5. **Transcript rendering is ThreadItem-first.** Codex `thread/read` → Turn.items (ThreadItem[]) → transcript cells → blocks → rendered lines. Add new formats (Mermaid, diff, etc.) by adding block renderers.
+6. **No coding-agent dependency.** Do not import from `@mariozechner/pi-coding-agent`.
 
 ## TUI Architecture
 
-Pico's OpenTUI code should be organized like Codex TUI surfaces, not as one large render file.
+Pico's OpenTUI code follows Codex-like surface composition:
 
 - `src/tui/opentui.ts` is bootstrap only: create renderer, create layout, hand off to runtime.
-- `src/tui/runtime/` owns mutable OpenTUI runtime wiring: current app, pending approvals, streaming text, renderer events, and calls into `runTurn`.
-- `src/tui/state.ts` and `src/tui/update.ts` own UI state and Elm-style transitions. Do not mutate OpenTUI renderables there.
-- `src/tui/keybindings.ts` maps key sequences to runtime actions. It should not build UI strings or mutate JSONL/thread state directly.
+- `src/tui/runtime/` owns mutable runtime wiring: current app, pending approvals, streaming text, renderer events, and turn orchestration.
+- `src/tui/core/state.ts` and `src/tui/core/update.ts` own UI state and Elm-style transitions. Do not mutate OpenTUI renderables there.
+- `src/tui/keybindings.ts` maps key sequences to runtime actions.
 - `src/tui/widgets/layout.tsx` composes top-level widgets.
-- `src/tui/widgets/bottom-pane.tsx` composes the Codex-style bottom pane: active bottom-pane view, passive queued preview, composer, transient status, and status line.
-- `src/tui/widgets/composer.tsx` owns composer renderables and composer status formatting.
-- `src/tui/widgets/footer.ts` owns footer mode derivation and footer text.
-- `src/tui/widgets/transcript-panel.ts` owns only the OpenTUI transcript panel renderables.
-- Main-screen layout has two persistent bands plus transient surfaces:
-  - **Transcript panel**: the single scrollable conversation flow. It owns transcript cells and scrolling only.
-  - **Bottom pane**: Codex-style bottom pane containing passive queued input preview, active short interactions, composer, transient status, and compact status line. The composer remains visible inside it.
-  - **PagerOverlay**: large static/browsing overlays such as transcript pager and shortcuts/help. `src/tui/widgets/overlay.tsx` is only this pager/static overlay container.
-  - **PickerSurface**: independent large picker surfaces for history and resume. They are not bottom-pane views and are not generic overlays.
-- Bottom-pane active views are `none`, `approval`, `commandPopup`, `themePicker`, and `statuslinePicker`.
-- Approval prompts are active bottom-pane views, matching Codex's approval-overlay naming semantics even though they are not generic overlays. They are tied to the active turn, should not expose raw app-server method names, and must route keys to the approval action while active.
-- Slash command popup belongs to the composer/bottom pane. Theme and statusline pickers are short bottom-pane views. History and resume are large `PickerSurface` views. Transcript pager and shortcuts/help are `PagerOverlay` views.
-- Focus ownership is explicit:
-  - `PagerOverlay`, `HistoryPicker`, and `ResumePicker` route keys before the bottom pane.
-  - Active bottom-pane views route their own Enter/Esc/Up/Down keys. Approval, theme, and statusline blur the composer input while active; command popup keeps typed text flowing to the draft.
-  - Composer focus means typed text edits the draft.
-  Runtime code must blur/focus the OpenTUI input to match the owning surface.
-- `src/tui/transcript/` owns transcript domain projection and rendering. Keep it split by layer:
-  - `index.ts` is the public façade used by runtime/tests.
-  - `model.ts` maps Pico JSONL/thread state into transcript rows.
-  - `response-item.ts` maps raw Codex/OpenAI `ResponseItem` shapes into semantic transcript rows.
-  - `cell.ts` maps rows into transcript cells and block types.
-  - `renderer.ts` maps cells/blocks into plain and styled terminal lines.
-  - `wrap.ts` owns width-aware wrapping helpers.
-- `src/tui/widgets/overlay.tsx` owns the pager/static overlay container renderable.
-- `src/tui/widgets/picker-surface.tsx` owns the large picker container renderable.
-- Surface-specific row/content builders belong in their own widget modules, e.g. `slash-command-popup.ts`, `history-picker.ts`, `resume-picker.ts`, `theme-picker.ts`, `statusline-picker.ts`, `transcript-pager.ts`, and `shortcut-overlay.ts`.
-- `src/tui/bottom-pane.ts`, `src/tui/picker-surfaces.ts`, and `src/tui/pager-overlays.ts` are routers/projectors only. Do not put surface-specific rendering logic there.
-- `src/tui/render.ts` is a temporary compatibility/shared export file. Do not add new surface-specific UI logic to it; add that logic to the owning widget module instead.
 
-Pure helpers in widget modules should be tested directly. Avoid terminal-pixel tests unless a layout regression cannot be covered by row/model helpers.
+### Layout
 
-Transcript rendering must stay extensible: add new transcript formats by adding or overriding transcript block renderers and preserving the raw response item → row → cell → block → line pipeline. Do not special-case formatted content or response-item rendering inside `src/tui/runtime/`, `layout.ts`, or the OpenTUI widget constructor.
+Main screen has two persistent bands plus transient surfaces:
 
-Main-screen UX should stay Codex-like: single transcript flow, no permanent dashboard panes, no persistent branch tree, `›` composer prefix, lightweight overlay pickers for Pico-specific capabilities.
+- **Transcript panel**: the single scrollable conversation flow.
+- **Bottom pane**: composer, queued input preview, active interactions, transient status, status line.
+- **PagerOverlay**: large static/browsing overlays (transcript pager, shortcuts/help).
+- **PickerSurface**: independent pickers (history, resume).
+
+### Focus ownership
+
+- `PagerOverlay`, `HistoryPicker`, and `ResumePicker` route keys before the bottom pane.
+- Active bottom-pane views (approval, theme, statusline) route their own Enter/Esc/Up/Down. They blur the composer while active, except command popup which keeps typed text flowing to the draft.
+- Composer focus means typed text edits the draft.
+
+### Transcript rendering pipeline
+
+- `src/tui/transcript/model.ts` — maps thread state into transcript rows
+- `src/tui/transcript/cell.ts` — maps rows into cells and block types
+- `src/tui/widgets/transcript-panel/blocks.tsx` — maps cells/blocks into terminal lines
+
+The primary rendering pipeline is: ThreadItem → `threadItemToTranscriptCells()` → cells → blocks → lines.
 
 ## Testing
 
@@ -146,13 +172,16 @@ bun test --watch      # watch mode
 ```
 
 - Scripted Codex app-server protocol tests live in `tests/codex/app-server/`.
-- App-server test launcher utilities live in `tools/codex-app-server/test-client.ts` and must point at the executable mocks in `tools/codex-app-server/`; do not keep mock-server helpers under `tests/`.
-- Organize app-server protocol test files by behavior, not by mock implementation. Prefer names like `turn-streaming.test.ts`, `approval-requests.test.ts`, or `startup-and-thread-start.test.ts` over one large mock-server test file.
-- Do not add a new `CodexAppServerClient` method, `runTurn` app-server interaction, or app-server notification/server-request handling without a matching scripted mock test.
-- Use `bun run mock` for manual/local operation. It launches Pico with `tools/codex-app-server/manual-mock-codex-app-server.ts` without editing `.pico/config.json`. The mock writes a JSONL control inbox path to `.pico/manual-mock-codex-app-server.json` and auto-runs `tools/codex-app-server/playbook.ts` unless `PICO_MANUAL_MOCK_PLAYBOOK=0`; playbook replies must first issue `item/permissions/requestApproval` before emitting deltas or raw items. Keep deterministic CI tests on the scripted mock unless the behavior is specifically about manual control.
+- App-server test launcher utilities in `tools/codex-app-server/test-client.ts` point at the executable mocks.
+- Organize protocol test files by behavior: `turn-streaming.test.ts`, `approval-requests.test.ts`, etc.
+- When adding a new Codex app-server method, notification handler, or server-request response path, add or update a scripted mock scenario test.
+- Use `bun run mock` for manual/local operation with the interactive mock.
+- Pure helpers in widget modules should be tested directly. Avoid terminal-pixel tests unless necessary.
 
 ## Key References
 
-- `docs/pico.md` — Boundary design and protocol contract
-- `docs/codex-server-architecture.md` — Codex internals
-- `docs/codex-client-meta-api.md` — API primitive reference
+- `docs/pico-product-direction.md` — Full product direction, architecture, and roadmap
+- `docs/codex-tui-feature-matrix.md` — Feature comparison with stock Codex TUI
+- `docs/archive/pico.md` — DEPRECATED: old boundary design (pre "Better Codex TUI" pivot)
+- `docs/archive/pico-storage-design.md` — DEPRECATED: old storage design
+- `docs/archive/codex-server-architecture.md` — DEPRECATED: old architecture notes

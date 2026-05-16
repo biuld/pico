@@ -1,7 +1,8 @@
 import { picoConfig } from "../../config";
-import type { CodexThreadState } from "../../app/codex-thread-state";
+import type { CodexThreadViewState } from "../../app/codex-thread-view-state";
 import { normalizeStatusLineItems, type StatusLineItemId } from "../statusline";
 import { DEFAULT_THEME_NAME, type ThemeName } from "../theme";
+import "../config";
 
 export type BottomPaneViewKind =
   | "none"
@@ -24,7 +25,8 @@ export interface BottomPaneState {
 }
 
 export interface TuiState {
-  selectedEntryId: string;
+  selectedTurnIndex: number;
+  selectedItemId: string | null;
   selectedThreadId: string;
   bottomPane: BottomPaneState;
   pickerSurface: PickerSurfaceKind;
@@ -40,10 +42,12 @@ export interface TuiState {
   themeName: ThemeName;
 }
 
-export function createTuiState(store?: CodexThreadState): TuiState {
+export function createTuiState(viewState?: CodexThreadViewState): TuiState {
+  const turns = viewState?.turns ?? [];
   return {
-    selectedEntryId: store?.leafId || "",
-    selectedThreadId: store?.id || "",
+    selectedTurnIndex: Math.max(0, turns.length - 1),
+    selectedItemId: null,
+    selectedThreadId: viewState?.id || "",
     bottomPane: {
       draft: "",
       activeView: "none",
@@ -67,32 +71,33 @@ export function updateInput(state: TuiState, draft: string): TuiState {
   return { ...state, bottomPane: { ...state.bottomPane, draft } };
 }
 
-export function selectEntry(state: TuiState, selectedEntryId: string): TuiState {
-  return { ...state, selectedEntryId };
+export function selectTurn(state: TuiState, selectedTurnIndex: number): TuiState {
+  return { ...state, selectedTurnIndex, selectedItemId: null };
+}
+
+export function selectItem(state: TuiState, selectedItemId: string): TuiState {
+  return { ...state, selectedItemId };
 }
 
 export function selectThread(state: TuiState, selectedThreadId: string): TuiState {
   return { ...state, selectedThreadId };
 }
 
-export function moveSelection(state: TuiState, entryIds: readonly string[], delta: number): TuiState {
-  if (entryIds.length === 0) return state;
-  const current = Math.max(0, entryIds.indexOf(state.selectedEntryId));
-  const next = Math.max(0, Math.min(entryIds.length - 1, current + delta));
-  return { ...state, selectedEntryId: entryIds[next] };
+export function moveSelection(state: TuiState, total: number, delta: number): TuiState {
+  if (total <= 0) return state;
+  const next = Math.max(0, Math.min(total - 1, state.selectedTurnIndex + delta));
+  return { ...state, selectedTurnIndex: next };
 }
 
 export function syncListScroll(
   state: TuiState,
-  entryIds: readonly string[],
+  total: number,
   viewportHeight: number,
 ): TuiState {
-  const selectedIndex = entryIds.indexOf(state.selectedEntryId);
-  if (selectedIndex < 0) return state;
   const height = Math.max(1, viewportHeight);
   let historyScroll = state.historyScroll;
-  if (selectedIndex < historyScroll) historyScroll = selectedIndex;
-  if (selectedIndex >= historyScroll + height) historyScroll = selectedIndex - height + 1;
+  if (state.selectedTurnIndex < historyScroll) historyScroll = state.selectedTurnIndex;
+  if (state.selectedTurnIndex >= historyScroll + height) historyScroll = state.selectedTurnIndex - height + 1;
   return { ...state, historyScroll: Math.max(0, historyScroll) };
 }
 

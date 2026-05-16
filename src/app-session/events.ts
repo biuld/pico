@@ -2,7 +2,6 @@ import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type {
   AssistantDeltaEvent,
   DraftAppState,
-  RawItemEvent,
   TurnAbortedEvent,
   TurnCompletedEvent,
   TurnFailedEvent,
@@ -13,7 +12,6 @@ import type { CodexStatusSnapshot, JSONRPCRequest } from "../codex/app-server";
 export const PICO_APP_SESSION_EVENTS = {
   APP_CHANGED: "app:changed",
   CODEX_STATUS: "codex:status",
-  THREAD_BRANCHED: "thread:branched",
   THREAD_LOADED: "thread:loaded",
   TURN_BUSY: "turn:busy",
   TURN_SUBMITTING: "turn:submitting",
@@ -23,7 +21,6 @@ export const PICO_APP_SESSION_EVENTS = {
   TURN_INTERRUPT_REQUESTED: "turn:interrupt-requested",
   TURN_INTERRUPT_FAILED: "turn:interrupt-failed",
   ASSISTANT_DELTA: "assistant:delta",
-  RAW_ITEM_COMPLETED: "raw-item:completed",
   TURN_COMPLETED: "turn:completed",
   TURN_ABORTED: "turn:aborted",
   TURN_FAILED: "turn:failed",
@@ -41,11 +38,10 @@ export type PicoAppSessionEventName =
 export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.APP_CHANGED]: DraftAppState;
   [PICO_APP_SESSION_EVENTS.CODEX_STATUS]: CodexStatusSnapshot;
-  [PICO_APP_SESSION_EVENTS.THREAD_BRANCHED]: { id: string; targetId: string } | { id: string; parentId: string | null; timestamp: string; item: Record<string, unknown> };
   [PICO_APP_SESSION_EVENTS.THREAD_LOADED]: { threadId: string };
   [PICO_APP_SESSION_EVENTS.TURN_BUSY]: void;
   [PICO_APP_SESSION_EVENTS.TURN_SUBMITTING]: void;
-  [PICO_APP_SESSION_EVENTS.TURN_THREAD_READY]: { leafId: string };
+  [PICO_APP_SESSION_EVENTS.TURN_THREAD_READY]: { threadId: string };
   [PICO_APP_SESSION_EVENTS.TURN_STARTED]: TurnStartedEvent;
   [PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED]: TurnStartedEvent;
   [PICO_APP_SESSION_EVENTS.TURN_INTERRUPT_REQUESTED]: {
@@ -55,7 +51,6 @@ export interface PicoAppSessionEventPayloads {
   };
   [PICO_APP_SESSION_EVENTS.TURN_INTERRUPT_FAILED]: { error: Error | string };
   [PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA]: AssistantDeltaEvent;
-  [PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED]: RawItemEvent;
   [PICO_APP_SESSION_EVENTS.TURN_COMPLETED]: TurnCompletedEvent;
   [PICO_APP_SESSION_EVENTS.TURN_ABORTED]: TurnAbortedEvent;
   [PICO_APP_SESSION_EVENTS.TURN_FAILED]: TurnFailedEvent;

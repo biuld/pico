@@ -1,4 +1,4 @@
-import { historyUserMarker, type HistoryTurnRow } from "../../history";
+import type { HistoryTurnRow } from "../../history";
 import type { OverlayView } from "../../core/overlay-model";
 import type { TuiState } from "../../core/state";
 import type { TuiTheme } from "../../theme";
@@ -31,8 +31,9 @@ export function buildHistoryPickerSurfaceView(
 }
 
 function historyRowText(row: HistoryTurnRow): string {
+  const prefix = row.isActive ? "* " : "  ";
   return [
-    `${row.userPrefix}${historyUserMarker(row)}${row.userText}`,
-    `${row.summaryPrefix}${historyUserMarker(row)}${row.agentSummary}`,
+    `${prefix}${row.userText}`,
+    `  ${row.agentSummary}`,
   ].join("\n");
 }

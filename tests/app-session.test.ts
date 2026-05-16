@@ -5,15 +5,39 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AppState } from "../src/app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../src/app-session";
-import { CodexThreadState, entryUserText } from "../src/app/codex-thread-state";
+import { CodexThreadViewState } from "../src/app/codex-thread-view-state";
 
 class SessionCodex extends EventEmitter {
   shutdownCount = 0;
 
-  async forkEphemeralThreadFromPath() {
+  async startThread() {
     return {
       thread: {
         id: "thread-1",
+        sessionId: "codex-session-1",
+        forkedFromId: null,
+        preview: "",
+        ephemeral: true,
+        modelProvider: "fake",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        status: "idle",
+        path: null,
+        cwd: process.cwd(),
+        cliVersion: "fake",
+        source: "test",
+        turns: [],
+      },
+      model: "fake-model",
+      modelProvider: "fake",
+      cwd: process.cwd(),
+    };
+  }
+
+  async resumeThread(_threadId: string) {
+    return {
+      thread: {
+        id: _threadId,
         sessionId: "codex-session-1",
         forkedFromId: null,
         preview: "",
@@ -40,16 +64,6 @@ class SessionCodex extends EventEmitter {
         threadId: "thread-1",
         turnId: "codex-turn-1",
         delta: "hello",
-      });
-      this.emit("rawResponseItem/completed", {
-        threadId: "thread-1",
-        turnId: "codex-turn-1",
-        item: {
-          id: "assistant-output",
-          type: "message",
-          role: "assistant",
-          content: [{ type: "output_text", text: "hello" }],
-        },
       });
       this.emit("turn/completed", {
         threadId: "thread-1",
@@ -80,11 +94,11 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: {},
   } as unknown as AppState);
@@ -98,13 +112,9 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
     seen.push("delta");
     expect(appSession.snapshot.streamingText).toBe("hello");
   });
-  appSession.on(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, () => {
-    seen.push("raw");
-    expect(appSession.snapshot.streamingText).toBe("");
-  });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, () => {
     seen.push("completed");
-    expect(appSession.snapshot.liveLeafId).toBeUndefined();
+    expect(appSession.snapshot.running).toBe(false);
   });
 
   const finished = new Promise<void>((resolve) => {
@@ -114,26 +124,19 @@ test("app session owns turn streaming lifecycle outside the TUI", async () => {
   await finished;
 
   expect(appSession.snapshot.running).toBe(false);
-  expect(seen).toEqual(["submitting", "delta", "raw", "completed"]);
-  expect(store.collectInjectItems()).toEqual([
-    {
-      id: "assistant-output",
-      type: "message",
-      role: "assistant",
-      content: [{ type: "output_text", text: "hello" }],
-    },
-  ]);
+  expect(seen).toEqual(["submitting", "delta", "completed"]);
+  expect(viewState.turnStatus).toBe("idle");
 });
 
 test("app session drains queued follow-up messages after a turn finishes", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: {},
   } as unknown as AppState);
@@ -165,22 +168,18 @@ test("app session drains queued follow-up messages after a turn finishes", async
 
   expect(queueCounts).toEqual([1, 1, 0]);
   expect(appSession.snapshot.queuedMessages).toEqual([]);
-  expect(
-    store.lines
-      .map((line) => entryUserText(line))
-      .filter(Boolean),
-  ).toEqual(["first", "third"]);
+  expect(viewState.turnStatus).toBe("idle");
 });
 
 test("app session can restore the single queued follow-up message", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: {},
   } as unknown as AppState);
@@ -216,11 +215,11 @@ test("app session interrupts the active codex turn", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new InterruptibleCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: {},
   } as unknown as AppState);
@@ -245,10 +244,7 @@ test("app session interrupts the active codex turn", async () => {
     { threadId: "thread-1", turnId: "codex-turn-interrupt" },
   ]);
   expect(appSession.snapshot.running).toBe(false);
-  expect(store.lines.at(-1)).toMatchObject({
-    type: "event_msg",
-    payload: { type: "turn_aborted" },
-  });
+  expect(viewState.turnStatus).toBe("idle");
 });
 
 test("app session sends the queued follow-up after interrupting the active turn", async () => {
@@ -260,16 +256,6 @@ test("app session sends the queued follow-up after interrupting the active turn"
       const turnId = `codex-turn-${this.turnCount}`;
       if (this.turnCount > 1) {
         setTimeout(() => {
-          this.emit("rawResponseItem/completed", {
-            threadId: "thread-1",
-            turnId,
-            item: {
-              id: `assistant-output-${this.turnCount}`,
-              type: "message",
-              role: "assistant",
-              content: [{ type: "output_text", text: "queued done" }],
-            },
-          });
           this.emit("turn/completed", {
             threadId: "thread-1",
             turnId,
@@ -295,11 +281,11 @@ test("app session sends the queued follow-up after interrupting the active turn"
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new InterruptThenCompleteCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: {},
   } as unknown as AppState);
@@ -322,23 +308,99 @@ test("app session sends the queued follow-up after interrupting the active turn"
   await finished;
 
   expect(appSession.snapshot.queuedMessages).toEqual([]);
-  expect(
-    store.lines
-      .map((line) => entryUserText(line))
-      .filter(Boolean),
-  ).toEqual(["first", "queued"]);
+  expect(viewState.turnStatus).toBe("idle");
 });
 
-test("new draft resets Pico-local session state without creating a store", async () => {
+test("app session keeps queued follow-up after a failed turn", async () => {
+  class FailingCodex extends SessionCodex {
+    async startTurn() {
+      setTimeout(() => {
+        this.emit("turn/completed", {
+          threadId: "thread-1",
+          turnId: "codex-turn-fail",
+          status: "failed",
+          error: { message: "mock failure" },
+        });
+      }, 0);
+      return { turn: { id: "codex-turn-fail", status: "inProgress" } };
+    }
+  }
+
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
   const home = await mkdtemp(join(tmpdir(), "pico-home-"));
   Bun.env.HOME = home;
-  const store = await CodexThreadState.create(cwd);
+  const viewState = await CodexThreadViewState.create(cwd);
+  const codex = new FailingCodex();
+  const appSession = new PicoAppSession({
+    cwd,
+    viewState,
+    codex,
+    config: {},
+  } as unknown as AppState);
+
+  const finished = new Promise<void>((resolve) => {
+    appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => resolve());
+  });
+  appSession.submit("fail");
+  appSession.queueMessage("queued-after-fail");
+  await finished;
+
+  // Queued message should be kept, not auto-sent after failure
+  expect(appSession.snapshot.queuedMessages).toHaveLength(1);
+  expect(appSession.snapshot.queuedMessages[0].text).toBe("queued-after-fail");
+  expect(viewState.turnStatus).toBe("idle");
+});
+
+test("app session keeps queued follow-up after a non-user aborted turn", async () => {
+  class AutoAbortedCodex extends SessionCodex {
+    async startTurn() {
+      setTimeout(() => {
+        this.emit("turn/completed", {
+          threadId: "thread-1",
+          turnId: "codex-turn-auto-abort",
+          status: "interrupted",
+          error: { message: "server aborted" },
+        });
+      }, 0);
+      return { turn: { id: "codex-turn-auto-abort", status: "inProgress" } };
+    }
+  }
+
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const viewState = await CodexThreadViewState.create(cwd);
+  const codex = new AutoAbortedCodex();
+  const appSession = new PicoAppSession({
+    cwd,
+    viewState,
+    codex,
+    config: {},
+  } as unknown as AppState);
+
+  const finished = new Promise<void>((resolve) => {
+    appSession.on(PICO_APP_SESSION_EVENTS.TURN_FINISHED, () => resolve());
+  });
+  appSession.submit("auto-abort");
+  appSession.queueMessage("queued-after-auto-abort");
+  await finished;
+
+  // Queued message should be kept — no user interrupt was requested
+  expect(appSession.snapshot.queuedMessages).toHaveLength(1);
+  expect(appSession.snapshot.queuedMessages[0].text).toBe("queued-after-auto-abort");
+  expect(viewState.turnStatus).toBe("idle");
+});
+
+test("new draft resets Pico-local session state", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const viewState = await CodexThreadViewState.create(cwd);
   const codex = new SessionCodex();
   const nextCodex = new SessionCodex();
   const appSession = new PicoAppSession({
     cwd,
-    store,
+    viewState,
     codex,
     config: { statusLineItems: ["model"] },
   } as unknown as AppState, {
@@ -353,7 +415,7 @@ test("new draft resets Pico-local session state without creating a store", async
   expect(await appSession.newDraft()).toBe(true);
 
   expect(codex.shutdownCount).toBe(1);
-  expect(appSession.app.store).toBeUndefined();
+  expect(appSession.app.viewState).toBeUndefined();
   expect(appSession.app.codex as unknown).toBe(nextCodex);
   expect(appSession.snapshot.queuedMessages).toEqual([]);
 });

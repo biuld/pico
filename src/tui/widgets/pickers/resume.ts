@@ -1,4 +1,4 @@
-import type { ThreadInfo } from "../../../app/codex-thread-state";
+import type { ThreadInfo } from "../../../app/codex-thread-view-state";
 import type { OverlayRowView, OverlayView } from "../../core/overlay-model";
 import type { TuiState } from "../../core/state";
 import type { TuiTheme } from "../../theme";
@@ -14,7 +14,6 @@ export interface ThreadRow {
   updatedAt: string;
   preview: string;
   turnCount: number;
-  responseItemCount: number;
 }
 
 export function buildResumePickerSurfaceView(
@@ -56,7 +55,6 @@ export function buildThreadRows(
     updatedAt: thread.updatedAt,
     preview: thread.preview,
     turnCount: thread.turnCount,
-    responseItemCount: thread.responseItemCount,
   }));
 }
 

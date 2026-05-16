@@ -8,7 +8,7 @@ import type {
 } from "../app/types";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import type { CodexAppServerClient, JSONRPCRequest } from "../codex/app-server";
-import { CodexThreadState, type ThreadInfo, type ResponseItem } from "../app/codex-thread-state";
+import { CodexThreadViewState, type ThreadInfo } from "../app/codex-thread-view-state";
 import {
   PICO_APP_SESSION_EVENTS,
   type PicoAppSessionEventArgs,
@@ -28,7 +28,6 @@ export interface PicoAppSessionSnapshot {
   app: DraftAppState;
   running: boolean;
   streamingText: string;
-  liveLeafId?: string;
   pendingApproval?: JSONRPCRequest;
   queuedMessages: readonly QueuedMessage[];
   activeCodexThreadId?: string;
@@ -56,7 +55,6 @@ export class PicoAppSession extends EventEmitter {
   private pendingApproval: PendingApproval | undefined;
   private running = false;
   private streamingText = "";
-  private liveLeafId: string | undefined;
   private queuedMessages: QueuedMessage[] = [];
   private nextQueuedMessageId = 1;
   private activeCodexThreadId: string | undefined;
@@ -99,7 +97,6 @@ export class PicoAppSession extends EventEmitter {
       app: this.currentApp,
       running: this.running,
       streamingText: this.streamingText,
-      liveLeafId: this.liveLeafId,
       pendingApproval: this.pendingApproval?.request,
       queuedMessages: [...this.queuedMessages],
       activeCodexThreadId: this.activeCodexThreadId,
@@ -113,33 +110,17 @@ export class PicoAppSession extends EventEmitter {
   }
 
   static listThreads(cwd: string, codex?: CodexAppServerClient): Promise<ThreadInfo[]> {
-    return CodexThreadState.list(cwd, codex);
-  }
-
-  async restore(entryId: string) {
-    const store = this.requireStore();
-    store.backtrack(entryId);
-    this.clearActiveCodexTurn();
-    this.clearQueuedMessages();
-    this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_BRANCHED, {
-      id: entryId,
-      parentId: null,
-      timestamp: new Date().toISOString(),
-      item: { type: "branch_out" },
-    });
-    return { id: entryId, targetId: entryId };
+    return CodexThreadViewState.list(cwd, codex);
   }
 
   async resume(threadId: string): Promise<void> {
-    if (!threadId || threadId === this.currentApp.store?.id) return;
-    const cwd = this.currentApp.store?.cwd || this.currentApp.cwd;
+    if (!threadId || threadId === this.currentApp.viewState?.id) return;
+    const cwd = this.currentApp.viewState?.cwd || this.currentApp.cwd;
     this.detachCodexStatus?.();
     this.detachCodexStatus = undefined;
     await this.currentApp.codex.shutdown().catch(() => {});
     this.currentApp = await loadApp(cwd, threadId);
-    this.streamingText = "";
-    this.liveLeafId = undefined;
-    this.clearActiveCodexTurn();
+    this.clearUiState();
     this.clearQueuedMessages();
     this.attachCodexStatus(this.currentApp);
     this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_LOADED, { threadId });
@@ -174,9 +155,7 @@ export class PicoAppSession extends EventEmitter {
       return;
     }
 
-    this.streamingText = "";
-    this.liveLeafId = undefined;
-    this.liveThreadItems = [];
+    this.clearUiState();
     this.running = true;
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_SUBMITTING);
 
@@ -243,16 +222,23 @@ export class PicoAppSession extends EventEmitter {
     void this.currentApp.codex.shutdown().catch(() => {});
   }
 
+  // ── private helpers ──
+
+  private clearUiState(): void {
+    this.streamingText = "";
+    this.liveThreadItems = [];
+  }
+
   private async runSubmittedTurn(userInput: string): Promise<void> {
+    let drainQueue = false;
     let failedFromEvent = false;
     let activeApp: AppState;
     try {
       activeApp = await ensureAppThread(this.currentApp);
       this.setApp(activeApp);
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_THREAD_READY, { leafId: activeApp.store.leafId });
+      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_THREAD_READY, { threadId: activeApp.viewState.id });
     } catch (err) {
       this.running = false;
-      this.liveLeafId = undefined;
       this.clearActiveCodexTurn();
       this.emitTurnFailed(err);
       this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FINISHED);
@@ -266,7 +252,6 @@ export class PicoAppSession extends EventEmitter {
           onTurnStarted: (event) => {
             this.activeCodexThreadId = event.threadId;
             this.activeCodexTurnId = undefined;
-            this.liveLeafId = event.turnId;
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_STARTED, event);
           },
           onCodexTurnStarted: (event) => {
@@ -279,47 +264,43 @@ export class PicoAppSession extends EventEmitter {
             this.streamingText += event.delta || "";
             this.emitAppSession(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, event);
           },
-          onRawItemCompleted: (event) => {
-            this.liveLeafId = event.entryId || this.liveLeafId;
-            if (rawResponseItemHasOutputText(event.item)) this.streamingText = "";
-            this.emitAppSession(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, event);
-          },
-          onTurnCompleted: (event) => {
+          onTurnCompleted: (_event) => {
+            drainQueue = true;
             this.streamingText = "";
-            this.liveLeafId = undefined;
             this.clearActiveCodexTurn();
-            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, event);
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, _event);
           },
-          onTurnAborted: (event) => {
+          onTurnAborted: (_event) => {
+            // Only drain the queue if the user explicitly interrupted.
+            drainQueue = this.interruptRequested;
             this.streamingText = "";
-            this.liveLeafId = undefined;
             this.clearActiveCodexTurn();
-            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_ABORTED, event);
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_ABORTED, _event);
           },
-          onTurnFailed: (event) => {
+          onTurnFailed: (_event) => {
             failedFromEvent = true;
             const interrupted = this.interruptRequested;
+            // Only drain the queue if the user explicitly interrupted.
+            drainQueue = interrupted;
             this.streamingText = "";
-            this.liveLeafId = undefined;
             this.clearActiveCodexTurn();
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, interrupted
-              ? { ...event, error: "Turn interrupted" }
-              : event);
+              ? { ..._event, error: "Turn interrupted" }
+              : _event);
           },
           onThreadItemCompleted: (item) => {
             this.liveThreadItems.push(item);
             this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_ITEM, item);
-            this.liveLeafId = item.id;
           },
         },
       });
     } catch (err) {
-      if (!failedFromEvent) this.emitTurnFailed(err, activeApp.store.leafId);
+      if (!failedFromEvent) this.emitTurnFailed(err);
     } finally {
       this.running = false;
       this.clearActiveCodexTurn();
       this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FINISHED);
-      this.submitNextQueuedMessage();
+      if (drainQueue) this.submitNextQueuedMessage();
     }
   }
 
@@ -330,14 +311,13 @@ export class PicoAppSession extends EventEmitter {
     });
   }
 
-  private emitTurnFailed(error: unknown, leafId?: string): void {
+  private emitTurnFailed(error: unknown, turnId?: string): void {
     this.streamingText = "";
-    this.liveLeafId = undefined;
     const interrupted = this.interruptRequested;
     this.clearActiveCodexTurn();
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, {
-      threadId: this.currentApp.store?.id,
-      turnId: leafId,
+      threadId: this.currentApp.viewState?.id,
+      turnId,
       error: interrupted ? "Turn interrupted" : error instanceof Error ? error : String(error),
     } satisfies TurnFailedEvent);
   }
@@ -385,15 +365,14 @@ export class PicoAppSession extends EventEmitter {
       return false;
     }
 
-    const cwd = this.currentApp.store?.cwd || this.currentApp.cwd;
+    const cwd = this.currentApp.viewState?.cwd || this.currentApp.cwd;
     const previous = this.currentApp;
     this.detachCodexStatus?.();
     this.detachCodexStatus = undefined;
     await previous.codex.shutdown().catch(() => {});
 
     this.currentApp = await this.createDraftApp(cwd);
-    this.streamingText = "";
-    this.liveLeafId = undefined;
+    this.clearUiState();
     this.pendingApproval = undefined;
     this.clearActiveCodexTurn();
     this.clearQueuedMessages();
@@ -424,26 +403,10 @@ export class PicoAppSession extends EventEmitter {
     this.detachCodexStatus = () => app.codex.off("status", onStatus);
   }
 
-  private requireStore(): CodexThreadState {
-    if (!this.currentApp.store) throw new Error("no turns yet");
-    return this.currentApp.store;
-  }
-
   private emitAppSession<Name extends PicoAppSessionEventName>(
     eventName: Name,
     ...args: PicoAppSessionEventArgs<Name>
   ): boolean {
     return super.emit(eventName, ...args);
   }
-}
-
-function rawResponseItemHasOutputText(item: ResponseItem): boolean {
-  if (item.type !== "message") return false;
-  const content = item.content;
-  return Array.isArray(content) && content.some((part) => {
-    if (!part || typeof part !== "object") return false;
-    const value = part as Record<string, unknown>;
-    return typeof value.text === "string" &&
-      (value.type === "output_text" || value.type === "text");
-  });
 }

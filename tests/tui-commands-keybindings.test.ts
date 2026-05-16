@@ -4,7 +4,7 @@ import { filterSlashCommands, parseTuiInput } from "../src/tui/commands";
 import { installOpenTuiKeybindings, type KeybindingRuntime } from "../src/tui/keybindings";
 import { createTuiState } from "../src/tui/core/state";
 import { updateTuiState } from "../src/tui/core/update";
-import { createStore } from "./tui-test-helpers";
+import { createViewState } from "./tui-test-helpers";
 
 test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () => {
   const handlers: Array<(sequence: string) => boolean> = [];
@@ -44,7 +44,7 @@ test("keybindings require double ctrl+d to exit and do not exit on ctrl+c", () =
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -105,7 +105,7 @@ test("tab queues a running draft", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -161,7 +161,7 @@ test("option up restores the queued draft into the composer", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -215,7 +215,7 @@ test("approval controls own focus and consume composer input", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -275,7 +275,7 @@ test("approval controls handle empty-composer navigation and decisions", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -333,7 +333,7 @@ test("tab does not submit an empty composer", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -393,7 +393,7 @@ test("ctrl+c and esc interrupt a running turn", () => {
     moveThreadSelection: () => {},
     moveThemeSelection: () => {},
     moveStatusLineSelection: () => {},
-    restoreSelected: () => {},
+    selectHistoryTurn: () => {},
     resumeSelected: () => {},
     selectTheme: () => {},
     toggleStatusLineItem: () => {},
@@ -437,8 +437,8 @@ test("parses local TUI slash commands", () => {
 });
 
 test("filters slash commands for popup selection without tab completion", async () => {
-  const store = await createStore();
-  let state = createTuiState(store);
+  const viewState = await createViewState();
+  let state = createTuiState(viewState);
 
   expect(filterSlashCommands("hello")).toEqual([]);
   expect(filterSlashCommands("/").map((command) => command.name)).toEqual([

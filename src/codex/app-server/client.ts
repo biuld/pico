@@ -63,8 +63,6 @@ import type {
   ThreadArchiveResponse,
   ThreadCompactStartParams,
   ThreadCompactStartResponse,
-  ThreadForkParams,
-  ThreadInjectItemsParams,
   ThreadListParams,
   ThreadListResponse,
   ThreadMetadataUpdateParams,
@@ -213,45 +211,10 @@ export class CodexAppServerClient extends EventEmitter {
   }
 
   async startThread(params: Partial<ThreadStartParams> = {}): Promise<ThreadStartResponse> {
-    const response = await this.request<ThreadStartResponse>("thread/start", {
-      ...params,
-      experimentalRawEvents: true,
-    });
+    const response = await this.request<ThreadStartResponse>("thread/start", params);
     this.status = updateCodexStatusFromThreadStart(this.status, response);
     this.emit("status", this.statusSnapshot);
     return response;
-  }
-
-  // @deprecated Use startThread for persistent threads
-  async startEphemeralThread(params: Partial<ThreadStartParams> = {}): Promise<ThreadStartResponse> {
-    const response = await this.request<ThreadStartResponse>("thread/start", {
-      ...params,
-      ephemeral: true,
-      experimentalRawEvents: true,
-    });
-    this.status = updateCodexStatusFromThreadStart(this.status, response);
-    this.emit("status", this.statusSnapshot);
-    return response;
-  }
-
-  async forkEphemeralThreadFromPath(
-    path: string,
-    params: Partial<Omit<ThreadForkParams, "path" | "ephemeral">> = {},
-  ): Promise<ThreadStartResponse> {
-    const response = await this.request<ThreadStartResponse>("thread/fork", {
-      ...params,
-      path,
-      ephemeral: true,
-      experimentalRawEvents: true,
-    });
-    this.status = updateCodexStatusFromThreadStart(this.status, response);
-    this.emit("status", this.statusSnapshot);
-    return response;
-  }
-
-  async injectItems(threadId: string, items: unknown[]): Promise<void> {
-    const params: ThreadInjectItemsParams = { threadId, items };
-    await this.request("thread/inject_items", params);
   }
 
   async startTurn(
@@ -349,8 +312,7 @@ export class CodexAppServerClient extends EventEmitter {
     const response = await this.request<ThreadStartResponse>("thread/resume", {
       ...params,
       threadId,
-      experimentalRawEvents: true,
-    });
+          });
     this.status = updateCodexStatusFromThreadStart(this.status, response);
     this.emit("status", this.statusSnapshot);
     return response;

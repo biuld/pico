@@ -25,7 +25,7 @@ export interface KeybindingRuntime {
   moveThreadSelection(delta: number): void;
   moveThemeSelection(delta: number): void;
   moveStatusLineSelection(delta: number): void;
-  restoreSelected(): void;
+  selectHistoryTurn(): void;
   resumeSelected(): void;
   selectTheme(): void;
   toggleStatusLineItem(): void;
@@ -240,7 +240,7 @@ function handleHistoryKey(sequence: string, runtime: KeybindingRuntime): boolean
     return true;
   }
   if (sequence === "\r") {
-    runtime.restoreSelected();
+    runtime.selectHistoryTurn();
     return true;
   }
   if (sequence === "/") {

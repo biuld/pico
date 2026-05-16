@@ -1,6 +1,6 @@
 import { StyledText, dim, fg } from "@opentui/core";
 import type { CodexStatusSnapshot } from "../codex/app-server";
-import type { CodexThreadState } from "../app/codex-thread-state";
+import type { CodexThreadViewState } from "../app/codex-thread-view-state";
 import type { TuiState } from "./core/state";
 import type { TuiTheme } from "./theme";
 
@@ -51,7 +51,7 @@ export interface StatusLineSegment {
 }
 
 export interface StatusLineInput {
-  store?: CodexThreadState;
+  viewState?: CodexThreadViewState;
   state: TuiState;
   codex: CodexStatusSnapshot;
   items?: readonly StatusLineItemId[];
@@ -72,7 +72,7 @@ export function formatCodexStatusLineStyled(
 export function buildAlignedStatusLineSegments(input: StatusLineInput): StatusLineSegment[] {
   const leftSegments = buildStatusLineSegments(
     input.codex,
-    input.store,
+    input.viewState,
     input.items || DEFAULT_STATUS_LINE_ITEMS,
   );
   return alignSegments(leftSegments);
@@ -80,7 +80,7 @@ export function buildAlignedStatusLineSegments(input: StatusLineInput): StatusLi
 
 export function formatConfiguredStatusText(
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
   items: readonly StatusLineItemId[],
 ): string {
   return statusLineSegmentsText(buildStatusLineSegments(codex, store, items));
@@ -88,7 +88,7 @@ export function formatConfiguredStatusText(
 
 export function formatConfiguredStatusPreviewText(
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
   items: readonly StatusLineItemId[],
 ): string {
   return statusLineSegmentsText(buildStatusLinePreviewSegments(codex, store, items));
@@ -96,7 +96,7 @@ export function formatConfiguredStatusPreviewText(
 
 export function buildStatusLineSegments(
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
   items: readonly StatusLineItemId[],
 ): StatusLineSegment[] {
   const values: StatusLineSegment[] = [];
@@ -109,7 +109,7 @@ export function buildStatusLineSegments(
 
 export function buildStatusLinePreviewSegments(
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
   items: readonly StatusLineItemId[],
 ): StatusLineSegment[] {
   const values: StatusLineSegment[] = [];
@@ -139,7 +139,7 @@ export function isStatusLineItemId(item: string): item is StatusLineItemId {
 export function statusLineItemValue(
   item: StatusLineItemId,
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
 ): string | undefined {
   return statusLineItemSegment(item, codex, store)?.text;
 }
@@ -163,7 +163,7 @@ function normalizeStatusLineItem(item: string): StatusLineItemId | undefined {
 function statusLineItemSegment(
   item: StatusLineItemId,
   codex: CodexStatusSnapshot,
-  store: CodexThreadState | undefined,
+  store: CodexThreadViewState | undefined,
 ): StatusLineSegment | undefined {
   switch (item) {
     case "model":

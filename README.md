@@ -42,7 +42,7 @@ bun run src/index.ts
 
 ## Development
 
-See `CLAUDE.md` for development conventions and project structure.
+See `AGENTS.md` for development conventions and project structure.
 See `docs/pico-product-direction.md` for full product direction and roadmap.
 
 ## Features
@@ -50,7 +50,7 @@ See `docs/pico-product-direction.md` for full product direction and roadmap.
 - [x] Codex JSON-RPC stdio client with typed SDK
 - [x] Rich transcript rendering (markdown, diffs, code blocks)
 - [x] OpenTUI foundation with streaming support
-- [x] History overlay for backtrack and branch navigation
+- [x] History overlay for turn browsing
 - [ ] Notification normalization layer
 - [ ] Mermaid diagram support
 - [ ] Better approval UI with structured info

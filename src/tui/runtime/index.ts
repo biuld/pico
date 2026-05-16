@@ -1,13 +1,12 @@
 import { CliRenderEvents, type CliRenderer, type KeyEvent } from "@opentui/core";
 import type {
   DraftAppState,
-  RawItemEvent,
   TurnAbortedEvent,
   TurnCompletedEvent,
   TurnFailedEvent,
 } from "../../app/controller";
 import { PicoAppSession, PICO_APP_SESSION_EVENTS } from "../../app-session";
-import type { ThreadInfo } from "../../app/codex-thread-state";
+import type { ThreadInfo } from "../../app/codex-thread-view-state";
 import "../config";
 import { installOpenTuiKeybindings } from "../keybindings";
 import { composerOwnsFocus, createTuiState, type TuiState } from "../core/state";
@@ -27,7 +26,7 @@ export function runOpenTuiRuntime(
   app: DraftAppState,
 ): Promise<void> {
   const appSession = new PicoAppSession(app);
-  let state: TuiState = createTuiState(appSession.app.store);
+  let state: TuiState = createTuiState(appSession.app.viewState);
   let threads: ThreadInfo[] = [];
   let closing = false;
   let render: () => void;
@@ -79,7 +78,6 @@ export function runOpenTuiRuntime(
       threads,
       inputValue: layout.getInputValue(),
       streamingText: snapshot.streamingText,
-      liveLeafId: snapshot.liveLeafId,
       liveThreadItems: snapshot.liveThreadItems,
       pendingApproval: snapshot.pendingApproval,
       queuedMessages: snapshot.queuedMessages,
@@ -160,16 +158,15 @@ export function runOpenTuiRuntime(
     clocks.restartActivity();
     render();
   });
-  appSession.on(PICO_APP_SESSION_EVENTS.TURN_THREAD_READY, (event) => {
-    if (!state.selectedEntryId) {
-      dispatch({ type: "selectEntry", entryId: event.leafId });
-      render();
-    }
+  appSession.on(PICO_APP_SESSION_EVENTS.TURN_THREAD_READY, () => {
+    const vs = appSession.app.viewState;
+    if (vs) dispatch({ type: "selectTurn", index: Math.max(0, vs.turns.length - 1) });
+    render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_STARTED, () => {
     clocks.markActivityStarted();
-    const store = appSession.app.store;
-    if (store) dispatch({ type: "selectEntry", entryId: store.leafId });
+    const vs = appSession.app.viewState;
+    if (vs) dispatch({ type: "selectTurn", index: Math.max(0, vs.turns.length) });
     dispatch({ type: "setTurnStatus", status: "running", message: "starting turn" });
     render();
   });
@@ -195,38 +192,30 @@ export function runOpenTuiRuntime(
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, render);
-  appSession.on(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, (event: RawItemEvent) => {
-    dispatch({
-      type: "setTurnStatus",
-      status: "running",
-      message: `stored ${event.entryId || "raw item"}`,
-    });
-    render();
-  });
   appSession.on(PICO_APP_SESSION_EVENTS.THREAD_ITEM, () => {
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, (event: TurnCompletedEvent) => {
     clocks.finishActivity();
-    dispatch({ type: "selectEntry", entryId: event.leafId });
+    const vs = appSession.app.viewState;
+    if (vs) dispatch({ type: "selectTurn", index: Math.max(0, vs.turns.length - 1) });
     dispatch({
       type: "setTurnStatus",
       status: "idle",
-      message: `stored ${event.rawItemCount} raw item(s)`,
+      message: "turn completed",
     });
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_ABORTED, (event: TurnAbortedEvent) => {
     clocks.finishActivity();
-    dispatch({ type: "selectEntry", entryId: event.leafId });
+    const vs = appSession.app.viewState;
+    if (vs) dispatch({ type: "selectTurn", index: Math.max(0, vs.turns.length - 1) });
     dispatch({ type: "setTurnStatus", status: "idle", message: event.reason || "interrupted" });
     render();
   });
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_FAILED, (event: TurnFailedEvent) => {
     const message = event.error instanceof Error ? event.error.message : String(event.error);
     clocks.finishActivity();
-    const store = appSession.app.store;
-    if (store) dispatch({ type: "selectEntry", entryId: store.leafId });
     dispatch({ type: "setTurnStatus", status: "failed", message });
     render();
   });
@@ -288,7 +277,7 @@ export function runOpenTuiRuntime(
     moveThreadSelection: actions.moveThreadSelection,
     moveThemeSelection: actions.moveThemeSelection,
     moveStatusLineSelection: actions.moveStatusLineSelection,
-    restoreSelected: () => void actions.restoreSelected(),
+    selectHistoryTurn: () => void actions.selectHistoryTurn(),
     resumeSelected: () => void actions.resumeSelected(),
     selectTheme: actions.selectTheme,
     toggleStatusLineItem: actions.toggleStatusLineItem,

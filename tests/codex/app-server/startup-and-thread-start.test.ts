@@ -6,7 +6,7 @@ import {
   threadStartResponse,
 } from "./scenario-helpers";
 
-test("startup handshake reads config, lists models, and starts an ephemeral raw-events thread", async () => {
+test("startup handshake reads config, lists models, and starts a thread", async () => {
   const { cwd } = await createTempProject();
   const fixture = await startMockCodexClient([
     ...startupSteps(),
@@ -26,14 +26,14 @@ test("startup handshake reads config, lists models, and starts an ephemeral raw-
     },
     {
       expectRequest: "thread/start",
-      params: { cwd, ephemeral: true, experimentalRawEvents: true },
+      params: { cwd },
       respond: threadStartResponse(cwd),
     },
   ]);
 
   try {
     await fixture.client.refreshConfigStatus({ cwd });
-    const thread = await fixture.client.startEphemeralThread({ cwd });
+    const thread = await fixture.client.startThread({ cwd });
 
     expect(thread.thread.id).toBe("thread-1");
     expect(fixture.client.statusSnapshot.model).toBe("mock-model");

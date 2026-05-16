@@ -21,7 +21,7 @@ test("get returns default value when no file exists", () => {
     validate: () => undefined,
     description: "test",
   });
-  expect(picoConfig.get("default-test")).toBe("test-default");
+  expect(picoConfig.get("default-test") as string).toBe("test-default");
 });
 
 test("load overrides default with file value", async () => {
@@ -35,7 +35,7 @@ test("load overrides default with file value", async () => {
   await Bun.write(configPath, JSON.stringify({ "load-test": "from-file" }));
 
   await picoConfig.load();
-  expect(picoConfig.get("load-test")).toBe("from-file");
+  expect(picoConfig.get("load-test") as string).toBe("from-file");
 });
 
 test("load falls back to default when file value fails validation", async () => {
@@ -49,7 +49,7 @@ test("load falls back to default when file value fails validation", async () => 
   await Bun.write(configPath, JSON.stringify({ "validate-test": 123 }));
 
   await picoConfig.load();
-  expect(picoConfig.get("validate-test")).toBe("test-default");
+  expect(picoConfig.get("validate-test") as string).toBe("test-default");
 });
 
 test("set persists value to file", async () => {
@@ -63,7 +63,7 @@ test("set persists value to file", async () => {
   await picoConfig.set("persist-test", "user-set");
   const file = JSON.parse(await Bun.file(configPath).text()) as Record<string, unknown>;
   expect(file["persist-test"]).toBe("user-set");
-  expect(picoConfig.get("persist-test")).toBe("user-set");
+  expect(picoConfig.get("persist-test") as string).toBe("user-set");
 });
 
 test("file only contains user-set values, not defaults", async () => {

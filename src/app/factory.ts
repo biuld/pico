@@ -1,6 +1,7 @@
 import { CodexAppServerClient } from "../codex/app-server";
 import { picoConfig } from "../config";
-import { CodexThreadState } from "./codex-thread-state";
+import { CodexThreadViewState } from "./codex-thread-view-state";
+import "./config";
 import type { AppState, DraftAppState } from "./types";
 
 export async function createApp(cwd: string = process.cwd()): Promise<AppState> {
@@ -13,16 +14,25 @@ export async function createDraftApp(cwd: string = process.cwd()): Promise<Draft
 }
 
 export async function ensureAppThread(app: DraftAppState): Promise<AppState> {
-  if (app.store) return app as AppState;
-  const store = await CodexThreadState.create(app.cwd, app.codex);
-  app.store = store;
+  if (app.viewState) return app as AppState;
+  const viewState = CodexThreadViewState.create(app.cwd);
+  app.viewState = viewState;
   return app as AppState;
 }
 
 export async function loadApp(cwd: string, threadId: string): Promise<AppState> {
   const codex = await createCodexClient(cwd);
-  const store = await CodexThreadState.load(cwd, threadId, codex);
-  return { store, codex, cwd: store.cwd };
+  const viewState = CodexThreadViewState.create(cwd);
+
+  try {
+    const response = await codex.readThread(threadId, true);
+    viewState.setThread(threadId, response.thread);
+  } catch {
+    // Fallback: empty view state with known thread ID
+    viewState.codexThreadId = threadId;
+  }
+
+  return { viewState, codex, cwd: viewState.cwd };
 }
 
 async function createCodexClient(cwd: string): Promise<CodexAppServerClient> {

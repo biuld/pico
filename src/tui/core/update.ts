@@ -9,7 +9,7 @@ import {
   moveThreadSelection,
   resetTranscriptScroll,
   scrollTranscript,
-  selectEntry,
+  selectTurn,
   selectThread,
   selectTheme,
   setBottomPaneView,
@@ -33,15 +33,15 @@ export type TuiMsg =
   | { type: "inputChanged"; value: string }
   | { type: "setInput"; value: string }
   | { type: "closeSurface" }
-  | { type: "openHistory"; leafId: string }
+  | { type: "openHistory" }
   | { type: "openThreads"; threadId: string }
   | { type: "openTheme" }
   | { type: "openStatusLine" }
   | { type: "openTranscript" }
   | { type: "openShortcuts" }
   | { type: "showApproval" }
-  | { type: "moveHistory"; entryIds: readonly string[]; delta: number; viewportHeight: number }
-  | { type: "syncHistory"; entryIds: readonly string[]; viewportHeight: number }
+  | { type: "moveHistory"; total: number; delta: number; viewportHeight: number }
+  | { type: "syncHistory"; total: number; viewportHeight: number }
   | { type: "moveThread"; threadIds: readonly string[]; delta: number; viewportHeight: number }
   | { type: "syncThreads"; threadIds: readonly string[]; viewportHeight: number }
   | { type: "moveSlash"; total: number; delta: number }
@@ -55,9 +55,8 @@ export type TuiMsg =
   | { type: "scrollTranscript"; delta: number }
   | { type: "jumpTranscriptTop" }
   | { type: "jumpTranscriptBottom" }
-  | { type: "selectEntry"; entryId: string }
+  | { type: "selectTurn"; index: number }
   | { type: "setTurnStatus"; status: TurnStatus; message?: string }
-  | { type: "restoreCompleted"; branchId: string; targetId: string }
   | { type: "resumeCompleted"; threadId: string }
   | { type: "themeSelected"; themeName: ThemeName };
 
@@ -83,7 +82,7 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
     case "closeSurface":
       return closeFocusSurfaces(state);
     case "openHistory":
-      return setPickerSurface(selectEntry(state, msg.leafId), "history");
+      return setPickerSurface(state, "history");
     case "openThreads":
       return setPickerSurface(selectThread(state, msg.threadId), "resume");
     case "openTheme":
@@ -101,12 +100,12 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       );
     case "moveHistory":
       return syncListScroll(
-        moveSelection(state, msg.entryIds, msg.delta),
-        msg.entryIds,
+        moveSelection(state, msg.total, msg.delta),
+        msg.total,
         msg.viewportHeight,
       );
     case "syncHistory":
-      return syncListScroll(state, msg.entryIds, msg.viewportHeight);
+      return syncListScroll(state, msg.total, msg.viewportHeight);
     case "moveThread":
       return syncThreadScroll(
         moveThreadSelection(state, msg.threadIds, msg.delta),
@@ -137,14 +136,10 @@ export function updateTuiState(state: TuiState, msg: TuiMsg): TuiState {
       return { ...state, transcriptScroll: 0 };
     case "jumpTranscriptBottom":
       return { ...state, transcriptScroll: Number.MAX_SAFE_INTEGER };
-    case "selectEntry":
-      return selectEntry(state, msg.entryId);
+    case "selectTurn":
+      return selectTurn(state, msg.index);
     case "setTurnStatus":
       return setTurnStatus(state, msg.status, msg.message);
-    case "restoreCompleted":
-      return closeFocusSurfaces(
-        setTurnStatus(selectEntry(state, msg.branchId), "idle", `backtracked ${shortId(msg.targetId)}`),
-      );
     case "resumeCompleted":
       return closeFocusSurfaces(
         setTurnStatus(selectThread(state, msg.threadId), "idle", `resumed ${shortId(msg.threadId)}`),

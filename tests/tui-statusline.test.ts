@@ -27,7 +27,7 @@ import {
   buildStatusLineRows,
   formatStatusLineRow,
 } from "../src/tui/widgets/pickers/statusline";
-import { createStore } from "./tui-test-helpers";
+import { createViewState } from "./tui-test-helpers";
 
 test("bottom statusline renders an unsaved thread before first submit", () => {
   const state = createTuiState();
@@ -59,10 +59,10 @@ test("bottom statusline renders an unsaved thread before first submit", () => {
   expect(formatComposerStatus({
     running: true,
     turnStatus: "idle",
-    statusMessage: "stored 1 raw item(s)",
+    statusMessage: "turn completed",
     frame: 2,
     elapsedMs: 65_400,
-  })).toBe("• stored 1 raw item(s)");
+  })).toBe("• turn completed");
   expect(formatCodexStatusLine({
     state,
     codex: { connected: true, turnStatus: "running", model: "gpt-test" },
@@ -122,7 +122,7 @@ test("statusline uses themed segments per item type", () => {
 });
 
 test("statusline command configures visible status line items", async () => {
-  const store = await createStore();
+  const store = await createViewState();
   let state = createTuiState(store);
   expect(state.statusLineItems).toContain("model");
 

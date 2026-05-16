@@ -22,10 +22,24 @@ export interface TurnResult {
   completed: unknown;
 }
 
+export interface TurnObserver {
+  onThreadChanged?(event: { type: string; leafId: string; [key: string]: unknown }): void;
+  onTurnStarted?(event: TurnStartedEvent): void;
+  onCodexTurnStarted?(event: TurnStartedEvent): void;
+  onAssistantDelta?(event: AssistantDeltaEvent): void;
+  onRawItemCompleted?(event: RawItemEvent): void;
+  onTurnCompleted?(event: TurnCompletedEvent): void;
+  onTurnAborted?(event: TurnAbortedEvent): void;
+  onTurnFailed?(event: TurnFailedEvent): void;
+  onApprovalRequested?(request: JSONRPCRequest): void;
+  onApprovalResolved?(event: { request: JSONRPCRequest; result: unknown }): void;
+  onApprovalRejected?(event: { request: JSONRPCRequest; error: string }): void;
+}
+
 export interface RunTurnOptions {
   askApproval?: (request: JSONRPCRequest) => Promise<unknown>;
   overrides?: TurnOverrides;
-  emit?: ControllerEventSink;
+  observer?: TurnObserver;
 }
 
 export interface AssistantDeltaEvent {
@@ -68,4 +82,3 @@ export interface TurnFailedEvent {
   error: Error | string;
 }
 
-export type ControllerEventSink = (event: string, payload: unknown) => void;

@@ -2,7 +2,7 @@ import { EventEmitter } from "events";
 import { CodexAppServerClient } from "../codex/app-server";
 import { picoConfig } from "../config";
 import { PicoThreadStore } from "../thread/store";
-import type { AppState, RunTurnOptions, TurnResult } from "./types";
+import type { AppState, RunTurnOptions, TurnObserver, TurnResult } from "./types";
 import { createApp, createDraftApp, ensureAppThread, loadApp } from "./factory";
 import { runTurn } from "./turn-runner";
 import "./config";
@@ -17,6 +17,7 @@ export type {
   TurnAbortedEvent,
   TurnCompletedEvent,
   TurnFailedEvent,
+  TurnObserver,
   TurnResult,
   TurnStartedEvent,
 } from "./types";
@@ -72,8 +73,24 @@ export class PicoController extends EventEmitter {
   async runTurn(userInput: string, options: RunTurnOptions = {}): Promise<TurnResult> {
     return runTurn(this.state, userInput, {
       ...options,
-      emit: (event, payload) => this.emit(event, payload),
+      observer: this.createTurnObserver(),
     });
+  }
+
+  private createTurnObserver(): TurnObserver {
+    return {
+      onThreadChanged: (e) => this.emit("thread:changed", e),
+      onTurnStarted: (e) => this.emit("turn:started", e),
+      onCodexTurnStarted: (e) => this.emit("turn:codex-started", e),
+      onAssistantDelta: (e) => this.emit("assistant:delta", e),
+      onRawItemCompleted: (e) => this.emit("raw-item:completed", e),
+      onTurnCompleted: (e) => this.emit("turn:completed", e),
+      onTurnAborted: (e) => this.emit("turn:aborted", e),
+      onTurnFailed: (e) => this.emit("turn:failed", e),
+      onApprovalRequested: (r) => this.emit("approval:requested", r),
+      onApprovalResolved: (e) => this.emit("approval:resolved", e),
+      onApprovalRejected: (e) => this.emit("approval:rejected", e),
+    };
   }
 
   async checkout(entryId: string): Promise<void> {

@@ -5,7 +5,7 @@ import type { PicoThreadStore, RawResponseItem, RolloutEntry, TurnOverrides } fr
 import type {
   AppState,
   AssistantDeltaEvent,
-  ControllerEventSink,
+  TurnObserver,
   RawItemEvent,
   RunTurnOptions,
   TurnAbortedEvent,
@@ -25,8 +25,7 @@ export async function runTurn(
     typeof optionsOrAskApproval === "function"
       ? { askApproval: optionsOrAskApproval, overrides: legacyOverrides }
       : optionsOrAskApproval;
-  const { askApproval, overrides = {} } = options;
-  const emit = "emit" in options ? (options.emit as ControllerEventSink | undefined) : undefined;
+  const { askApproval, overrides = {}, observer } = options;
   const { store, codex } = app;
   const snapshot = picoConfig.snapshot();
   const { codexBinary: _codexBinary, ...configOverrides } = snapshot;
@@ -40,7 +39,7 @@ export async function runTurn(
   try {
     const branchParentId = await store.ensureBranchForAppend();
     if (branchParentId !== parentId) {
-      emit?.("thread:changed", { type: "branch", leafId: store.leafId, fromId: parentId });
+      observer?.onThreadChanged?.({ type: "branch", leafId: store.leafId, fromId: parentId });
       parentId = branchParentId;
     }
 
@@ -60,7 +59,7 @@ export async function runTurn(
     picoTurnId = picoTurn.id;
     parentId = picoTurn.id;
     codexTurnId = picoTurn.id;
-    emit?.("turn:started", {
+    observer?.onTurnStarted?.({
       threadId,
       turnId: picoTurn.id,
       userInput,
@@ -79,7 +78,7 @@ export async function runTurn(
         const entry = await store.appendResponseItem(parentId, item);
         parentId = entry.id;
         rawItemCount += 1;
-        emit?.("raw-item:completed", {
+        observer?.onRawItemCompleted?.({
           threadId: threadId!,
           turnId: picoTurn.id,
           item,
@@ -93,7 +92,7 @@ export async function runTurn(
       const maybeThreadId = value?.threadId || value?.thread_id;
       if (maybeThreadId && maybeThreadId !== threadId) return;
       if (typeof value?.delta === "string") {
-        emit?.("assistant:delta", {
+        observer?.onAssistantDelta?.({
           threadId: threadId!,
           turnId: codexTurnId,
           delta: value.delta,
@@ -102,15 +101,15 @@ export async function runTurn(
     };
 
     const onServerRequest = async (request: JSONRPCRequest) => {
-      emit?.("approval:requested", request);
+      observer?.onApprovalRequested?.(request);
       try {
         const result = askApproval ? await askApproval(request) : defaultServerRequestResult(request);
         codex.resolveServerRequest(request.id, result);
-        emit?.("approval:resolved", { request, result });
+        observer?.onApprovalResolved?.({ request, result });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         codex.rejectServerRequest(request.id, -32000, message);
-        emit?.("approval:rejected", { request, error: message });
+        observer?.onApprovalRejected?.({ request, error: message });
       }
     };
 
@@ -153,7 +152,7 @@ export async function runTurn(
       });
       const turnId = started.turn.id;
       codexTurnId = turnId;
-      emit?.("turn:codex-started", {
+      observer?.onCodexTurnStarted?.({
         threadId,
         turnId: picoTurn.id,
         codexTurnId: turnId,
@@ -190,12 +189,12 @@ export async function runTurn(
           leafId: store.leafId,
           completed,
         } satisfies TurnResult;
-        emit?.("turn:aborted", {
+        observer?.onTurnAborted?.({
           threadId,
           ...result,
           reason,
         } satisfies TurnAbortedEvent);
-        emit?.("thread:changed", { type: "turn", leafId: store.leafId });
+        observer?.onThreadChanged?.({ type: "turn", leafId: store.leafId });
         return result;
       }
       if (terminalStatus === "failed") {
@@ -225,8 +224,8 @@ export async function runTurn(
         leafId: store.leafId,
         completed,
       } satisfies TurnResult;
-      emit?.("turn:completed", { threadId, ...result } satisfies TurnCompletedEvent);
-      emit?.("thread:changed", { type: "turn", leafId: store.leafId });
+      observer?.onTurnCompleted?.({ threadId, ...result } satisfies TurnCompletedEvent);
+      observer?.onThreadChanged?.({ type: "turn", leafId: store.leafId });
       return result;
     } catch (err) {
       await pendingRawWrites.catch(() => {});
@@ -245,7 +244,7 @@ export async function runTurn(
     }
   } catch (err) {
     const error = err instanceof Error ? err : String(err);
-    emit?.("turn:failed", {
+    observer?.onTurnFailed?.({
       threadId,
       turnId: picoTurnId,
       error,

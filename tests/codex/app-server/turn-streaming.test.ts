@@ -52,7 +52,12 @@ test("runTurn streams assistant delta, raw item, and completion through stdio", 
       { cwd, store, codex: fixture.client, config: {} } as AppState,
       "hello",
       {
-        emit: (event) => events.push(event),
+        observer: {
+          onAssistantDelta: () => events.push("assistant:delta"),
+          onRawItemCompleted: () => events.push("raw-item:completed"),
+          onTurnCompleted: () => events.push("turn:completed"),
+          onTurnFailed: () => events.push("turn:failed"),
+        },
       },
     );
 

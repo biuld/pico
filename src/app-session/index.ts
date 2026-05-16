@@ -3,13 +3,8 @@ import { approvalResult, runTurn } from "../app/turn-runner";
 import { createDraftApp, ensureAppThread, loadApp } from "../app/factory";
 import type {
   AppState,
-  AssistantDeltaEvent,
   DraftAppState,
-  RawItemEvent,
-  TurnAbortedEvent,
-  TurnCompletedEvent,
   TurnFailedEvent,
-  TurnStartedEvent,
 } from "../app/types";
 import type { JSONRPCRequest } from "../codex/app-server";
 import { PicoThreadStore, type PicoThreadInfo, type RawResponseItem } from "../thread/store";
@@ -262,9 +257,50 @@ export class PicoAppSession extends EventEmitter {
     try {
       await runTurn(activeApp, userInput, {
         askApproval: (request) => this.askApproval(request),
-        emit: (event, payload) => {
-          if (event === PICO_APP_SESSION_EVENTS.TURN_FAILED) failedFromEvent = true;
-          this.handleTurnEvent(event, payload);
+        observer: {
+          onTurnStarted: (event) => {
+            this.activeCodexThreadId = event.threadId;
+            this.activeCodexTurnId = undefined;
+            this.liveLeafId = event.turnId;
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_STARTED, event);
+          },
+          onCodexTurnStarted: (event) => {
+            this.activeCodexThreadId = event.threadId;
+            this.activeCodexTurnId = event.codexTurnId;
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED, event);
+            if (this.interruptRequested) void this.sendActiveInterrupt();
+          },
+          onAssistantDelta: (event) => {
+            this.streamingText += event.delta || "";
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, event);
+          },
+          onRawItemCompleted: (event) => {
+            this.liveLeafId = event.entryId || this.liveLeafId;
+            if (rawResponseItemHasOutputText(event.item)) this.streamingText = "";
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, event);
+          },
+          onTurnCompleted: (event) => {
+            this.streamingText = "";
+            this.liveLeafId = undefined;
+            this.clearActiveCodexTurn();
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, event);
+          },
+          onTurnAborted: (event) => {
+            this.streamingText = "";
+            this.liveLeafId = undefined;
+            this.clearActiveCodexTurn();
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_ABORTED, event);
+          },
+          onTurnFailed: (event) => {
+            failedFromEvent = true;
+            const interrupted = this.interruptRequested;
+            this.streamingText = "";
+            this.liveLeafId = undefined;
+            this.clearActiveCodexTurn();
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, interrupted
+              ? { ...event, error: "Turn interrupted" }
+              : event);
+          },
         },
       });
     } catch (err) {
@@ -282,64 +318,6 @@ export class PicoAppSession extends EventEmitter {
       this.pendingApproval = { request, resolve };
       this.emitAppSession(PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED, request);
     });
-  }
-
-  private handleTurnEvent(event: string, payload: unknown): void {
-    if (event === PICO_APP_SESSION_EVENTS.TURN_STARTED) {
-      const started = payload as TurnStartedEvent;
-      this.activeCodexThreadId = started.threadId;
-      this.activeCodexTurnId = undefined;
-      this.liveLeafId = started.turnId;
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_STARTED, started);
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED) {
-      const started = payload as TurnStartedEvent;
-      this.activeCodexThreadId = started.threadId;
-      this.activeCodexTurnId = started.codexTurnId;
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_CODEX_STARTED, started);
-      if (this.interruptRequested) void this.sendActiveInterrupt();
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA) {
-      const delta = payload as AssistantDeltaEvent;
-      this.streamingText += delta.delta || "";
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, delta);
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED) {
-      const item = payload as RawItemEvent;
-      this.liveLeafId = item.entryId || this.liveLeafId;
-      if (rawResponseItemHasOutputText(item.item)) this.streamingText = "";
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.RAW_ITEM_COMPLETED, item);
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.TURN_COMPLETED) {
-      const result = payload as TurnCompletedEvent;
-      this.streamingText = "";
-      this.liveLeafId = undefined;
-      this.clearActiveCodexTurn();
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, result);
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.TURN_ABORTED) {
-      const result = payload as TurnAbortedEvent;
-      this.streamingText = "";
-      this.liveLeafId = undefined;
-      this.clearActiveCodexTurn();
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_ABORTED, result);
-      return;
-    }
-    if (event === PICO_APP_SESSION_EVENTS.TURN_FAILED) {
-      const failed = payload as TurnFailedEvent;
-      const interrupted = this.interruptRequested;
-      this.streamingText = "";
-      this.liveLeafId = undefined;
-      this.clearActiveCodexTurn();
-      this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, interrupted
-        ? { ...failed, error: "Turn interrupted" }
-        : failed);
-    }
   }
 
   private emitTurnFailed(error: unknown, leafId?: string): void {

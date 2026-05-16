@@ -1,74 +1,49 @@
-import type { ResponseItem as CodexGeneratedResponseItem } from "@pico/codex-app-server-protocol";
+import type { ResponseItem } from "@pico/codex-app-server-protocol";
 
 export type PicoConfigSnapshot = Record<string, unknown>;
 
-export type CodexResponseItem = CodexGeneratedResponseItem;
+// === Codex-native RolloutItem format ===
 
-// Pico persists raw JSON exactly as received from app-server. The generated
-// union documents known Codex shapes, while the object branch keeps JSONL
-// tolerant of older tests, forward-compatible payloads, and unmodeled fields.
-export type RawResponseItem = Record<string, unknown> & (
-  | { type?: string }
-  | CodexGeneratedResponseItem
-);
+export type RolloutItem =
+  | { type: "session_meta"; payload: SessionMeta }
+  | { type: "response_item"; payload: ResponseItem };
 
-export type ResponseItem = RawResponseItem;
-
-export interface PicoThreadHeader {
-  type: "thread";
-  version: 1;
+export interface SessionMeta {
   id: string;
-  createdAt: string;
   cwd: string;
+  createdAt: string;
   config: PicoConfigSnapshot;
 }
 
-export interface BaseEntry {
-  id: string;
-  parentId: string | null;
+// === Pico line format: RolloutLine + tree navigation ===
+
+export interface RolloutLine {
   timestamp: string;
+  type: RolloutItem["type"];
+  payload: RolloutItem["payload"];
+  id: string;
+  parent?: string;
 }
 
-export type CodexRolloutItemType = "response_item" | "event_msg" | "compacted";
-
-export type RolloutItem =
-  | { type: "response_item"; payload: RawResponseItem }
-  | { type: "event_msg"; payload: unknown }
-  | { type: "compacted"; payload: unknown }
-  | { type: "branch_out" };
-
-export interface RolloutEntry extends BaseEntry {
-  item: RolloutItem;
+export interface BranchOut {
+  id: string;
+  type: "branch_out";
+  parent: string;
 }
 
-export type PicoThreadEntry = RolloutEntry;
+export type PicoLine = RolloutLine | BranchOut | EventLine;
 
-export type TurnEntry = RolloutEntry & {
-  type?: "turn";
-  userInput?: string;
-  status?: TurnStatus;
-};
-export type ResponseItemEntry = RolloutEntry & {
-  type?: "response_item";
-  responseItem?: RawResponseItem;
-  turnId?: string;
-};
-export type TurnCompletedEntry = RolloutEntry;
-export type TurnFailedEntry = RolloutEntry;
-export type TurnAbortedEntry = RolloutEntry;
-export type BranchEntry = RolloutEntry & { targetId?: string; name?: string };
-export type LabelEntry = RolloutEntry & { targetId?: string; label?: string };
-export type ConfigChangeEntry = RolloutEntry;
-
-export interface TurnOverrides {
-  model?: string;
-  modelProvider?: string;
-  approvalPolicy?: string;
-  sandbox?: unknown;
-  cwd?: string;
-  personality?: string;
-  developerInstructions?: string;
+export interface EventLine {
+  id: string;
+  parent: string;
+  timestamp: string;
+  type: "event_msg";
+  payload: unknown;
 }
+
+export const CURRENT_THREAD_VERSION = 3;
+
+// === Thread info (for list view) ===
 
 export interface PicoThreadInfo {
   id: string;
@@ -82,12 +57,55 @@ export interface PicoThreadInfo {
   label?: string;
 }
 
+// === Turn overrides ===
+
+export interface TurnOverrides {
+  model?: string;
+  modelProvider?: string;
+  approvalPolicy?: string;
+  sandbox?: unknown;
+  cwd?: string;
+  personality?: string;
+  developerInstructions?: string;
+}
+
 export type TurnStatus = "started" | "completed" | "failed" | "aborted";
 
-export interface UserInputResponseItem extends RawResponseItem {
+// === User input helper ===
+
+export interface UserInputResponseItem {
   id: string;
   type: "message";
   role: "user";
   content: Array<{ type: "input_text"; text: string }>;
+  created_at: string;
   pico?: { kind: "user_input"; status?: TurnStatus; overrides?: TurnOverrides; cwd?: string };
+}
+
+// === Backward-compat types (compiled against by import code, history, etc.) ===
+
+export type RolloutEntryItem =
+  | { type: "response_item"; payload: any }
+  | { type: "branch_out" }
+  | { type: "event_msg"; payload: any }
+  | { type: string; payload?: any };
+
+export interface RolloutEntry {
+  id: string;
+  parentId: string | null;
+  timestamp: string;
+  item: RolloutEntryItem;
+}
+
+export type PicoThreadEntry = RolloutEntry;
+export type RawResponseItem = ResponseItem;
+
+/** Legacy header written by the Codex-thread import tool. */
+export interface PicoThreadHeader {
+  type: "thread";
+  version: number;
+  id: string;
+  createdAt: string;
+  cwd: string;
+  config: PicoConfigSnapshot;
 }

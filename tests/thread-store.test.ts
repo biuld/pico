@@ -23,20 +23,22 @@ test("stores entries as rollout entries with a unified RolloutItem ADT", async (
   await store.appendEventMsg(assistant.id, { type: "turn_completed", turnId: user.id });
 
   const lines = parseJsonl(await Bun.file(store.path).text());
-  expect(lines.slice(1).every((line) => "item" in (line as Record<string, unknown>))).toBe(true);
+  expect(lines.slice(1).every((line) => "type" in (line as Record<string, unknown>) && "payload" in (line as Record<string, unknown>))).toBe(true);
   expect(lines[1]).toMatchObject({
     id: user.id,
-    parentId: store.id,
-    item: { type: "response_item" },
+    type: "response_item",
+    parent: store.id,
   });
   expect(lines[2]).toMatchObject({
     id: assistant.id,
-    parentId: user.id,
-    item: { type: "response_item", payload: { id: "assistant-1" } },
+    type: "response_item",
+    parent: user.id,
+    payload: { id: "assistant-1" },
   });
   expect(lines[3]).toMatchObject({
-    parentId: assistant.id,
-    item: { type: "event_msg", payload: { type: "turn_completed" } },
+    type: "event_msg",
+    parent: assistant.id,
+    payload: { type: "turn_completed" },
   });
 });
 

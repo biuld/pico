@@ -61,7 +61,7 @@ export async function runTurn(
     if (codexThreadId) {
       thread = await codex.resumeThread(codexThreadId, threadParams as Record<string, unknown>);
     } else {
-      thread = await codex.startEphemeralThread(threadParams as Record<string, unknown>);
+      thread = await codex.startThread(threadParams as Record<string, unknown>);
       store.codexThreadId = thread.thread.id;
     }
     threadId = thread.thread.id;

@@ -212,6 +212,17 @@ export class CodexAppServerClient extends EventEmitter {
     this.emit("status", this.statusSnapshot);
   }
 
+  async startThread(params: Partial<ThreadStartParams> = {}): Promise<ThreadStartResponse> {
+    const response = await this.request<ThreadStartResponse>("thread/start", {
+      ...params,
+      experimentalRawEvents: true,
+    });
+    this.status = updateCodexStatusFromThreadStart(this.status, response);
+    this.emit("status", this.statusSnapshot);
+    return response;
+  }
+
+  // @deprecated Use startThread for persistent threads
   async startEphemeralThread(params: Partial<ThreadStartParams> = {}): Promise<ThreadStartResponse> {
     const response = await this.request<ThreadStartResponse>("thread/start", {
       ...params,

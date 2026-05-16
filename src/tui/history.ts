@@ -4,7 +4,7 @@ import type {
   ResponseItem,
 } from "../thread/store";
 import { entryUserText } from "../thread/store";
-import { responseItemText } from "./response-items";
+import { responseItemAgentText } from "./response-items";
 
 export interface HistoryTurnRow {
   id: string;
@@ -76,10 +76,7 @@ export function buildHistoryTurnRows(
     if (!node) continue;
     node.endId = entry.id;
     if (entry.item.type === "response_item") {
-      const item = entry.item.payload as ResponseItem;
-      const role = typeof item.role === "string" ? item.role : undefined;
-      if (role === "user" || role === "developer") continue;
-      const text = responseItemText(item);
+      const text = responseItemAgentText(entry.item.payload as ResponseItem);
       if (text) node.agentParts.push(text);
     } else if (entry.item.type === "event_msg") {
       const event = entry.item.payload as Record<string, unknown> | undefined;

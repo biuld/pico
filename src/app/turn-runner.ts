@@ -1,6 +1,6 @@
 import { normalizeCodexStatusValue } from "../codex/app-server";
-import type { JSONRPCRequest } from "../codex/app-server";
-import type { ItemCompletedNotification, ThreadItem } from "@pico/codex-app-server-protocol/v2";
+import type { JSONRPCRequest, CodexEvent } from "../codex/app-server";
+import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { picoConfig } from "../config";
 import type { CodexThreadViewState, TurnOverrides } from "./codex-thread-view-state";
 import type {
@@ -72,17 +72,25 @@ export async function runTurn(
       modelProvider: thread.modelProvider,
     } satisfies TurnStartedEvent);
 
-    const onDelta = (params: unknown) => {
-      const value = params as Record<string, unknown> | undefined;
-      const maybeThreadId = value?.threadId || value?.thread_id;
-      if (maybeThreadId && maybeThreadId !== threadId) return;
-      if (typeof value?.delta === "string") {
-        viewState.appendDelta(value.delta);
-        observer?.onAssistantDelta?.({
-          threadId: threadId!,
-          turnId: codexTurnId,
-          delta: value.delta,
-        } satisfies AssistantDeltaEvent);
+    const onCodexEvent = (event: CodexEvent) => {
+      switch (event.type) {
+        case "assistant.delta": {
+          if (event.threadId !== threadId) return;
+          viewState.appendDelta(event.delta);
+          observer?.onAssistantDelta?.({
+            threadId: threadId!,
+            turnId: codexTurnId,
+            delta: event.delta,
+          } satisfies AssistantDeltaEvent);
+          break;
+        }
+        case "item.completed": {
+          if (event.threadId !== threadId) return;
+          const item = event.item;
+          viewState.addLiveItem(item);
+          observer?.onThreadItemCompleted?.(item);
+          break;
+        }
       }
     };
 
@@ -99,16 +107,8 @@ export async function runTurn(
       }
     };
 
-    const onItemCompleted = (params: ItemCompletedNotification) => {
-      if (params.threadId !== threadId) return;
-      const item = params.item as ThreadItem;
-      viewState.addLiveItem(item);
-      observer?.onThreadItemCompleted?.(item);
-    };
-
-    codex.on("item/agentMessage/delta", onDelta);
+    codex.on("codex:event", onCodexEvent);
     codex.on("serverRequest", onServerRequest);
-    codex.on("item/completed", onItemCompleted);
 
     try {
       const started = await codex.startTurn(threadId, userInput, {
@@ -193,9 +193,8 @@ export async function runTurn(
       viewState.abortTurn();
       throw err;
     } finally {
-      codex.off("item/agentMessage/delta", onDelta);
+      codex.off("codex:event", onCodexEvent);
       codex.off("serverRequest", onServerRequest);
-      codex.off("item/completed", onItemCompleted);
     }
   } catch (err) {
     const error = err instanceof Error ? err : String(err);

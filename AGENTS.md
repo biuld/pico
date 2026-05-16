@@ -12,6 +12,10 @@ See `docs/pico-product-direction.md` for full product direction and roadmap.
 
 **Every Codex app-server interaction goes through `src/codex/app-server`.** Do not scatter raw JSON-RPC method strings or parse notifications in TUI/runtime code. Add typed SDK methods, status projection, or event normalization there first, then consume the clean semantic surface from the UI layer.
 
+**Event boundary**: `CodexAppServerClient` emits two event surfaces:
+- `codex:event` — semantic `CodexEvent` (e.g. `assistant.delta`, `item.completed`). **This is the only surface app/runtime/TUI may consume.**
+- Legacy raw method events (e.g. `"item/agentMessage/delta"`) — emitted for backward compatibility. **Only SDK tests and tools may use these; app/TUI must not.**
+
 ## Runtime
 
 - **Bun** (not Node). `bun run src/index.ts` for dev.

@@ -60,7 +60,8 @@ class SessionCodex extends EventEmitter {
 
   async startTurn() {
     setTimeout(() => {
-      this.emit("item/agentMessage/delta", {
+      this.emit("codex:event", {
+        type: "assistant.delta",
         threadId: "thread-1",
         turnId: "codex-turn-1",
         delta: "hello",

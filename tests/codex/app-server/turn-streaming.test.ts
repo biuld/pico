@@ -67,3 +67,114 @@ test("runTurn streams assistant delta and completion through stdio", async () =>
     await fixture.client.shutdown();
   }
 });
+
+test("CodexAppServerClient emits semantic codex:event for raw notifications", async () => {
+  const { cwd } = await createTempProject();
+  const fixture = await startMockCodexClient([
+    ...startupSteps(),
+    {
+      expectRequest: "thread/start",
+      params: {},
+      respond: threadStartResponse(cwd),
+    },
+    {
+      expectRequest: "turn/start",
+      params: {
+        threadId: "thread-1",
+        input: [{ type: "text", text: "test" }],
+      },
+      respond: { turn: { id: "turn-1", status: "inProgress" } },
+    },
+    { delay: 20 },
+    {
+      notify: "item/agentMessage/delta",
+      params: { threadId: "thread-1", turnId: "turn-1", delta: "semantic" },
+    },
+    {
+      notify: "item/completed",
+      params: {
+        threadId: "thread-1",
+        item: { type: "agentMessage", id: "a1", text: "reply", phase: null, memoryCitation: null },
+      },
+    },
+    {
+      notify: "warning",
+      params: { message: "rate limit approaching" },
+    },
+    {
+      notify: "turn/completed",
+      params: { threadId: "thread-1", turnId: "turn-1", status: "completed" },
+    },
+  ]);
+
+  try {
+    const events: Array<{ type: string }> = [];
+    fixture.client.on("codex:event", (event) => events.push(event));
+
+    const viewState = CodexThreadViewState.create(cwd);
+    await runTurn(
+      { cwd, viewState, codex: fixture.client } as AppState,
+      "test",
+    );
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("assistant.delta");
+    expect(types).toContain("item.completed");
+    expect(types).toContain("turn.completed");
+    expect(types).toContain("warning");
+
+    // Verify assistant.delta payload
+    const delta = events.find((e) => e.type === "assistant.delta") as { delta: string } | undefined;
+    expect(delta?.delta).toBe("semantic");
+
+    // Verify item.completed payload
+    const itemCompleted = events.find((e) => e.type === "item.completed") as { item: unknown } | undefined;
+    expect(itemCompleted?.item).toBeDefined();
+
+    // Verify warning payload
+    const warningEvent = events.find((e) => e.type === "warning") as { message: string } | undefined;
+    expect(warningEvent?.message).toBe("rate limit approaching");
+  } finally {
+    await fixture.client.shutdown();
+  }
+});
+
+test("CodexAppServerClient emits both codex:event and notification:error for raw error", async () => {
+  const { cwd } = await createTempProject();
+  const fixture = await startMockCodexClient([
+    ...startupSteps(),
+    // No turn — just test client-level notification wiring
+    { delay: 10 },
+    {
+      notify: "error",
+      params: { message: "fatal error", willRetry: true },
+    },
+    // Keep mock alive briefly so events propagate
+    { delay: 50 },
+  ]);
+
+  try {
+    const semanticError = new Promise<unknown>((resolve) => {
+      fixture.client.on("codex:event", (event) => {
+        if (event.type === "error") resolve(event);
+      });
+    });
+    const rawErrorSeen = new Promise<unknown>((resolve) => {
+      fixture.client.on("notification:error", resolve);
+    });
+
+    const [errorEventValue, rawErrorValue] = await Promise.all([
+      semanticError,
+      rawErrorSeen,
+    ]);
+
+    const errorEvent = errorEventValue as { message: string; willRetry: boolean };
+    expect(errorEvent.message).toBe("fatal error");
+    expect(errorEvent.willRetry).toBe(true);
+
+    const rawError = rawErrorValue as { message: string };
+    expect(rawError.message).toBe("fatal error");
+  } finally {
+    await fixture.client.shutdown();
+  }
+});

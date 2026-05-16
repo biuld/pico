@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { normalizeNotification, type CodexEvent } from "./notifications";
 import {
   messageThreadId,
   messageTurnId,
@@ -110,10 +111,14 @@ export class CodexAppServerClient extends EventEmitter {
       this.emit("status", this.statusSnapshot);
       this.emit("notification", notification);
       if (notification.method === "error") {
+        const event = normalizeNotification(notification);
+        this.emit("codex:event", event);
         this.emit("notification:error", notification.params);
         return;
       }
       this.emit(notification.method, notification.params);
+      const event = normalizeNotification(notification);
+      this.emit("codex:event", event);
     });
     this.transport.on("serverRequest", (request: JSONRPCRequest) => {
       this.emit("serverRequest", request);

@@ -219,13 +219,18 @@ export function normalizeNotification(
         params,
       };
 
-    case "item/completed":
+    case "item/completed": {
+      const item = (params as Record<string, unknown> | null)?.item;
+      if (!item || typeof item !== "object") {
+        return { type: "unknown", method, params };
+      }
       return {
         type: "item.completed",
         threadId: stringValue(params, "threadId", "thread_id") ?? "",
-        item: (params as Record<string, unknown>)?.item as ThreadItem,
+        item: item as ThreadItem,
         params,
       };
+    }
 
     case "item/agentMessage/delta":
       return {

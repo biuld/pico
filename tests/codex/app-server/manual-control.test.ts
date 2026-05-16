@@ -13,9 +13,13 @@ test("manual mock control API can drive an active turn to completion", async () 
 
   try {
     const deltas: string[] = [];
+    const semanticDeltas: string[] = [];
     fixture.client.on("item/agentMessage/delta", (params) => {
       const value = params as Record<string, unknown>;
       if (typeof value.delta === "string") deltas.push(value.delta);
+    });
+    fixture.client.on("codex:event", (event) => {
+      if (event.type === "assistant.delta") semanticDeltas.push(event.delta);
     });
 
     const thread = await fixture.client.startThread({ cwd });
@@ -34,6 +38,7 @@ test("manual mock control API can drive an active turn to completion", async () 
       status: "completed",
     });
     expect(deltas).toEqual(["manual hello"]);
+    expect(semanticDeltas).toEqual(["manual hello"]);
   } finally {
     await fixture.client.shutdown();
   }

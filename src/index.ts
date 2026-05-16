@@ -3,7 +3,7 @@
 import { formatCliHelp, parseCliArgs } from "./cli";
 import { createDraftApp, loadApp } from "./app/controller";
 import { picoConfig } from "./config";
-import { importCodexThreads } from "./import/codex-threads";
+// import { importCodexThreads } from "./import/codex-threads";
 import { PicoThreadStore } from "./thread/store";
 import { startOpenTui } from "./tui/opentui";
 
@@ -26,30 +26,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (options.command === "import") {
-    const result = await importCodexThreads({
-      cwd: options.cwd,
-      allCwd: options.importAllCwd,
-      dryRun: options.importDryRun,
-    });
-    const action = result.dryRun ? "would_import" : "imported";
-    console.log(
-      `Codex rollout import: ${action}=${result.dryRun ? result.wouldImport : result.imported} skipped=${result.skipped} failed=${result.failed}`,
-    );
-    for (const thread of result.threads) {
-      if (thread.status === "imported" || thread.status === "would_import") {
-        console.log(
-          `${thread.status} ${thread.codexThreadId} -> ${thread.picoThreadId} turns=${thread.turnCount || 0} items=${thread.responseItemCount || 0} ${thread.cwd || ""}`,
-        );
-      } else if (thread.status === "skipped") {
-        console.log(`skipped ${thread.codexThreadId} ${thread.reason || ""}`);
-      } else {
-        console.log(`failed ${thread.codexThreadId} ${thread.reason || ""}`);
-      }
-    }
-    if (result.failed > 0) process.exitCode = 1;
-    return;
-  }
+  // TODO: re-enable after import module is updated for RolloutLine V3 format
+  // if (options.command === "import") {
+  //   const result = await importCodexThreads({
+  //     cwd: options.cwd,
+  //     allCwd: options.importAllCwd,
+  //     dryRun: options.importDryRun,
+  //   });
+  //   ...
+  //   return;
+  // }
 
   try {
     const app = options.resumeThreadId

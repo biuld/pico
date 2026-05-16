@@ -100,12 +100,3 @@ export interface RolloutEntry {
 export type PicoThreadEntry = RolloutEntry;
 export type RawResponseItem = ResponseItem;
 
-/** Legacy header written by the Codex-thread import tool. */
-export interface PicoThreadHeader {
-  type: "thread";
-  version: number;
-  id: string;
-  createdAt: string;
-  cwd: string;
-  config: PicoConfigSnapshot;
-}

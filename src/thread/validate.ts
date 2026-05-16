@@ -56,19 +56,3 @@ export function validatePicoLine(raw: unknown): PicoLine {
 }
 
 // ── Backward‑compat validation for old‑format files ────────
-
-/**
- * Validate an old-format thread header (type: "thread", version check).
- * Kept so `codex-threads.ts` import tool continues to compile.
- */
-export function validatePicoThreadHeader(raw: unknown, path: string): Record<string, unknown> {
-  if (!isRecord(raw)) throw new Error(`Invalid thread header in ${path}`);
-
-  const id = raw.id;
-  if (!isNonEmptyString(id)) throw new Error(`Invalid thread header id in ${path}`);
-  if (typeof raw.createdAt !== "string") throw new Error(`Invalid thread header createdAt in ${path}`);
-  if (typeof raw.cwd !== "string") throw new Error(`Invalid thread header cwd in ${path}`);
-  if (!isRecord(raw.config)) throw new Error(`Invalid thread header config in ${path}`);
-
-  return raw as Record<string, unknown>;
-}

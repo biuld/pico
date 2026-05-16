@@ -142,46 +142,8 @@ export class PicoThreadStore {
       throw new Error(`Empty thread file: ${path}`);
     }
 
-    // Convert old-format lines (PicoThreadHeader + RolloutEntry) to PicoLine
-    const normalized = rawLines.map((raw, idx) => {
-      const obj = raw as Record<string, unknown>;
-      // Old header format: { type: "thread", version, id, createdAt, cwd, config }
-      if (idx === 0 && obj.type === "thread") {
-        return {
-          id: String(obj.id || ""),
-          timestamp: String(obj.createdAt || new Date().toISOString()),
-          type: "session_meta" as const,
-          payload: {
-            id: String(obj.id || ""),
-            cwd: String(obj.cwd || ""),
-            createdAt: String(obj.createdAt || ""),
-            config: (obj.config || {}) as PicoConfigSnapshot,
-          },
-        };
-      }
-      // Old entry format: { id, parentId, timestamp, item: { type, payload } }
-      if (obj.item && typeof obj.item === "object") {
-        const item = obj.item as Record<string, unknown>;
-        if (item.type === "branch_out") {
-          return {
-            id: String(obj.id || ""),
-            type: "branch_out" as const,
-            parent: String(obj.parentId || ""),
-          };
-        }
-        return {
-          id: String(obj.id || ""),
-          parent: obj.parentId ? String(obj.parentId) : undefined,
-          timestamp: String(obj.timestamp || new Date().toISOString()),
-          type: (String(item.type || "response_item")) as "response_item" | "event_msg",
-          payload: item.payload as Record<string, unknown>,
-        };
-      }
-      return raw;
-    });
-
     const lines: PicoLine[] = [];
-    for (const [idx, raw] of normalized.entries()) {
+    for (const [idx, raw] of rawLines.entries()) {
       const line = validatePicoLine(raw);
       lines.push(line);
       if (idx === 0 && line.type !== "session_meta") {

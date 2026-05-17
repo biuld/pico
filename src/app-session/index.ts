@@ -54,14 +54,12 @@ export class PicoAppSession extends EventEmitter {
   private currentApp: DraftAppState;
   private pendingApproval: PendingApproval | undefined;
   private running = false;
-  private streamingText = "";
   private queuedMessages: QueuedMessage[] = [];
   private nextQueuedMessageId = 1;
   private activeCodexThreadId: string | undefined;
   private activeCodexTurnId: string | undefined;
   private interruptRequested = false;
   private interrupting = false;
-  private liveThreadItems: ThreadItem[] = [];
   private detachCodexStatus: (() => void) | undefined;
   private readonly createDraftApp: (cwd: string) => Promise<DraftAppState>;
 
@@ -93,15 +91,16 @@ export class PicoAppSession extends EventEmitter {
   }
 
   get snapshot(): PicoAppSessionSnapshot {
+    const vs = this.currentApp.viewState;
     return {
       app: this.currentApp,
       running: this.running,
-      streamingText: this.streamingText,
+      streamingText: vs?.streamingText ?? "",
       pendingApproval: this.pendingApproval?.request,
       queuedMessages: [...this.queuedMessages],
       activeCodexThreadId: this.activeCodexThreadId,
       activeCodexTurnId: this.activeCodexTurnId,
-      liveThreadItems: [...this.liveThreadItems],
+      liveThreadItems: vs ? [...vs.liveTurnItems] : [],
     };
   }
 
@@ -120,7 +119,6 @@ export class PicoAppSession extends EventEmitter {
     this.detachCodexStatus = undefined;
     await this.currentApp.codex.shutdown().catch(() => {});
     this.currentApp = await loadApp(cwd, threadId);
-    this.clearUiState();
     this.clearQueuedMessages();
     this.attachCodexStatus(this.currentApp);
     this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_LOADED, { threadId });
@@ -155,7 +153,6 @@ export class PicoAppSession extends EventEmitter {
       return;
     }
 
-    this.clearUiState();
     this.running = true;
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_SUBMITTING);
 
@@ -224,11 +221,6 @@ export class PicoAppSession extends EventEmitter {
 
   // ── private helpers ──
 
-  private clearUiState(): void {
-    this.streamingText = "";
-    this.liveThreadItems = [];
-  }
-
   private async runSubmittedTurn(userInput: string): Promise<void> {
     let drainQueue = false;
     let failedFromEvent = false;
@@ -261,35 +253,28 @@ export class PicoAppSession extends EventEmitter {
             if (this.interruptRequested) void this.sendActiveInterrupt();
           },
           onAssistantDelta: (event) => {
-            this.streamingText += event.delta || "";
             this.emitAppSession(PICO_APP_SESSION_EVENTS.ASSISTANT_DELTA, event);
           },
           onTurnCompleted: (_event) => {
             drainQueue = true;
-            this.streamingText = "";
             this.clearActiveCodexTurn();
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, _event);
           },
           onTurnAborted: (_event) => {
-            // Only drain the queue if the user explicitly interrupted.
             drainQueue = this.interruptRequested;
-            this.streamingText = "";
             this.clearActiveCodexTurn();
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_ABORTED, _event);
           },
           onTurnFailed: (_event) => {
             failedFromEvent = true;
             const interrupted = this.interruptRequested;
-            // Only drain the queue if the user explicitly interrupted.
             drainQueue = interrupted;
-            this.streamingText = "";
             this.clearActiveCodexTurn();
             this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, interrupted
               ? { ..._event, error: "Turn interrupted" }
               : _event);
           },
           onThreadItemCompleted: (item) => {
-            this.liveThreadItems.push(item);
             this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_ITEM, item);
           },
           onLiveTranscriptChanged: () => {
@@ -315,7 +300,6 @@ export class PicoAppSession extends EventEmitter {
   }
 
   private emitTurnFailed(error: unknown, turnId?: string): void {
-    this.streamingText = "";
     const interrupted = this.interruptRequested;
     this.clearActiveCodexTurn();
     this.emitAppSession(PICO_APP_SESSION_EVENTS.TURN_FAILED, {
@@ -375,7 +359,6 @@ export class PicoAppSession extends EventEmitter {
     await previous.codex.shutdown().catch(() => {});
 
     this.currentApp = await this.createDraftApp(cwd);
-    this.clearUiState();
     this.pendingApproval = undefined;
     this.clearActiveCodexTurn();
     this.clearQueuedMessages();

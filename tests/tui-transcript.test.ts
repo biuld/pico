@@ -438,3 +438,60 @@ test("buildTranscriptCells shows no duplicate after live plan + completed plan i
   expect(cells.filter((c) => c.kind === "plan_update")).toHaveLength(0);
   expect(cells.some((c) => c.kind === "assistant_markdown" && c.id === "p2")).toBe(true);
 });
+
+// ── Tool/MCP display quality ──
+
+function toolPayload(cell: { blocks: readonly { type: string; payload: unknown }[] }) {
+  return cell.blocks[0]?.payload as { label?: string; detail?: string; status?: string };
+}
+
+test("threadItemToTranscriptCells: mcpToolCall shows args preview in detail", () => {
+  const cells = threadItemToTranscriptCells("m1", mockMcpToolCallItem("m1", "fs", "read", { path: "/x" }));
+  expect(cells).toHaveLength(1);
+  expect(toolPayload(cells[0]).detail).toContain("path");
+});
+
+test("threadItemToTranscriptCells: mcpToolCall shows duration when present", () => {
+  const item = {
+    type: "mcpToolCall", id: "dur1", server: "fs", tool: "stat",
+    arguments: {}, status: "completed", result: null, error: null,
+    durationMs: 1234,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("dur1", item);
+  expect(toolPayload(cells[0]).detail).toContain("1234ms");
+});
+
+test("threadItemToTranscriptCells: mcpToolCall with error shows error in detail", () => {
+  const item = {
+    type: "mcpToolCall", id: "err1", server: "fs", tool: "write",
+    arguments: { path: "/x", content: "data" },
+    status: "failed", result: null,
+    error: { message: "permission denied" },
+    durationMs: 150,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("err1", item);
+  expect(cells).toHaveLength(1);
+  expect(cells[0].status).toBe("failed");
+  const detail = toolPayload(cells[0]).detail!;
+  expect(detail).toContain("error: permission denied");
+  expect(detail).toContain("150ms");
+});
+
+test("threadItemToTranscriptCells: tool detail truncates long args", () => {
+  const longArgs = { data: "x".repeat(300) };
+  const item = {
+    type: "mcpToolCall", id: "t1", server: "fs", tool: "read",
+    arguments: longArgs, status: "completed", result: null, error: null, durationMs: null,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("t1", item);
+  const detail = toolPayload(cells[0]).detail!;
+  expect(detail.length).toBeLessThanOrEqual(210);
+});
+
+test("threadItemToTranscriptCells: dynamicToolCall shows namespace/tool label", () => {
+  const cells = threadItemToTranscriptCells("d1", mockDynamicToolCallItem("d1", "search", "grep", { q: "test" }));
+  expect(toolPayload(cells[0]).label).toBe("search/grep");
+});

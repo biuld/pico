@@ -287,7 +287,7 @@ function ToolBlock(props: {
           id={`${props.id}-header`}
           width="100%"
           content={`↳ ${header}`}
-          fg={props.theme.colors.status}
+          fg={props.block.payload.status === "failed" ? props.theme.colors.error : props.theme.colors.status}
           bg={groupBg}
           wrapMode="word"
         />

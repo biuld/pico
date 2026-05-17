@@ -51,30 +51,33 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
 
     case "mcpToolCall": {
       const label = `${item.server}/${item.tool}`;
-      const args = typeof item.arguments === "string"
-        ? item.arguments
-        : JSON.stringify(item.arguments);
-      return [toolCallCell(id, label, args)];
+      const detail = buildToolDetail(item.arguments, item.result, item.error, item.durationMs);
+      const status = toolStatusTone(item.status);
+      return [toolCallCell(id, label, detail, status)];
     }
 
     case "dynamicToolCall": {
       const label = item.namespace
         ? `${item.namespace}/${item.tool}`
         : item.tool;
-      const args = typeof item.arguments === "string"
-        ? item.arguments
-        : JSON.stringify(item.arguments);
-      return [toolCallCell(id, label, args)];
+      const detail = buildToolDetail(item.arguments, item.contentItems, null, item.durationMs);
+      const status = toolStatusTone(item.status);
+      return [toolCallCell(id, label, detail, status)];
     }
 
-    case "webSearch":
-      return [toolCallCell(id, "web_search", item.query)];
+    case "webSearch": {
+      const query = truncate(item.query, 120);
+      return [toolCallCell(id, "web_search", query)];
+    }
 
-    case "imageGeneration":
-      return [toolCallCell(id, "image_generation", item.revisedPrompt || item.result)];
+    case "imageGeneration": {
+      const prompt = truncate(item.revisedPrompt || item.result, 120);
+      return [toolCallCell(id, "image_generation", prompt)];
+    }
 
-    case "imageView":
+    case "imageView": {
       return [toolCallCell(id, "image_view", String(item.path))];
+    }
 
     case "enteredReviewMode":
     case "exitedReviewMode":
@@ -84,8 +87,8 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
       return [systemNoticeCell(id, "Context compacted", "compaction")];
 
     case "collabAgentToolCall": {
-      const c = item as unknown as { tool: string; prompt: string | null };
-      return [toolCallCell(id, `collab:${c.tool}`, c.prompt ?? "")];
+      const c = item as unknown as { tool: string; prompt: string | null; status: string; durationMs: number | null };
+      return [toolCallCell(id, `collab:${c.tool}`, truncate(c.prompt ?? "", 120), toolStatusTone(c.status))];
     }
 
     case "hookPrompt":
@@ -95,4 +98,61 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
       // Unknown item types show a muted notice so nothing is silently lost
       return [systemNoticeCell(id, `item: ${(item as { type: string }).type}`, "muted")];
   }
+}
+
+// ── Tool rendering helpers ──
+
+function toolStatusTone(status: string): string | undefined {
+  switch (status) {
+    case "failed":
+    case "error":
+    case "declined":
+    case "cancelled":
+      return "failed";
+    case "inProgress":
+    case "running":
+      return "running";
+    default:
+      return undefined;
+  }
+}
+
+function buildToolDetail(
+  args: unknown,
+  result: unknown,
+  error: unknown,
+  durationMs: number | null | undefined,
+): string {
+  const parts: string[] = [];
+
+  // Args preview
+  if (args !== undefined && args !== null) {
+    const argsStr = typeof args === "string" ? args : JSON.stringify(args);
+    parts.push(truncate(argsStr, 200));
+  }
+
+  // Result or error
+  if (error !== undefined && error !== null) {
+    const errStr = typeof error === "string" ? error
+      : (error as Record<string, unknown>).message as string | undefined
+      ?? JSON.stringify(error);
+    parts.push(`error: ${truncate(errStr, 160)}`);
+  } else if (result !== undefined && result !== null) {
+    const resultStr = typeof result === "string" ? result : JSON.stringify(result);
+    if (resultStr.length > 0 && resultStr !== "{}" && resultStr !== "null") {
+      parts.push(`result: ${truncate(resultStr, 160)}`);
+    }
+  }
+
+  // Duration
+  if (typeof durationMs === "number") {
+    parts.push(`${durationMs}ms`);
+  }
+
+  return parts.join(" · ");
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength - 3) + "...";
 }

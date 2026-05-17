@@ -24,6 +24,7 @@ export interface TuiThemeColors {
   textStrong: string;
   muted: string;
   status: string;
+  error: string;
   placeholder: string;
   userMessageBackground: string;
   statusLine: StatusLineThemeColors;
@@ -51,6 +52,7 @@ interface ThemePalette {
     textStrong: string;
     muted: string;
     status: string;
+    error?: string;
     placeholder?: string;
     userMessage?: string;
     accents: AccentPalette;
@@ -228,6 +230,7 @@ function buildTheme(theme: ThemePalette & { name: ThemeName }): TuiTheme {
       textStrong: palette.textStrong,
       muted: palette.muted,
       status: palette.status,
+      error: palette.error || palette.accents.magenta,
       placeholder: palette.placeholder || palette.muted,
       userMessageBackground: palette.userMessage || palette.surfaceAlt,
       statusLine: {

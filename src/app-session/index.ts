@@ -292,6 +292,9 @@ export class PicoAppSession extends EventEmitter {
             this.liveThreadItems.push(item);
             this.emitAppSession(PICO_APP_SESSION_EVENTS.THREAD_ITEM, item);
           },
+          onLiveTranscriptChanged: () => {
+            this.emitAppSession(PICO_APP_SESSION_EVENTS.LIVE_TRANSCRIPT_CHANGED);
+          },
         },
       });
     } catch (err) {

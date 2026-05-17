@@ -195,6 +195,7 @@ export function runOpenTuiRuntime(
   appSession.on(PICO_APP_SESSION_EVENTS.THREAD_ITEM, () => {
     render();
   });
+  appSession.on(PICO_APP_SESSION_EVENTS.LIVE_TRANSCRIPT_CHANGED, render);
   appSession.on(PICO_APP_SESSION_EVENTS.TURN_COMPLETED, (event: TurnCompletedEvent) => {
     clocks.finishActivity();
     const vs = appSession.app.viewState;

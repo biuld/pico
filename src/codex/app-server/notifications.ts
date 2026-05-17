@@ -1,5 +1,5 @@
 import type { JSONRPCNotification, JSONRPCRequest } from "./types";
-import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
+import type { ThreadItem, FileUpdateChange } from "@pico/codex-app-server-protocol/v2";
 
 // ── Semantic event types ──
 
@@ -100,16 +100,18 @@ export interface CodexReasoningDeltaEvent {
 export interface CodexCommandOutputDeltaEvent {
   type: "command.output.delta";
   threadId: string;
-  output: string;
-  stream: string;
+  turnId: string;
+  itemId: string;
+  delta: string;
   params: unknown;
 }
 
 export interface CodexFileChangeDeltaEvent {
   type: "file.change.delta";
   threadId: string;
-  path: string;
-  diff: string;
+  turnId: string;
+  itemId: string;
+  changes: FileUpdateChange[];
   params: unknown;
 }
 
@@ -276,20 +278,40 @@ export function normalizeNotification(
       return {
         type: "command.output.delta",
         threadId: stringValue(params, "threadId", "thread_id") ?? "",
-        output: stringValue(params, "output") ?? "",
-        stream: stringValue(params, "stream") ?? "stdout",
+        turnId: stringValue(params, "turnId", "turn_id") ?? "",
+        itemId: stringValue(params, "itemId", "item_id") ?? "",
+        delta: stringValue(params, "delta") ?? "",
         params,
       };
 
     case "item/fileChange/outputDelta":
-    case "item/fileChange/patchUpdated":
+      // Deprecated legacy notification for apply_patch textual output.
+      // Map to unknown — the primary path is patchUpdated with changes[].
+      return {
+        type: "unknown",
+        method,
+        params,
+      };
+
+    case "item/fileChange/patchUpdated": {
+      const raw = (params as Record<string, unknown> | null) ?? {};
+      const changes: FileUpdateChange[] = [];
+      if (Array.isArray(raw.changes)) {
+        for (const c of raw.changes) {
+          if (c && typeof c === "object") {
+            changes.push(c as FileUpdateChange);
+          }
+        }
+      }
       return {
         type: "file.change.delta",
         threadId: stringValue(params, "threadId", "thread_id") ?? "",
-        path: stringValue(params, "path") ?? "",
-        diff: stringValue(params, "diff") ?? "",
+        turnId: stringValue(params, "turnId", "turn_id") ?? "",
+        itemId: stringValue(params, "itemId", "item_id") ?? "",
+        changes,
         params,
       };
+    }
 
     case "warning":
       return {

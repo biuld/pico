@@ -1,4 +1,4 @@
-import type { Turn, ThreadItem } from "@pico/codex-app-server-protocol/v2";
+import type { Turn, ThreadItem, FileUpdateChange } from "@pico/codex-app-server-protocol/v2";
 import type { CodexPersistentThread } from "../codex/app-server";
 
 // ── Thread view state (read-only UI projection of Codex thread data) ──
@@ -32,6 +32,9 @@ export class CodexThreadViewState {
   liveTurnItems: ThreadItem[] = [];
   liveUserInput = "";
   streamingText = "";
+  liveReasoningText = "";
+  liveCommandOutputs = new Map<string, string>();
+  liveFileChanges = new Map<string, FileUpdateChange[]>();
   turnStatus: "idle" | "running" | "approval" = "idle";
   cwd: string;
 
@@ -66,15 +69,46 @@ export class CodexThreadViewState {
     this.liveUserInput = userInput;
     this.liveTurnItems = [];
     this.streamingText = "";
+    this.liveReasoningText = "";
+    this.liveCommandOutputs.clear();
+    this.liveFileChanges.clear();
     this.turnStatus = "running";
   }
 
   addLiveItem(item: ThreadItem): void {
+    // Clear corresponding live temp state so completed item doesn't duplicate live content.
+    switch (item.type) {
+      case "agentMessage":
+        this.streamingText = "";
+        break;
+      case "reasoning":
+        this.liveReasoningText = "";
+        break;
+      case "commandExecution":
+        this.liveCommandOutputs.delete(item.id);
+        break;
+      case "fileChange":
+        this.liveFileChanges.delete(item.id);
+        break;
+    }
     this.liveTurnItems.push(item);
   }
 
   appendDelta(text: string): void {
     this.streamingText += text;
+  }
+
+  appendReasoningDelta(text: string): void {
+    this.liveReasoningText += text;
+  }
+
+  appendCommandOutput(itemId: string, delta: string): void {
+    const prev = this.liveCommandOutputs.get(itemId) ?? "";
+    this.liveCommandOutputs.set(itemId, prev + delta);
+  }
+
+  setLiveFileChanges(itemId: string, changes: FileUpdateChange[]): void {
+    this.liveFileChanges.set(itemId, changes);
   }
 
   finishTurn(thread: CodexPersistentThread): void {
@@ -86,6 +120,9 @@ export class CodexThreadViewState {
     this.liveUserInput = "";
     this.liveTurnItems = [];
     this.streamingText = "";
+    this.liveReasoningText = "";
+    this.liveCommandOutputs.clear();
+    this.liveFileChanges.clear();
     this.turnStatus = "idle";
   }
 

@@ -81,11 +81,18 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
       return [systemNoticeCell(id, `review: ${item.review}`)];
 
     case "contextCompaction":
+      return [systemNoticeCell(id, "Context compacted", "compaction")];
+
+    case "collabAgentToolCall": {
+      const c = item as unknown as { tool: string; prompt: string | null };
+      return [toolCallCell(id, `collab:${c.tool}`, c.prompt ?? "")];
+    }
+
     case "hookPrompt":
-    case "collabAgentToolCall":
       return [];
 
     default:
-      return [];
+      // Unknown item types show a muted notice so nothing is silently lost
+      return [systemNoticeCell(id, `item: ${(item as { type: string }).type}`, "muted")];
   }
 }

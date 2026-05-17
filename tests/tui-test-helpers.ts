@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../src/tui/config";
 import { CodexThreadViewState } from "../src/app/codex-thread-view-state";
-import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
+import type { ThreadItem, FileUpdateChange, PatchChangeKind } from "@pico/codex-app-server-protocol/v2";
 
 export async function createViewState(): Promise<CodexThreadViewState> {
   const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
@@ -40,10 +40,14 @@ export function mockAgentMessageItem(id: string, text: string): ThreadItem {
   } as ThreadItem;
 }
 
-export function mockFileChangeItem(id: string, path: string, diff: string): ThreadItem {
+export function mockFileUpdateChange(path: string, diff: string, kind: PatchChangeKind = { type: "update", move_path: null }): FileUpdateChange {
+  return { path, kind, diff };
+}
+
+export function mockFileChangeItem(id: string, changes: FileUpdateChange[]): ThreadItem {
   return {
     type: "fileChange",
     id,
-    changes: [{ path, kind: "modify", diff }],
+    changes,
   } as unknown as ThreadItem;
 }

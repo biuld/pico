@@ -149,3 +149,64 @@ test("normalizeServerRequest handles missing params gracefully", () => {
   expect(event.command).toBeUndefined();
   expect(event.cwd).toBeUndefined();
 });
+
+// ── Live streaming event normalization ──
+
+test("normalizeNotification maps item/reasoningText/delta", () => {
+  const event = normalizeNotification({
+    method: "item/reasoningText/delta",
+    params: { threadId: "t1", turnId: "turn-1", delta: "thinking..." },
+  });
+
+  expect(event.type).toBe("reasoning.delta");
+  if (event.type === "reasoning.delta") {
+    expect(event.delta).toBe("thinking...");
+  }
+});
+
+test("normalizeNotification maps item/commandExecution/outputDelta", () => {
+  const event = normalizeNotification({
+    method: "item/commandExecution/outputDelta",
+    params: { threadId: "t1", turnId: "turn-1", itemId: "cmd-1", delta: "file.txt\n" },
+  });
+
+  expect(event.type).toBe("command.output.delta");
+  if (event.type === "command.output.delta") {
+    expect(event.delta).toBe("file.txt\n");
+    expect(event.itemId).toBe("cmd-1");
+  }
+});
+
+test("normalizeNotification maps item/fileChange/patchUpdated with changes[]", () => {
+  const event = normalizeNotification({
+    method: "item/fileChange/patchUpdated",
+    params: {
+      threadId: "t1",
+      turnId: "turn-1",
+      itemId: "fc-1",
+      changes: [
+        { path: "a.ts", kind: { type: "update", move_path: null }, diff: "-old\n+new" },
+        { path: "b.ts", kind: { type: "add" }, diff: "+added" },
+      ],
+    },
+  });
+
+  expect(event.type).toBe("file.change.delta");
+  if (event.type === "file.change.delta") {
+    expect(event.changes).toHaveLength(2);
+    expect(event.changes[0].path).toBe("a.ts");
+    expect(event.changes[1].path).toBe("b.ts");
+  }
+});
+
+test("normalizeNotification maps deprecated item/fileChange/outputDelta to unknown", () => {
+  const event = normalizeNotification({
+    method: "item/fileChange/outputDelta",
+    params: { threadId: "t1", turnId: "turn-1", itemId: "fc-1", delta: "patch applied" },
+  });
+
+  expect(event.type).toBe("unknown");
+  if (event.type === "unknown") {
+    expect(event.method).toBe("item/fileChange/outputDelta");
+  }
+});

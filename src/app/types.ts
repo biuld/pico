@@ -32,6 +32,8 @@ export interface TurnObserver {
   onApprovalResolved?(event: { request: JSONRPCRequest; result: unknown }): void;
   onApprovalRejected?(event: { request: JSONRPCRequest; error: string }): void;
   onThreadItemCompleted?(item: ThreadItem): void;
+  /** Fired for reasoning, command output, file change, and other non-assistant live deltas. */
+  onLiveTranscriptChanged?(): void;
 }
 
 export interface RunTurnOptions {

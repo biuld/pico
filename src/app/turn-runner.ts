@@ -91,6 +91,24 @@ export async function runTurn(
           observer?.onThreadItemCompleted?.(item);
           break;
         }
+        case "reasoning.delta": {
+          if (event.threadId !== threadId) return;
+          viewState.appendReasoningDelta(event.delta);
+          observer?.onLiveTranscriptChanged?.();
+          break;
+        }
+        case "command.output.delta": {
+          if (event.threadId !== threadId) return;
+          viewState.appendCommandOutput(event.itemId, event.delta);
+          observer?.onLiveTranscriptChanged?.();
+          break;
+        }
+        case "file.change.delta": {
+          if (event.threadId !== threadId) return;
+          viewState.setLiveFileChanges(event.itemId, event.changes);
+          observer?.onLiveTranscriptChanged?.();
+          break;
+        }
         case "approval.requested": {
           const request = event.request;
           observer?.onApprovalRequested?.(request);

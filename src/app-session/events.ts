@@ -30,6 +30,7 @@ export const PICO_APP_SESSION_EVENTS = {
   QUEUE_CHANGED: "queue:changed",
   DRAFT_RESET: "draft:reset",
   THREAD_ITEM: "thread:item",
+  LIVE_TRANSCRIPT_CHANGED: "live:transcript-changed",
 } as const;
 
 export type PicoAppSessionEventName =
@@ -60,6 +61,7 @@ export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.QUEUE_CHANGED]: { queuedCount: number };
   [PICO_APP_SESSION_EVENTS.DRAFT_RESET]: { reason: "new" | "clear" };
   [PICO_APP_SESSION_EVENTS.THREAD_ITEM]: ThreadItem;
+  [PICO_APP_SESSION_EVENTS.LIVE_TRANSCRIPT_CHANGED]: void;
 }
 
 export type PicoAppSessionEventArgs<Name extends PicoAppSessionEventName> =

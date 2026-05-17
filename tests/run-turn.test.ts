@@ -203,6 +203,61 @@ test("runTurn handles interrupted completions as aborted turns", async () => {
   expect(viewState.turnStatus).toBe("idle");
 });
 
+test("runTurn fires onLiveTranscriptChanged for non-assistant live deltas", async () => {
+  class LiveDeltaCodex extends FakeCodex {
+    async startTurn(threadId: string) {
+      const tid = threadId;
+      setTimeout(() => {
+        this.emit("codex:event", {
+          type: "reasoning.delta",
+          threadId: tid,
+          turnId: "turn-live",
+          delta: "live thought",
+        });
+        this.emit("codex:event", {
+          type: "command.output.delta",
+          threadId: tid,
+          turnId: "turn-live",
+          itemId: "cmd-live",
+          delta: "live output",
+        });
+        this.emit("codex:event", {
+          type: "file.change.delta",
+          threadId: tid,
+          turnId: "turn-live",
+          itemId: "fc-live",
+          changes: [{ path: "a.ts", kind: { type: "update", move_path: null }, diff: "live diff" }],
+        });
+        this.emit("turn/completed", { threadId: tid, turnId: "turn-live", status: "completed" });
+      }, 0);
+      return { turn: { id: "turn-live", status: "inProgress" } };
+    }
+  }
+
+  const cwd = await mkdtemp(join(tmpdir(), "pico-cwd-"));
+  const home = await mkdtemp(join(tmpdir(), "pico-home-"));
+  Bun.env.HOME = home;
+  const viewState = CodexThreadViewState.create(cwd);
+  const codex = new LiveDeltaCodex();
+  const app = { viewState, codex, cwd } as unknown as AppState;
+
+  const liveChanges = new Set<string>();
+  await withQuietConsole(() =>
+    runTurn(app, "trigger live deltas", {
+      observer: {
+        onLiveTranscriptChanged: () => liveChanges.add("changed"),
+      },
+    }),
+  );
+
+  // Observer should have fired at least once for the live deltas
+  expect(liveChanges.has("changed")).toBe(true);
+  // live state should be cleared after turn completes
+  expect(viewState.liveReasoningText).toBe("");
+  expect(viewState.liveCommandOutputs.size).toBe(0);
+  expect(viewState.liveFileChanges.size).toBe(0);
+});
+
 async function withQuietConsole<T>(fn: () => Promise<T>): Promise<T> {
   const originalLog = console.log;
   const originalWrite = process.stdout.write;

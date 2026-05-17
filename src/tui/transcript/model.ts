@@ -3,6 +3,9 @@ import type { ThreadItem, Turn } from "@pico/codex-app-server-protocol/v2";
 import { CodexThreadViewState } from "../../app/codex-thread-view-state";
 import {
   assistantMarkdownCell,
+  commandCell,
+  fileChangeCell,
+  reasoningCell,
   userMessageCell,
   type TranscriptCell,
 } from "./cell";
@@ -32,12 +35,35 @@ export function buildTranscriptCells(
   }
 
   // Append live turn items
+  let hasLiveAgentMessage = false;
   for (const item of viewState.liveTurnItems) {
     cells.push(...threadItemToTranscriptCells(item.id, item));
+    if (item.type === "agentMessage") hasLiveAgentMessage = true;
   }
 
-  // Append streaming text
-  if (viewState.streamingText) {
+  // Live reasoning text (before streaming assistant, because it's different content)
+  if (viewState.liveReasoningText) {
+    cells.push(reasoningCell("live-reasoning", viewState.liveReasoningText));
+  }
+
+  // Live command outputs (keyed by itemId)
+  for (const [itemId, output] of viewState.liveCommandOutputs) {
+    cells.push(commandCell(`live-cmd-${itemId}`, "command output", output));
+  }
+
+  // Live file changes
+  for (const [, changes] of viewState.liveFileChanges) {
+    for (const change of changes) {
+      cells.push(fileChangeCell(`live-file-${change.path}`, {
+        path: change.path,
+        diff: change.diff,
+      }));
+    }
+  }
+
+  // Append streaming assistant text — but skip if a completed agentMessage
+  // already arrived (avoids showing both streaming and complete duplicate).
+  if (viewState.streamingText && !hasLiveAgentMessage) {
     cells.push(assistantMarkdownCell("live", viewState.streamingText, { streaming: true }));
   }
 
@@ -47,19 +73,10 @@ export function buildTranscriptCells(
 export function buildTranscriptCellsWithLive(
   app: DraftAppState,
   streamingText: string,
-  liveThreadItems?: readonly ThreadItem[],
+  _liveThreadItems?: readonly ThreadItem[],
 ): TranscriptCell[] {
   const viewState = app.viewState;
   if (!viewState) return [];
-
-  // buildTranscriptCells handles everything: cached turns + live items + streaming
-  // liveThreadItems is kept for backward compat during migration
-  if (liveThreadItems && liveThreadItems.length > 0 && viewState.liveTurnItems.length === 0) {
-    // Migration path: live items from external source
-    for (const item of liveThreadItems) {
-      viewState.addLiveItem(item);
-    }
-  }
 
   const cells = buildTranscriptCells(viewState);
 

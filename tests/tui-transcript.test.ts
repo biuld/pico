@@ -14,7 +14,15 @@ import {
   limitedTranscriptOutputLines,
   mainTranscriptMuteStrategyForCell,
 } from "../src/tui/widgets/transcript-panel";
-import { createViewState, setMockTurns, mockAgentMessageItem } from "./tui-test-helpers";
+import {
+  createViewState, setMockTurns,
+  mockUserMessageItem, mockAgentMessageItem, mockReasoningItem, mockPlanItem,
+  mockCommandExecutionItem, mockFileChangeItem, mockFileUpdateChange,
+  mockMcpToolCallItem, mockDynamicToolCallItem, mockWebSearchItem,
+  mockImageGenerationItem, mockImageViewItem,
+  mockEnteredReviewModeItem, mockContextCompactionItem,
+  mockHookPromptItem, mockCollabAgentToolCallItem,
+} from "./tui-test-helpers";
 import type { ThreadItem, FileUpdateChange } from "@pico/codex-app-server-protocol/v2";
 import { CodexThreadViewState } from "../src/app/codex-thread-view-state";
 import { threadItemToTranscriptCells } from "../src/tui/transcript/thread-item";
@@ -26,7 +34,7 @@ test("transcript cells render from CodexThreadViewState turns", async () => {
       id: "turn-1",
       status: "completed",
       items: [
-        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Explain Pico" }] } as ThreadItem,
+        mockUserMessageItem("u1", "Explain Pico"),
         mockAgentMessageItem("a1", "Pico stores raw Codex items."),
       ],
     },
@@ -46,11 +54,11 @@ test("transcript projects ThreadItem types into semantic cells", async () => {
       id: "turn-1",
       status: "completed",
       items: [
-        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Inspect the repo" }] } as ThreadItem,
-        { type: "reasoning", id: "r1", summary: ["checking project files"], content: [] } as ThreadItem,
-        { type: "plan", id: "p1", text: "## Plan\n1. Read code\n2. Run tests" } as ThreadItem,
-        { type: "commandExecution", id: "c1", command: "bun test", cwd: "/app" } as ThreadItem,
-        { type: "fileChange", id: "f1", changes: [{ path: "src/index.ts", kind: { type: "update", move_path: null }, diff: "@@ changed" }] } as unknown as ThreadItem,
+        mockUserMessageItem("u1", "Inspect the repo"),
+        mockReasoningItem("r1", ["checking project files"]),
+        mockPlanItem("p1", "## Plan\n1. Read code\n2. Run tests"),
+        mockCommandExecutionItem("c1", "bun test"),
+        mockFileChangeItem("f1", [mockFileUpdateChange("src/index.ts", "@@ changed")]),
       ],
     },
   ]);
@@ -72,12 +80,8 @@ test("transcript handles fileChange items", async () => {
       id: "turn-1",
       status: "completed",
       items: [
-        { type: "userMessage", id: "u1", content: [{ type: "text", text: "Patch files" }] } as ThreadItem,
-        {
-          type: "fileChange",
-          id: "fc1",
-          changes: [{ path: "src/cli.ts", kind: { type: "update", move_path: null }, diff: "-old\n+new" }],
-        } as unknown as ThreadItem,
+        mockUserMessageItem("u1", "Patch files"),
+        mockFileChangeItem("fc1", [mockFileUpdateChange("src/cli.ts", "-old\n+new")]),
       ],
     },
   ]);
@@ -197,65 +201,47 @@ test("compactTranscriptPreview joins lines and truncates", () => {
 // ── ThreadItem → TranscriptCell mapping ──
 
 test("threadItemToTranscriptCells: userMessage", () => {
-  const cells = threadItemToTranscriptCells("u1", {
-    type: "userMessage",
-    id: "u1",
-    content: [{ type: "text", text: "hello world" }],
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("u1", mockUserMessageItem("u1", "hello world"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("user_message");
 });
 
 test("threadItemToTranscriptCells: agentMessage", () => {
-  const cells = threadItemToTranscriptCells("a1", {
-    type: "agentMessage", id: "a1", text: "I can help", phase: null, memoryCitation: null,
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("a1", mockAgentMessageItem("a1", "I can help"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("assistant_markdown");
   expect(cells[0].blocks[0]).toMatchObject({ type: "markdown", payload: { text: "I can help" } });
 });
 
 test("threadItemToTranscriptCells: reasoning", () => {
-  const cells = threadItemToTranscriptCells("r1", {
-    type: "reasoning", id: "r1", summary: ["step 1"], content: [],
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("r1", mockReasoningItem("r1", ["step 1"]));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("reasoning");
   expect(cells[0].blocks[0]).toMatchObject({ type: "reasoning", payload: { text: "step 1" } });
 });
 
 test("threadItemToTranscriptCells: plan", () => {
-  const cells = threadItemToTranscriptCells("p1", {
-    type: "plan", id: "p1", text: "## Plan",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("p1", mockPlanItem("p1", "## Plan"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("assistant_markdown");
 });
 
 test("threadItemToTranscriptCells: commandExecution", () => {
-  const cells = threadItemToTranscriptCells("c1", {
-    type: "commandExecution", id: "c1", command: "ls", cwd: "/app",
-    aggregatedOutput: "file.txt",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("c1", mockCommandExecutionItem("c1", "ls", { aggregatedOutput: "file.txt" }));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("command");
   expect(cells[0].blocks[0]).toMatchObject({ type: "command", payload: { command: "ls", output: "file.txt" } });
 });
 
 test("threadItemToTranscriptCells: fileChange", () => {
-  const cells = threadItemToTranscriptCells("f1", {
-    type: "fileChange", id: "f1",
-    changes: [{ path: "a.ts", kind: { type: "update", move_path: null }, diff: "-old\n+new" }],
-  } as unknown as ThreadItem);
+  const cells = threadItemToTranscriptCells("f1",
+    mockFileChangeItem("f1", [mockFileUpdateChange("a.ts", "-old\n+new")]));
   expect(cells.length).toBeGreaterThanOrEqual(1);
   expect(cells[0].kind).toBe("file_change");
 });
 
 test("threadItemToTranscriptCells: mcpToolCall", () => {
-  const cells = threadItemToTranscriptCells("m1", {
-    type: "mcpToolCall", id: "m1", server: "filesystem", tool: "read",
-    arguments: { path: "/x" },
-  } as unknown as ThreadItem);
+  const cells = threadItemToTranscriptCells("m1", mockMcpToolCallItem("m1", "filesystem", "read", { path: "/x" }));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
   expect(cells[0].blocks[0]).toMatchObject({
@@ -265,66 +251,48 @@ test("threadItemToTranscriptCells: mcpToolCall", () => {
 });
 
 test("threadItemToTranscriptCells: dynamicToolCall", () => {
-  const cells = threadItemToTranscriptCells("d1", {
-    type: "dynamicToolCall", id: "d1", namespace: "search", tool: "grep",
-    arguments: { q: "test" },
-  } as unknown as ThreadItem);
+  const cells = threadItemToTranscriptCells("d1", mockDynamicToolCallItem("d1", "search", "grep", { q: "test" }));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
 });
 
 test("threadItemToTranscriptCells: webSearch", () => {
-  const cells = threadItemToTranscriptCells("w1", {
-    type: "webSearch", id: "w1", query: "pico codex tui",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("w1", mockWebSearchItem("w1", "pico codex tui"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
 });
 
 test("threadItemToTranscriptCells: imageGeneration", () => {
-  const cells = threadItemToTranscriptCells("i1", {
-    type: "imageGeneration", id: "i1", revisedPrompt: "a cat", result: "done",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("i1", mockImageGenerationItem("i1", "a cat"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
 });
 
 test("threadItemToTranscriptCells: imageView", () => {
-  const cells = threadItemToTranscriptCells("v1", {
-    type: "imageView", id: "v1", path: "/tmp/img.png",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("v1", mockImageViewItem("v1", "/tmp/img.png"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
 });
 
 test("threadItemToTranscriptCells: enteredReviewMode", () => {
-  const cells = threadItemToTranscriptCells("rv1", {
-    type: "enteredReviewMode", id: "rv1", review: "diff review",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("rv1", mockEnteredReviewModeItem("rv1", "diff review"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("system_notice");
 });
 
 test("threadItemToTranscriptCells: contextCompaction", () => {
-  const cells = threadItemToTranscriptCells("cc1", {
-    type: "contextCompaction", id: "cc1",
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("cc1", mockContextCompactionItem("cc1"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("system_notice");
 });
 
 test("threadItemToTranscriptCells: hookPrompt is hidden", () => {
-  const cells = threadItemToTranscriptCells("hp1", {
-    type: "hookPrompt", id: "hp1", fragments: [],
-  } as ThreadItem);
+  const cells = threadItemToTranscriptCells("hp1", mockHookPromptItem("hp1"));
   expect(cells).toHaveLength(0);
 });
 
 test("threadItemToTranscriptCells: collabAgentToolCall", () => {
-  const cells = threadItemToTranscriptCells("ca1", {
-    type: "collabAgentToolCall", id: "ca1", tool: "code-reviewer",
-    prompt: "review this PR", senderThreadId: "t1", receiverThreadIds: [],
-  } as unknown as ThreadItem);
+  const cells = threadItemToTranscriptCells("ca1", mockCollabAgentToolCallItem("ca1", "code-reviewer"));
   expect(cells).toHaveLength(1);
   expect(cells[0].kind).toBe("tool_call");
   expect(cells[0].blocks[0]).toMatchObject({
@@ -387,9 +355,7 @@ test("buildTranscriptCells skips streamingText when live agentMessage is present
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");
   viewState.appendDelta("streaming text");
-  viewState.addLiveItem({
-    type: "agentMessage", id: "a1", text: "complete response", phase: null, memoryCitation: null,
-  } as ThreadItem);
+  viewState.addLiveItem(mockAgentMessageItem("a1", "complete response"));
 
   const cells = buildTranscriptCells(viewState);
   // Should have the completed agentMessage, not the streaming cell
@@ -401,12 +367,7 @@ test("addLiveItem clears liveReasoningText when completed reasoning arrives", ()
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");
   viewState.appendReasoningDelta("live thinking...");
-
-  // Completed reasoning item arrives
-  viewState.addLiveItem({
-    type: "reasoning", id: "r1", summary: ["final thought"], content: [],
-  } as ThreadItem);
-
+  viewState.addLiveItem(mockReasoningItem("r1", ["final thought"]));
   expect(viewState.liveReasoningText).toBe("");
 });
 
@@ -414,25 +375,15 @@ test("addLiveItem clears liveCommandOutputs when completed commandExecution arri
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");
   viewState.appendCommandOutput("cmd-1", "live output...");
-
-  viewState.addLiveItem({
-    type: "commandExecution", id: "cmd-1", command: "ls", cwd: "/app",
-  } as ThreadItem);
-
+  viewState.addLiveItem(mockCommandExecutionItem("cmd-1", "ls"));
   expect(viewState.liveCommandOutputs.has("cmd-1")).toBe(false);
 });
 
 test("addLiveItem clears liveFileChanges when completed fileChange arrives", () => {
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");
-  viewState.setLiveFileChanges("fc-1", [
-    { path: "a.ts", kind: { type: "update" } as unknown as FileUpdateChange["kind"], diff: "-old\n+new" },
-  ]);
-
-  viewState.addLiveItem({
-    type: "fileChange", id: "fc-1", changes: [{ path: "a.ts", kind: { type: "update", move_path: null }, diff: "final" }],
-  } as unknown as ThreadItem);
-
+  viewState.setLiveFileChanges("fc-1", [mockFileUpdateChange("a.ts", "-old\n+new")]);
+  viewState.addLiveItem(mockFileChangeItem("fc-1", [mockFileUpdateChange("a.ts", "final")]));
   expect(viewState.liveFileChanges.has("fc-1")).toBe(false);
 });
 
@@ -440,11 +391,50 @@ test("buildTranscriptCells shows no duplicate after live reasoning + completed r
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");
   viewState.appendReasoningDelta("live think...");
-  viewState.addLiveItem({
-    type: "reasoning", id: "r2", summary: ["final thought"], content: [],
-  } as ThreadItem);
+  viewState.addLiveItem(mockReasoningItem("r2", ["final thought"]));
 
   const cells = buildTranscriptCells(viewState);
   const reasoning = cells.filter((c) => c.kind === "reasoning");
   expect(reasoning).toHaveLength(1);
+});
+
+// ── Live plan update rendering ──
+
+test("buildTranscriptCells renders livePlan", () => {
+  const viewState = CodexThreadViewState.create("/tmp");
+  viewState.startTurn("test");
+  viewState.setLivePlan("need to read and patch", [
+    { step: "Read config", status: "completed" },
+    { step: "Patch file", status: "inProgress" },
+    { step: "Run tests", status: "pending" },
+  ]);
+
+  const cells = buildTranscriptCells(viewState);
+  const plan = cells.find((c) => c.kind === "plan_update");
+  expect(plan).toBeDefined();
+  expect(plan!.blocks[0]?.type).toBe("plan");
+});
+
+test("addLiveItem clears livePlan when completed plan item arrives", () => {
+  const viewState = CodexThreadViewState.create("/tmp");
+  viewState.startTurn("test");
+  viewState.setLivePlan(null, [{ step: "Do it", status: "inProgress" }]);
+  expect(viewState.livePlan).not.toBeNull();
+
+  viewState.addLiveItem(mockPlanItem("p1", "## Plan"));
+  expect(viewState.livePlan).toBeNull();
+});
+
+test("buildTranscriptCells shows no duplicate after live plan + completed plan item", () => {
+  const viewState = CodexThreadViewState.create("/tmp");
+  viewState.startTurn("test");
+  viewState.setLivePlan("planning", [{ step: "Step 1", status: "inProgress" }]);
+  // Completed plan item arrives — clears livePlan, renders as assistant_markdown
+  viewState.addLiveItem(mockPlanItem("p2", "## Plan"));
+
+  const cells = buildTranscriptCells(viewState);
+  // Live plan should be cleared; completed plan renders as assistant_markdown
+  expect(viewState.livePlan).toBeNull();
+  expect(cells.filter((c) => c.kind === "plan_update")).toHaveLength(0);
+  expect(cells.some((c) => c.kind === "assistant_markdown" && c.id === "p2")).toBe(true);
 });

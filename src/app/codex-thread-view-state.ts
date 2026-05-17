@@ -35,6 +35,7 @@ export class CodexThreadViewState {
   liveReasoningText = "";
   liveCommandOutputs = new Map<string, string>();
   liveFileChanges = new Map<string, FileUpdateChange[]>();
+  livePlan: { explanation: string | null; steps: Array<{ step: string; status: "pending" | "inProgress" | "completed" }> } | null = null;
   turnStatus: "idle" | "running" | "approval" = "idle";
   cwd: string;
 
@@ -72,6 +73,7 @@ export class CodexThreadViewState {
     this.liveReasoningText = "";
     this.liveCommandOutputs.clear();
     this.liveFileChanges.clear();
+    this.livePlan = null;
     this.turnStatus = "running";
   }
 
@@ -89,6 +91,9 @@ export class CodexThreadViewState {
         break;
       case "fileChange":
         this.liveFileChanges.delete(item.id);
+        break;
+      case "plan":
+        this.livePlan = null;
         break;
     }
     this.liveTurnItems.push(item);
@@ -111,6 +116,10 @@ export class CodexThreadViewState {
     this.liveFileChanges.set(itemId, changes);
   }
 
+  setLivePlan(explanation: string | null, steps: Array<{ step: string; status: "pending" | "inProgress" | "completed" }>): void {
+    this.livePlan = { explanation, steps };
+  }
+
   finishTurn(thread: CodexPersistentThread): void {
     this.cachedThread = thread;
     this.clearLiveTurn();
@@ -123,6 +132,7 @@ export class CodexThreadViewState {
     this.liveReasoningText = "";
     this.liveCommandOutputs.clear();
     this.liveFileChanges.clear();
+    this.livePlan = null;
     this.turnStatus = "idle";
   }
 

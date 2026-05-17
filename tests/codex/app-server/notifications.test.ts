@@ -210,3 +210,40 @@ test("normalizeNotification maps deprecated item/fileChange/outputDelta to unkno
     expect(event.method).toBe("item/fileChange/outputDelta");
   }
 });
+
+test("normalizeNotification maps turn/planUpdated", () => {
+  const event = normalizeNotification({
+    method: "turn/planUpdated",
+    params: {
+      threadId: "t1",
+      turnId: "turn-1",
+      explanation: "need to read and patch",
+      plan: [
+        { step: "Read config", status: "completed" },
+        { step: "Patch file", status: "inProgress" },
+        { step: "Run tests", status: "pending" },
+      ],
+    },
+  });
+
+  expect(event.type).toBe("plan.updated");
+  if (event.type === "plan.updated") {
+    expect(event.plan).toHaveLength(3);
+    expect(event.plan[0]).toMatchObject({ step: "Read config", status: "completed" });
+    expect(event.plan[1].status).toBe("inProgress");
+    expect(event.explanation).toBe("need to read and patch");
+  }
+});
+
+test("normalizeNotification maps turn/planUpdated with empty plan and null explanation", () => {
+  const event = normalizeNotification({
+    method: "turn/planUpdated",
+    params: { threadId: "t1", turnId: "turn-1", explanation: null, plan: [] },
+  });
+
+  expect(event.type).toBe("plan.updated");
+  if (event.type === "plan.updated") {
+    expect(event.plan).toHaveLength(0);
+    expect(event.explanation).toBeNull();
+  }
+});

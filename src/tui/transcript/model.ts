@@ -5,6 +5,7 @@ import {
   assistantMarkdownCell,
   commandCell,
   fileChangeCell,
+  planUpdateCell,
   reasoningCell,
   userMessageCell,
   type TranscriptCell,
@@ -49,6 +50,20 @@ export function buildTranscriptCells(
   // Live command outputs (keyed by itemId)
   for (const [itemId, output] of viewState.liveCommandOutputs) {
     cells.push(commandCell(`live-cmd-${itemId}`, "command output", output));
+  }
+
+  // Live plan update (from turn/planUpdated)
+  if (viewState.livePlan) {
+    const steps = viewState.livePlan.steps.map((s) => ({
+      step: s.step,
+      status: s.status === "inProgress" ? "in_progress" as const
+            : s.status === "completed" ? "completed" as const
+            : "pending" as const,
+    }));
+    cells.push(planUpdateCell("live-plan", {
+      explanation: viewState.livePlan.explanation ?? undefined,
+      steps,
+    }));
   }
 
   // Live file changes

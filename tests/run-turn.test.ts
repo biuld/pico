@@ -228,6 +228,13 @@ test("runTurn fires onLiveTranscriptChanged for non-assistant live deltas", asyn
           itemId: "fc-live",
           changes: [{ path: "a.ts", kind: { type: "update", move_path: null }, diff: "live diff" }],
         });
+        this.emit("codex:event", {
+          type: "plan.updated",
+          threadId: tid,
+          turnId: "turn-live",
+          explanation: "reading and patching",
+          plan: [{ step: "Read config", status: "completed" }, { step: "Patch", status: "inProgress" }],
+        });
         this.emit("turn/completed", { threadId: tid, turnId: "turn-live", status: "completed" });
       }, 0);
       return { turn: { id: "turn-live", status: "inProgress" } };

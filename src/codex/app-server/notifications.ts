@@ -17,6 +17,7 @@ export type CodexEvent =
   | CodexReasoningDeltaEvent
   | CodexCommandOutputDeltaEvent
   | CodexFileChangeDeltaEvent
+  | CodexPlanUpdatedEvent
   | CodexApprovalRequestedEvent
   | CodexWarningEvent
   | CodexErrorEvent
@@ -112,6 +113,15 @@ export interface CodexFileChangeDeltaEvent {
   turnId: string;
   itemId: string;
   changes: FileUpdateChange[];
+  params: unknown;
+}
+
+export interface CodexPlanUpdatedEvent {
+  type: "plan.updated";
+  threadId: string;
+  turnId: string;
+  explanation: string | null;
+  plan: Array<{ step: string; status: "pending" | "inProgress" | "completed" }>;
   params: unknown;
 }
 
@@ -234,6 +244,31 @@ export function normalizeNotification(
         turnId: stringValue(params, "turnId", "turn_id") ?? "",
         params,
       };
+
+    case "turn/planUpdated": {
+      const raw = (params as Record<string, unknown> | null) ?? {};
+      const plan: CodexPlanUpdatedEvent["plan"] = [];
+      if (Array.isArray(raw.plan)) {
+        for (const s of raw.plan) {
+          if (s && typeof s === "object") {
+            const step = s as Record<string, unknown>;
+            const status = stringValue(step, "status") ?? "";
+            plan.push({
+              step: stringValue(step, "step") ?? "",
+              status: (status === "inProgress" || status === "pending" || status === "completed") ? status : "pending",
+            });
+          }
+        }
+      }
+      return {
+        type: "plan.updated",
+        threadId: stringValue(params, "threadId", "thread_id") ?? "",
+        turnId: stringValue(params, "turnId", "turn_id") ?? "",
+        explanation: stringValue(raw, "explanation") ?? null,
+        plan,
+        params,
+      };
+    }
 
     case "item/started":
       return {

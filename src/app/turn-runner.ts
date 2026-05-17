@@ -109,6 +109,12 @@ export async function runTurn(
           observer?.onLiveTranscriptChanged?.();
           break;
         }
+        case "plan.updated": {
+          if (event.threadId !== threadId) return;
+          viewState.setLivePlan(event.explanation, event.plan);
+          observer?.onLiveTranscriptChanged?.();
+          break;
+        }
         case "approval.requested": {
           const request = event.request;
           observer?.onApprovalRequested?.(request);

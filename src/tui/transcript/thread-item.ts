@@ -51,18 +51,25 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
 
     case "mcpToolCall": {
       const label = `${item.server}/${item.tool}`;
-      const detail = buildToolDetail(item.arguments, item.result, item.error, item.durationMs);
       const status = toolStatusTone(item.status);
-      return [toolCallCell(id, label, detail, status)];
+      return [toolCallCell(id, label, undefined, status, undefined, undefined, {
+        argsPreview: anyPreview(item.arguments, 200),
+        resultPreview: resultPreview(item.result),
+        errorMessage: errorMessage(item.error),
+        durationMs: item.durationMs,
+      })];
     }
 
     case "dynamicToolCall": {
       const label = item.namespace
         ? `${item.namespace}/${item.tool}`
         : item.tool;
-      const detail = buildToolDetail(item.arguments, item.contentItems, null, item.durationMs);
       const status = toolStatusTone(item.status);
-      return [toolCallCell(id, label, detail, status)];
+      return [toolCallCell(id, label, undefined, status, undefined, undefined, {
+        argsPreview: anyPreview(item.arguments, 200),
+        resultPreview: resultPreview(item.contentItems),
+        durationMs: item.durationMs,
+      })];
     }
 
     case "webSearch": {
@@ -88,7 +95,10 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
 
     case "collabAgentToolCall": {
       const c = item as unknown as { tool: string; prompt: string | null; status: string; durationMs: number | null };
-      return [toolCallCell(id, `collab:${c.tool}`, truncate(c.prompt ?? "", 120), toolStatusTone(c.status))];
+      return [toolCallCell(id, `collab:${c.tool}`, undefined, toolStatusTone(c.status), undefined, undefined, {
+        argsPreview: truncate(c.prompt ?? "", 200),
+        durationMs: c.durationMs,
+      })];
     }
 
     case "hookPrompt":
@@ -117,39 +127,22 @@ function toolStatusTone(status: string): string | undefined {
   }
 }
 
-function buildToolDetail(
-  args: unknown,
-  result: unknown,
-  error: unknown,
-  durationMs: number | null | undefined,
-): string {
-  const parts: string[] = [];
+function anyPreview(value: unknown, maxLength: number): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const str = typeof value === "string" ? value : JSON.stringify(value);
+  if (str.length === 0 || str === "{}" || str === "null") return undefined;
+  return truncate(str, maxLength);
+}
 
-  // Args preview
-  if (args !== undefined && args !== null) {
-    const argsStr = typeof args === "string" ? args : JSON.stringify(args);
-    parts.push(truncate(argsStr, 200));
-  }
+function resultPreview(result: unknown): string | undefined {
+  return anyPreview(result, 160);
+}
 
-  // Result or error
-  if (error !== undefined && error !== null) {
-    const errStr = typeof error === "string" ? error
-      : (error as Record<string, unknown>).message as string | undefined
-      ?? JSON.stringify(error);
-    parts.push(`error: ${truncate(errStr, 160)}`);
-  } else if (result !== undefined && result !== null) {
-    const resultStr = typeof result === "string" ? result : JSON.stringify(result);
-    if (resultStr.length > 0 && resultStr !== "{}" && resultStr !== "null") {
-      parts.push(`result: ${truncate(resultStr, 160)}`);
-    }
-  }
-
-  // Duration
-  if (typeof durationMs === "number") {
-    parts.push(`${durationMs}ms`);
-  }
-
-  return parts.join(" · ");
+function errorMessage(error: unknown): string | undefined {
+  if (error === undefined || error === null) return undefined;
+  if (typeof error === "string") return truncate(error, 160);
+  const msg = (error as Record<string, unknown>).message;
+  return typeof msg === "string" ? truncate(msg, 160) : truncate(JSON.stringify(error), 160);
 }
 
 function truncate(value: string, maxLength: number): string {

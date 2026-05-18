@@ -261,6 +261,27 @@ function PlanStep(props: {
   );
 }
 
+export function buildToolHeader(
+  payload: { label?: string; argsPreview?: string; resultPreview?: string; errorMessage?: string; durationMs?: number | null; detail?: string },
+  showDetail: boolean,
+): { text: string; hasError: boolean } {
+  const parts: string[] = [payload.label ?? ""];
+  let hasError = false;
+  if (showDetail) {
+    if (payload.argsPreview) parts.push(payload.argsPreview);
+    if (payload.errorMessage) {
+      hasError = true;
+    } else if (payload.resultPreview) {
+      parts.push(payload.resultPreview);
+    }
+    if (typeof payload.durationMs === "number") parts.push(`${payload.durationMs}ms`);
+    if (!payload.argsPreview && !payload.errorMessage && !payload.resultPreview && payload.detail) {
+      parts.push(payload.detail);
+    }
+  }
+  return { text: parts.filter(Boolean).join(" · "), hasError };
+}
+
 function ToolBlock(props: {
   id: string;
   block: TranscriptToolBlock;
@@ -269,10 +290,11 @@ function ToolBlock(props: {
   syntaxStyle?: SyntaxStyle;
 }) {
   const showDetail = props.strategy === "expanded" || props.strategy === "tool-call-summary";
-  const header = [props.block.payload.label, showDetail ? props.block.payload.detail : undefined]
-    .filter(Boolean)
-    .join(" ");
+  const isFailed = props.block.payload.status === "failed";
   const groupBg = props.theme.colors.background;
+  const headerColor = isFailed ? props.theme.colors.error : props.theme.colors.status;
+
+  const { text: header, hasError } = buildToolHeader(props.block.payload, showDetail);
 
   return (
     <box
@@ -287,7 +309,17 @@ function ToolBlock(props: {
           id={`${props.id}-header`}
           width="100%"
           content={`↳ ${header}`}
-          fg={props.block.payload.status === "failed" ? props.theme.colors.error : props.theme.colors.status}
+          fg={headerColor}
+          bg={groupBg}
+          wrapMode="word"
+        />
+      ) : undefined}
+      {showDetail && hasError ? (
+        <SolidText
+          id={`${props.id}-error`}
+          width="100%"
+          content={`  ${props.block.payload.errorMessage}`}
+          fg={props.theme.colors.error}
           bg={groupBg}
           wrapMode="word"
         />

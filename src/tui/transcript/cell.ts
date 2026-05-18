@@ -62,7 +62,12 @@ export interface TranscriptToolBlock {
   type: "tool";
   payload: {
     label?: string;
+    /** Deprecated: kept for backward compat. Prefer structured fields below. */
     detail?: string;
+    argsPreview?: string;
+    resultPreview?: string;
+    errorMessage?: string;
+    durationMs?: number | null;
     body?: string;
     diff?: string;
     status?: string;
@@ -156,12 +161,22 @@ export function toolCallCell(
   status?: string,
   callId?: string,
   diff?: string,
+  opts?: { argsPreview?: string; resultPreview?: string; errorMessage?: string; durationMs?: number | null },
 ): TranscriptCell {
   return {
     id,
     kind: "tool_call",
     status,
-    blocks: [{ type: "tool", payload: { label, detail, status, callId, diff } }],
+    blocks: [{
+      type: "tool",
+      payload: {
+        label, detail, status, callId, diff,
+        argsPreview: opts?.argsPreview,
+        resultPreview: opts?.resultPreview,
+        errorMessage: opts?.errorMessage,
+        durationMs: opts?.durationMs,
+      },
+    }],
   };
 }
 

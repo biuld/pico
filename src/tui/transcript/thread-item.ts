@@ -33,26 +33,38 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
       return item.text ? [assistantMarkdownCell(id, item.text)] : [];
 
     case "commandExecution": {
-      const output = item.aggregatedOutput || undefined;
-      const cell = commandCell(id, item.command, output);
-      return [cell];
+      return [commandCell({
+        id,
+        command: item.command,
+        cwd: item.cwd as string | undefined,
+        output: item.aggregatedOutput || undefined,
+        status: item.status as string | undefined,
+        exitCode: item.exitCode,
+        durationMs: item.durationMs,
+      })];
     }
 
     case "fileChange": {
       const cells: TranscriptCell[] = [];
       for (const change of item.changes) {
+        const kind = typeof change.kind === "object" && change.kind && "type" in change.kind
+          ? (change.kind as { type: string }).type
+          : undefined;
         cells.push(fileChangeCell(`${id}_${change.path}`, {
           path: change.path,
           diff: change.diff,
+          kind,
+          status: item.status as string | undefined,
         }));
       }
       return cells;
     }
 
     case "mcpToolCall": {
-      const label = `${item.server}/${item.tool}`;
-      const status = toolStatusTone(item.status);
-      return [toolCallCell(id, label, undefined, status, undefined, undefined, {
+      return [toolCallCell({
+        id,
+        label: `${item.server}/${item.tool}`,
+        status: toolStatusTone(item.status),
         argsPreview: anyPreview(item.arguments, 200),
         resultPreview: resultPreview(item.result),
         errorMessage: errorMessage(item.error),
@@ -61,30 +73,24 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
     }
 
     case "dynamicToolCall": {
-      const label = item.namespace
-        ? `${item.namespace}/${item.tool}`
-        : item.tool;
-      const status = toolStatusTone(item.status);
-      return [toolCallCell(id, label, undefined, status, undefined, undefined, {
+      return [toolCallCell({
+        id,
+        label: item.namespace ? `${item.namespace}/${item.tool}` : item.tool,
+        status: toolStatusTone(item.status),
         argsPreview: anyPreview(item.arguments, 200),
         resultPreview: resultPreview(item.contentItems),
         durationMs: item.durationMs,
       })];
     }
 
-    case "webSearch": {
-      const query = truncate(item.query, 120);
-      return [toolCallCell(id, "web_search", query)];
-    }
+    case "webSearch":
+      return [toolCallCell({ id, label: "web_search", detail: truncate(item.query, 120) })];
 
-    case "imageGeneration": {
-      const prompt = truncate(item.revisedPrompt || item.result, 120);
-      return [toolCallCell(id, "image_generation", prompt)];
-    }
+    case "imageGeneration":
+      return [toolCallCell({ id, label: "image_generation", detail: truncate(item.revisedPrompt || item.result, 120) })];
 
-    case "imageView": {
-      return [toolCallCell(id, "image_view", String(item.path))];
-    }
+    case "imageView":
+      return [toolCallCell({ id, label: "image_view", detail: String(item.path) })];
 
     case "enteredReviewMode":
     case "exitedReviewMode":
@@ -95,7 +101,10 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
 
     case "collabAgentToolCall": {
       const c = item as unknown as { tool: string; prompt: string | null; status: string; durationMs: number | null };
-      return [toolCallCell(id, `collab:${c.tool}`, undefined, toolStatusTone(c.status), undefined, undefined, {
+      return [toolCallCell({
+        id,
+        label: `collab:${c.tool}`,
+        status: toolStatusTone(c.status),
         argsPreview: truncate(c.prompt ?? "", 200),
         durationMs: c.durationMs,
       })];

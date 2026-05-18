@@ -80,8 +80,11 @@ export interface TranscriptCommandBlock {
   type: "command";
   payload: {
     command: string;
+    cwd?: string;
     output?: string;
     status?: string;
+    exitCode?: number | null;
+    durationMs?: number | null;
     callId?: string;
   };
 }
@@ -92,6 +95,8 @@ export interface TranscriptFileChangeBlock {
     path?: string;
     summary?: string;
     diff?: string;
+    kind?: string;
+    status?: string;
   };
 }
 
@@ -154,27 +159,34 @@ export function planUpdateCell(
   };
 }
 
-export function toolCallCell(
-  id: string,
-  label: string,
-  detail?: string,
-  status?: string,
-  callId?: string,
-  diff?: string,
-  opts?: { argsPreview?: string; resultPreview?: string; errorMessage?: string; durationMs?: number | null },
-): TranscriptCell {
+export function toolCallCell(params: {
+  id: string;
+  label: string;
+  detail?: string;
+  status?: string;
+  callId?: string;
+  diff?: string;
+  argsPreview?: string;
+  resultPreview?: string;
+  errorMessage?: string;
+  durationMs?: number | null;
+}): TranscriptCell {
   return {
-    id,
+    id: params.id,
     kind: "tool_call",
-    status,
+    status: params.status,
     blocks: [{
       type: "tool",
       payload: {
-        label, detail, status, callId, diff,
-        argsPreview: opts?.argsPreview,
-        resultPreview: opts?.resultPreview,
-        errorMessage: opts?.errorMessage,
-        durationMs: opts?.durationMs,
+        label: params.label,
+        detail: params.detail,
+        status: params.status,
+        callId: params.callId,
+        diff: params.diff,
+        argsPreview: params.argsPreview,
+        resultPreview: params.resultPreview,
+        errorMessage: params.errorMessage,
+        durationMs: params.durationMs,
       },
     }],
   };
@@ -194,18 +206,32 @@ export function toolOutputCell(
   };
 }
 
-export function commandCell(
-  id: string,
-  command: string,
-  output?: string,
-  status?: string,
-  callId?: string,
-): TranscriptCell {
+export function commandCell(params: {
+  id: string;
+  command: string;
+  cwd?: string;
+  output?: string;
+  status?: string;
+  exitCode?: number | null;
+  durationMs?: number | null;
+  callId?: string;
+}): TranscriptCell {
   return {
-    id,
+    id: params.id,
     kind: "command",
-    status,
-    blocks: [{ type: "command", payload: { command, output, status, callId } }],
+    status: params.status,
+    blocks: [{
+      type: "command",
+      payload: {
+        command: params.command,
+        cwd: params.cwd,
+        output: params.output,
+        status: params.status,
+        exitCode: params.exitCode,
+        durationMs: params.durationMs,
+        callId: params.callId,
+      },
+    }],
   };
 }
 

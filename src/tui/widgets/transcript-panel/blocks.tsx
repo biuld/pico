@@ -364,6 +364,16 @@ function CommandBlock(props: {
   syntaxStyle: SyntaxStyle;
   strategy: MainTranscriptMuteStrategy;
 }) {
+  const p = props.block.payload;
+  const isFailed = p.status === "failed" || p.status === "declined"
+    || (p.exitCode !== null && p.exitCode !== undefined && p.exitCode !== 0);
+  const fg = isFailed ? props.theme.colors.error : props.theme.colors.status;
+  const meta: string[] = [];
+  if (p.cwd) meta.push(p.cwd);
+  if (typeof p.durationMs === "number") meta.push(`${p.durationMs}ms`);
+  if (p.exitCode !== null && p.exitCode !== undefined) meta.push(`exit ${p.exitCode}`);
+  const header = meta.length > 0 ? `$ ${p.command}  (${meta.join(" · ")})` : `$ ${p.command}`;
+
   return (
     <box
       id={props.id}
@@ -375,8 +385,8 @@ function CommandBlock(props: {
       <SolidText
         id={`${props.id}-header`}
         width="100%"
-        content={`$ ${props.block.payload.command}`}
-        fg={props.theme.colors.status}
+        content={header}
+        fg={fg}
         bg={props.theme.colors.background}
         wrapMode="word"
       />
@@ -412,6 +422,11 @@ function FileChangeBlock(props: {
   syntaxStyle: SyntaxStyle;
   strategy: MainTranscriptMuteStrategy;
 }) {
+  const kind = props.block.payload.kind
+    ? ({ add: "A", delete: "D", update: "M", modify: "M" } as Record<string, string>)[props.block.payload.kind] ?? "~"
+    : "~";
+  const isFailed = props.block.payload.status === "failed" || props.block.payload.status === "declined";
+  const fg = isFailed ? props.theme.colors.error : props.theme.colors.status;
   const header = props.block.payload.path || props.block.payload.summary || "file change";
   return (
     <box
@@ -424,8 +439,8 @@ function FileChangeBlock(props: {
       <SolidText
         id={`${props.id}-header`}
         width="100%"
-        content={`~ ${header}`}
-        fg={props.theme.colors.status}
+        content={`${kind} ${header}`}
+        fg={fg}
         bg={props.theme.colors.background}
         wrapMode="word"
       />

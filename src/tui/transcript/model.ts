@@ -49,7 +49,7 @@ export function buildTranscriptCells(
 
   // Live command outputs (keyed by itemId)
   for (const [itemId, output] of viewState.liveCommandOutputs) {
-    cells.push(commandCell(`live-cmd-${itemId}`, "command output", output));
+    cells.push(commandCell({ id: `live-cmd-${itemId}`, command: "command output", output }));
   }
 
   // Live plan update (from turn/planUpdated)

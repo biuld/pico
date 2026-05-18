@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { ThreadItem } from "@pico/codex-app-server-protocol/v2";
 import { buildToolHeader } from "../src/tui/widgets/transcript-panel/blocks";
 import { threadItemToTranscriptCells } from "../src/tui/transcript/thread-item";
-import { mockMcpToolCallItem, mockDynamicToolCallItem } from "./tui-test-helpers";
+import { mockMcpToolCallItem, mockDynamicToolCallItem, mockFileChangeItem, mockFileUpdateChange } from "./tui-test-helpers";
 
 // ── buildToolHeader ──
 
@@ -52,6 +52,15 @@ test("buildToolHeader: showDetail false shows only label", () => {
   );
   expect(text).toBe("fs/ls");
   expect(hasError).toBe(false);
+});
+
+test("buildToolHeader: errorMessage sets hasError and stays out of header", () => {
+  const { text, hasError } = buildToolHeader(
+    { label: "fs/rm", errorMessage: "not found" },
+    true,
+  );
+  expect(hasError).toBe(true);
+  expect(text).not.toContain("not found");
 });
 
 // ── Tool/MCP payload quality ──
@@ -109,4 +118,23 @@ test("threadItemToTranscriptCells: tool argsPreview truncates long args", () => 
 test("threadItemToTranscriptCells: dynamicToolCall shows namespace/tool label", () => {
   const cells = threadItemToTranscriptCells("d1", mockDynamicToolCallItem("d1", "search", "grep", { q: "test" }));
   expect(toolPayload(cells[0]).label).toBe("search/grep");
+});
+
+test("threadItemToTranscriptCells: fileChange carries kind from PatchChangeKind", () => {
+  const cells = threadItemToTranscriptCells("f1",
+    mockFileChangeItem("f1", [mockFileUpdateChange("a.ts", "-old\n+new")]));
+  expect(cells).toHaveLength(1);
+  const payload = cells[0].blocks[0]?.payload as { kind?: string };
+  expect(payload.kind).toBe("update");
+});
+
+test("threadItemToTranscriptCells: commandExecution with failed status sets cell status", () => {
+  const item = {
+    type: "commandExecution", id: "fail1", command: "rm -rf /",
+    cwd: "/app", status: "failed", aggregatedOutput: null,
+    exitCode: null, durationMs: 500,
+  } as unknown as import("@pico/codex-app-server-protocol/v2").ThreadItem;
+
+  const cells = threadItemToTranscriptCells("fail1", item);
+  expect(cells[0].status).toBe("failed");
 });

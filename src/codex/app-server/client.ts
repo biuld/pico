@@ -304,11 +304,11 @@ export class CodexAppServerClient extends EventEmitter {
   // ── Config ──
 
   async writeConfigValue(params: ConfigValueWriteParams): Promise<ConfigWriteResponse> {
-    return this.request<ConfigWriteResponse>("config/write", params);
+    return this.request<ConfigWriteResponse>("config/value/write", params);
   }
 
   async batchWriteConfig(params: ConfigBatchWriteParams): Promise<ConfigWriteResponse> {
-    return this.request<ConfigWriteResponse>("config/batch_write", params);
+    return this.request<ConfigWriteResponse>("config/batchWrite", params);
   }
 
   // ── Thread lifecycle ──
@@ -348,7 +348,7 @@ export class CodexAppServerClient extends EventEmitter {
 
   async setThreadName(threadId: string, name: string): Promise<ThreadSetNameResponse> {
     const params: ThreadSetNameParams = { threadId, name };
-    return this.request<ThreadSetNameResponse>("thread/set_name", params);
+    return this.request<ThreadSetNameResponse>("thread/name/set", params);
   }
 
   async updateThreadMetadata(
@@ -392,15 +392,15 @@ export class CodexAppServerClient extends EventEmitter {
   // ── Filesystem ──
 
   async readFile(params: FsReadFileParams): Promise<FsReadFileResponse> {
-    return this.request<FsReadFileResponse>("fs/read_file", params);
+    return this.request<FsReadFileResponse>("fs/readFile", params);
   }
 
   async readDirectory(params: FsReadDirectoryParams): Promise<FsReadDirectoryResponse> {
-    return this.request<FsReadDirectoryResponse>("fs/read_directory", params);
+    return this.request<FsReadDirectoryResponse>("fs/readDirectory", params);
   }
 
   async getFileMetadata(params: FsGetMetadataParams): Promise<FsGetMetadataResponse> {
-    return this.request<FsGetMetadataResponse>("fs/get_metadata", params);
+    return this.request<FsGetMetadataResponse>("fs/getMetadata", params);
   }
 
   async watchFs(params: FsWatchParams): Promise<FsWatchResponse> {
@@ -423,7 +423,7 @@ export class CodexAppServerClient extends EventEmitter {
     params: ModelProviderCapabilitiesReadParams,
   ): Promise<ModelProviderCapabilitiesReadResponse> {
     return this.request<ModelProviderCapabilitiesReadResponse>(
-      "model/provider_capabilities/read",
+      "modelProvider/capabilities/read",
       params,
     );
   }
@@ -431,19 +431,19 @@ export class CodexAppServerClient extends EventEmitter {
   // ── Account ──
 
   async getAccount(params: Partial<GetAccountParams> = {}): Promise<GetAccountResponse> {
-    return this.request<GetAccountResponse>("get_account", params);
+    return this.request<GetAccountResponse>("account/read", params);
   }
 
   async getAccountRateLimits(): Promise<GetAccountRateLimitsResponse> {
-    return this.request<GetAccountRateLimitsResponse>("get_account_rate_limits");
+    return this.request<GetAccountRateLimitsResponse>("account/rateLimits/read");
   }
 
   async loginAccount(params: LoginAccountParams): Promise<LoginAccountResponse> {
-    return this.request<LoginAccountResponse>("login/account", params);
+    return this.request<LoginAccountResponse>("account/login/start", params);
   }
 
   async logoutAccount(): Promise<LogoutAccountResponse> {
-    return this.request<LogoutAccountResponse>("logout/account");
+    return this.request<LogoutAccountResponse>("account/logout");
   }
 
   // ── Server requests ──

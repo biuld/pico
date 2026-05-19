@@ -245,7 +245,7 @@ export function normalizeNotification(
         params,
       };
 
-    case "turn/planUpdated": {
+    case "turn/plan/updated": {
       const raw = (params as Record<string, unknown> | null) ?? {};
       const plan: CodexPlanUpdatedEvent["plan"] = [];
       if (Array.isArray(raw.plan)) {
@@ -300,7 +300,7 @@ export function normalizeNotification(
         params,
       };
 
-    case "item/reasoningText/delta":
+    case "item/reasoning/textDelta":
       return {
         type: "reasoning.delta",
         threadId: stringValue(params, "threadId", "thread_id") ?? "",

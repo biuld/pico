@@ -152,9 +152,9 @@ test("normalizeServerRequest handles missing params gracefully", () => {
 
 // ── Live streaming event normalization ──
 
-test("normalizeNotification maps item/reasoningText/delta", () => {
+test("normalizeNotification maps item/reasoning/textDelta", () => {
   const event = normalizeNotification({
-    method: "item/reasoningText/delta",
+    method: "item/reasoning/textDelta",
     params: { threadId: "t1", turnId: "turn-1", delta: "thinking..." },
   });
 
@@ -211,9 +211,9 @@ test("normalizeNotification maps deprecated item/fileChange/outputDelta to unkno
   }
 });
 
-test("normalizeNotification maps turn/planUpdated", () => {
+test("normalizeNotification maps turn/plan/updated", () => {
   const event = normalizeNotification({
-    method: "turn/planUpdated",
+    method: "turn/plan/updated",
     params: {
       threadId: "t1",
       turnId: "turn-1",
@@ -235,9 +235,9 @@ test("normalizeNotification maps turn/planUpdated", () => {
   }
 });
 
-test("normalizeNotification maps turn/planUpdated with empty plan and null explanation", () => {
+test("normalizeNotification maps turn/plan/updated with empty plan and null explanation", () => {
   const event = normalizeNotification({
-    method: "turn/planUpdated",
+    method: "turn/plan/updated",
     params: { threadId: "t1", turnId: "turn-1", explanation: null, plan: [] },
   });
 

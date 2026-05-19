@@ -57,13 +57,13 @@ export function mockPlanItem(id: string, text: string): ThreadItem {
   return { type: "plan", id, text } as ThreadItem;
 }
 
-export function mockCommandExecutionItem(id: string, command: string, opts?: { cwd?: string; aggregatedOutput?: string | null }): ThreadItem {
+export function mockCommandExecutionItem(id: string, command: string, opts?: { cwd?: string; aggregatedOutput?: string | null; status?: string }): ThreadItem {
   return {
     type: "commandExecution", id, command,
     cwd: opts?.cwd ?? "/app",
     processId: null,
     source: "agent",
-    status: "completed",
+    status: opts?.status ?? "completed",
     commandActions: [],
     aggregatedOutput: opts?.aggregatedOutput ?? null,
     exitCode: null,

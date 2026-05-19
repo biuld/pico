@@ -86,9 +86,13 @@ export class CodexThreadViewState {
       case "reasoning":
         this.liveReasoningText = "";
         break;
-      case "commandExecution":
-        this.liveCommandOutputs.delete(item.id);
+      case "commandExecution": {
+        const status = item.status as string;
+        if (status !== "inProgress" && status !== "running") {
+          this.liveCommandOutputs.delete(item.id);
+        }
         break;
+      }
       case "fileChange":
         this.liveFileChanges.delete(item.id);
         break;

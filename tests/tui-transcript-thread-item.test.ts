@@ -124,3 +124,43 @@ test("threadItemToTranscriptCells: unknown type shows muted notice", () => {
     payload: { text: "item: futureItemType" },
   });
 });
+
+// ── command status normalization ──
+
+test("threadItemToTranscriptCells: commandExecution inProgress normalizes to running", () => {
+  const item = {
+    type: "commandExecution", id: "ip1", command: "bun build",
+    cwd: "/app", status: "inProgress", aggregatedOutput: null,
+    exitCode: null, durationMs: null,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("ip1", item);
+  expect(cells).toHaveLength(1);
+  expect(cells[0].status).toBe("running");
+  const block = cells[0].blocks[0]?.payload as { status?: string };
+  expect(block.status).toBe("running");
+});
+
+test("threadItemToTranscriptCells: commandExecution running status passes through", () => {
+  const item = {
+    type: "commandExecution", id: "r1", command: "sleep 10",
+    cwd: "/app", status: "running", aggregatedOutput: null,
+    exitCode: null, durationMs: null,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("r1", item);
+  expect(cells[0].status).toBe("running");
+});
+
+test("threadItemToTranscriptCells: commandExecution declined passes through (not normalized to failed)", () => {
+  const item = {
+    type: "commandExecution", id: "d1", command: "rm -rf /",
+    cwd: "/app", status: "declined", aggregatedOutput: null,
+    exitCode: null, durationMs: null,
+  } as unknown as ThreadItem;
+
+  const cells = threadItemToTranscriptCells("d1", item);
+  expect(cells[0].status).toBe("declined");
+  const block = cells[0].blocks[0]?.payload as { status?: string };
+  expect(block.status).toBe("declined");
+});

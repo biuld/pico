@@ -37,7 +37,20 @@ export function buildTranscriptCells(
 
   // Append live turn items
   let hasLiveAgentMessage = false;
+  const renderedLiveCommandOutputIds = new Set<string>();
   for (const item of viewState.liveTurnItems) {
+    if (item.type === "commandExecution" && viewState.liveCommandOutputs.has(item.id)) {
+      const output = viewState.liveCommandOutputs.get(item.id);
+      renderedLiveCommandOutputIds.add(item.id);
+      cells.push(commandCell({
+        id: item.id,
+        command: item.command,
+        cwd: item.cwd as string | undefined,
+        output,
+        status: "running",
+      }));
+      continue;
+    }
     cells.push(...threadItemToTranscriptCells(item.id, item));
     if (item.type === "agentMessage") hasLiveAgentMessage = true;
   }
@@ -48,8 +61,24 @@ export function buildTranscriptCells(
   }
 
   // Live command outputs (keyed by itemId)
+  // Look up the real command text from live items so the header shows the
+  // actual command rather than a placeholder.
+  const liveCommandLookup = new Map<string, { command: string; cwd?: string }>();
+  for (const item of viewState.liveTurnItems) {
+    if (item.type === "commandExecution") {
+      liveCommandLookup.set(item.id, { command: item.command, cwd: item.cwd as string | undefined });
+    }
+  }
   for (const [itemId, output] of viewState.liveCommandOutputs) {
-    cells.push(commandCell({ id: `live-cmd-${itemId}`, command: "command output", output }));
+    if (renderedLiveCommandOutputIds.has(itemId)) continue;
+    const info = liveCommandLookup.get(itemId);
+    cells.push(commandCell({
+      id: `live-cmd-${itemId}`,
+      command: info?.command ?? "command",
+      cwd: info?.cwd,
+      output,
+      status: "running",
+    }));
   }
 
   // Live plan update (from turn/planUpdated)

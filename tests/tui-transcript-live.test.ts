@@ -33,6 +33,32 @@ test("buildTranscriptCells renders liveCommandOutputs", () => {
   expect(cmd).toBeDefined();
 });
 
+test("buildTranscriptCells merges live command item with live output", () => {
+  const viewState = CodexThreadViewState.create("/tmp");
+  viewState.startTurn("test");
+  viewState.addLiveItem(mockCommandExecutionItem("cmd-1", "bun build", { status: "inProgress" }));
+  viewState.appendCommandOutput("cmd-1", "building...\n");
+
+  const cells = buildTranscriptCells(viewState);
+  const commands = cells.filter((c) => c.kind === "command");
+  expect(commands).toHaveLength(1);
+  expect(commands[0].id).toBe("cmd-1");
+  expect(commands[0].status).toBe("running");
+  expect(commands[0].blocks[0]).toMatchObject({
+    type: "command",
+    payload: { command: "bun build", output: "building...\n", status: "running" },
+  });
+});
+
+test("addLiveItem keeps command output for in-progress command items", () => {
+  const viewState = CodexThreadViewState.create("/tmp");
+  viewState.startTurn("test");
+  viewState.appendCommandOutput("cmd-1", "building...\n");
+  viewState.addLiveItem(mockCommandExecutionItem("cmd-1", "bun build", { status: "inProgress" }));
+
+  expect(viewState.liveCommandOutputs.get("cmd-1")).toBe("building...\n");
+});
+
 test("buildTranscriptCells renders liveFileChanges", () => {
   const viewState = CodexThreadViewState.create("/tmp");
   viewState.startTurn("test");

@@ -38,7 +38,7 @@ export function threadItemToTranscriptCells(id: string, item: ThreadItem): Trans
         command: item.command,
         cwd: item.cwd as string | undefined,
         output: item.aggregatedOutput || undefined,
-        status: item.status as string | undefined,
+        status: commandStatusTone(item.status as string) ?? (item.status as string | undefined),
         exitCode: item.exitCode,
         durationMs: item.durationMs,
       })];
@@ -128,6 +128,18 @@ function toolStatusTone(status: string): string | undefined {
     case "declined":
     case "cancelled":
       return "failed";
+    case "inProgress":
+    case "running":
+      return "running";
+    default:
+      return undefined;
+  }
+}
+
+function commandStatusTone(status: string): string | undefined {
+  // Only normalize inProgress → running so buildCommandHeader can still
+  // differentiate FAILED vs DECLINED labels from the original status.
+  switch (status) {
     case "inProgress":
     case "running":
       return "running";

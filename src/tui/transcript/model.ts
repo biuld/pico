@@ -69,9 +69,13 @@ export function buildTranscriptCells(
   // Live file changes
   for (const [, changes] of viewState.liveFileChanges) {
     for (const change of changes) {
+      const kind = typeof change.kind === "object" && change.kind && "type" in change.kind
+        ? (change.kind as { type: string }).type
+        : undefined;
       cells.push(fileChangeCell(`live-file-${change.path}`, {
         path: change.path,
         diff: change.diff,
+        kind,
       }));
     }
   }

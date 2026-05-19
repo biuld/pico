@@ -71,13 +71,20 @@ export function mockCommandExecutionItem(id: string, command: string, opts?: { c
   } as unknown as ThreadItem;
 }
 
-export function mockMcpToolCallItem(id: string, server: string, tool: string, args?: unknown): ThreadItem {
+export function mockMcpToolCallItem(
+  id: string,
+  server: string,
+  tool: string,
+  args?: unknown,
+  status?: string,
+  error?: { message: string } | null,
+): ThreadItem {
   return {
     type: "mcpToolCall", id, server, tool,
     arguments: args ?? {},
-    status: "completed",
+    status: status ?? "completed",
     result: null,
-    error: null,
+    error: error ?? null,
     durationMs: null,
   } as unknown as ThreadItem;
 }

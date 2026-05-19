@@ -22,7 +22,7 @@ export interface CommandHeaderInfo {
 export function buildCommandHeader(
   payload: TranscriptCommandBlock["payload"],
 ): CommandHeaderInfo {
-  const isRunning = payload.status === "running";
+  const isRunning = payload.status === "running" || payload.status === "inProgress";
   const isFailed = !isRunning && (
     payload.status === "failed" ||
     payload.status === "declined" ||

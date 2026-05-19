@@ -114,6 +114,23 @@ test("buildCommandHeader: running status not failed, shows RUNNING label", () =>
   expect(info.text).not.toContain("ms");
 });
 
+test("buildCommandHeader: inProgress status treated as running", () => {
+  const info = buildCommandHeader({ command: "bun build", status: "inProgress", cwd: "/app" });
+  expect(info.isRunning).toBe(true);
+  expect(info.isFailed).toBe(false);
+  expect(info.text).toContain("RUNNING");
+  expect(info.text).not.toContain("exit");
+  expect(info.text).not.toContain("ms");
+});
+
+test("buildCommandHeader: inProgress ignores exitCode (running takes priority)", () => {
+  const info = buildCommandHeader({ command: "bun build", status: "inProgress", cwd: "/app", exitCode: 0 });
+  expect(info.isRunning).toBe(true);
+  expect(info.isFailed).toBe(false);
+  expect(info.text).toContain("RUNNING");
+  expect(info.text).not.toContain("exit");
+});
+
 test("buildCommandHeader: exitCode 0 alone is not failed", () => {
   const info = buildCommandHeader({ command: "true", exitCode: 0 });
   expect(info.isFailed).toBe(false);

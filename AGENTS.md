@@ -12,6 +12,19 @@ See `docs/pico-product-direction.md` for full product direction and roadmap.
 
 **Every Codex app-server interaction goes through `src/codex/app-server`.** Do not scatter raw JSON-RPC method strings or parse notifications in TUI/runtime code. Add typed SDK methods, status projection, or event normalization there first, then consume the clean semantic surface from the UI layer.
 
+### SDK Architecture
+
+Pico's runtime SDK is built from two layers:
+
+| Layer | Package | Role |
+|-------|---------|------|
+| Type-level SDK | `@pico/codex-app-server-protocol` | Auto-generated from Codex Rust protocol via `ts-rs`. Provides `ClientRequest`, `ServerRequest`, `ServerNotification`, `ClientNotification` discriminated unions — every method string and its params type. Also provides individual response types. |
+| Runtime SDK | `src/codex/app-server/` | Hand-written. `CodexAppServerClient` consumes the type-level SDK's method types, adds JSON-RPC transport, status projection, `codex:event` semantic event emission, and request resolution. |
+
+**Method string safety**: `CodexAppServerClient.request()` accepts `ClientRequest["method"]` (not `string`). This means every method string in the SDK is type-checked against the generated protocol types. A typo like `"thread/set_name"` (should be `"thread/name/set"`) fails typecheck. `notify()` is similarly constrained to `ClientNotification["method"]`.
+
+**Sync**: Run `bun run sync:codex-protocol` to pull the latest protocol types from the Codex repo. This script does a sparse checkout of `codex-rs/app-server-protocol/schema/typescript/` and copies the files into `packages/codex-app-server-protocol/src/`.
+
 **Event boundary**: `CodexAppServerClient` emits two event surfaces:
 - `codex:event` — semantic `CodexEvent` (e.g. `assistant.delta`, `item.completed`, `approval.requested`). **This is the only surface app/runtime/TUI may consume.** Notifications and server requests are both normalized through this channel.
 - Legacy raw method events (e.g. `"item/agentMessage/delta"`, `"serverRequest"`) — emitted for backward compatibility. **Only SDK tests and tools may use these; app/TUI must not.**

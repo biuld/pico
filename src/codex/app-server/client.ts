@@ -1,3 +1,4 @@
+import type { ClientNotification, ClientRequest } from "@pico/codex-app-server-protocol";
 import { EventEmitter } from "events";
 import { normalizeNotification, normalizeServerRequest, type CodexEvent } from "./notifications";
 import {
@@ -94,6 +95,9 @@ export interface RefreshConfigStatusOptions {
   overrides?: CodexConfig;
 }
 
+type ClientMethod = ClientRequest["method"];
+type ClientNotifyMethod = ClientNotification["method"];
+
 const DEFAULT_CODEX_MODEL_PROVIDER = "openai";
 
 export class CodexAppServerClient extends EventEmitter {
@@ -164,11 +168,11 @@ export class CodexAppServerClient extends EventEmitter {
     await this.notify("initialized");
   }
 
-  async request<T>(method: string, params?: unknown): Promise<T> {
+  async request<T>(method: ClientMethod, params?: unknown): Promise<T> {
     return this.transport.request<T>(method, params);
   }
 
-  async notify(method: string, params?: unknown): Promise<void> {
+  async notify(method: ClientNotifyMethod, params?: unknown): Promise<void> {
     return this.transport.notify(method, params);
   }
 

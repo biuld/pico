@@ -76,6 +76,10 @@ import type {
   ThreadRollbackResponse,
   ThreadSetNameParams,
   ThreadSetNameResponse,
+  ThreadShellCommandParams,
+  ThreadShellCommandResponse,
+  ThreadInjectItemsParams,
+  ThreadInjectItemsResponse,
   ThreadStartParams,
   ThreadStartResponse,
   ThreadUnarchiveParams,
@@ -86,6 +90,14 @@ import type {
   TurnStartResponse,
   TurnSteerParams,
   TurnSteerResponse,
+  FsWriteFileParams,
+  FsWriteFileResponse,
+  FsCopyParams,
+  FsCopyResponse,
+  FsCreateDirectoryParams,
+  FsCreateDirectoryResponse,
+  FsRemoveParams,
+  FsRemoveResponse,
 } from "./types";
 
 export interface CodexAppServerClientOptions extends CodexAppServerTransportOptions {}
@@ -317,6 +329,16 @@ export class CodexAppServerClient extends EventEmitter {
 
   // ── Thread lifecycle ──
 
+  async injectThreadItems(threadId: string, items: unknown[]): Promise<ThreadInjectItemsResponse> {
+    const params: ThreadInjectItemsParams = { threadId, items };
+    return this.request<ThreadInjectItemsResponse>("thread/inject_items", params);
+  }
+
+  async runShellCommand(threadId: string, command: string): Promise<ThreadShellCommandResponse> {
+    const params: ThreadShellCommandParams = { threadId, command };
+    return this.request<ThreadShellCommandResponse>("thread/shellCommand", params);
+  }
+
   async resumeThread(
     threadId: string,
     params: Partial<Omit<ThreadResumeParams, "threadId">> = {},
@@ -413,6 +435,22 @@ export class CodexAppServerClient extends EventEmitter {
 
   async unwatchFs(params: FsUnwatchParams): Promise<FsUnwatchResponse> {
     return this.request<FsUnwatchResponse>("fs/unwatch", params);
+  }
+
+  async writeFile(params: FsWriteFileParams): Promise<FsWriteFileResponse> {
+    return this.request<FsWriteFileResponse>("fs/writeFile", params);
+  }
+
+  async copyFs(params: FsCopyParams): Promise<FsCopyResponse> {
+    return this.request<FsCopyResponse>("fs/copy", params);
+  }
+
+  async createDirectory(params: FsCreateDirectoryParams): Promise<FsCreateDirectoryResponse> {
+    return this.request<FsCreateDirectoryResponse>("fs/createDirectory", params);
+  }
+
+  async removeFs(params: FsRemoveParams): Promise<FsRemoveResponse> {
+    return this.request<FsRemoveResponse>("fs/remove", params);
   }
 
   // ── Review ──

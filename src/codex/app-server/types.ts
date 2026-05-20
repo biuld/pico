@@ -81,6 +81,19 @@ import type {
   LoginAccountParams,
   LoginAccountResponse,
   LogoutAccountResponse,
+  // P2 - Thread extras
+  ThreadShellCommandParams,
+  ThreadShellCommandResponse,
+  ThreadInjectItemsResponse,
+  // P2 - FS write
+  FsWriteFileParams,
+  FsWriteFileResponse,
+  FsCopyParams,
+  FsCopyResponse,
+  FsCreateDirectoryParams,
+  FsCreateDirectoryResponse,
+  FsRemoveParams,
+  FsRemoveResponse,
 } from "@pico/codex-app-server-protocol/v2";
 
 export type {
@@ -146,6 +159,19 @@ export type {
   LoginAccountParams,
   LoginAccountResponse,
   LogoutAccountResponse,
+  // P2 - Thread extras
+  ThreadShellCommandParams,
+  ThreadShellCommandResponse,
+  ThreadInjectItemsResponse,
+  // P2 - FS write
+  FsWriteFileParams,
+  FsWriteFileResponse,
+  FsCopyParams,
+  FsCopyResponse,
+  FsCreateDirectoryParams,
+  FsCreateDirectoryResponse,
+  FsRemoveParams,
+  FsRemoveResponse,
 };
 
 export type RequestId = number | string;

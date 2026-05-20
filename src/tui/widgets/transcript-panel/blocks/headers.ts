@@ -58,8 +58,11 @@ export interface FileChangeInfo {
   kindSymbol: string;
   headerText: string;
   isFailed: boolean;
+  isDeclined: boolean;
   statusLabel: string | null;
   diffLineCount: number | null;
+  addedLines: number | null;
+  removedLines: number | null;
 }
 
 export function buildFileChangeInfo(
@@ -68,21 +71,36 @@ export function buildFileChangeInfo(
   const kindMap: Record<string, string> = { add: "A", delete: "D", update: "M", modify: "M" };
   const kindSymbol = kindMap[payload.kind ?? ""] ?? "~";
   const isFailed = payload.status === "failed" || payload.status === "declined";
+  const isDeclined = payload.status === "declined";
   const statusLabel = isFailed
-    ? payload.status === "declined" ? "DECLINED" : "FAILED"
+    ? isDeclined ? "DECLINED" : "FAILED"
     : null;
 
   const base = `${kindSymbol} ${payload.path || payload.summary || "file change"}`;
   const headerText = statusLabel ? `${base} (${statusLabel})` : base;
 
-  const diffLineCount = payload.diff != null
-    ? payload.diff.split("\n").filter(
-        (line) => (line.startsWith("+") && !line.startsWith("+++")) ||
-                  (line.startsWith("-") && !line.startsWith("---")),
-      ).length
-    : null;
+  const stats = payload.diff != null ? parseDiffStats(payload.diff) : null;
 
-  return { kindSymbol, headerText, isFailed, statusLabel, diffLineCount };
+  return {
+    kindSymbol,
+    headerText,
+    isFailed,
+    isDeclined,
+    statusLabel,
+    diffLineCount: stats ? stats.added + stats.removed : null,
+    addedLines: stats?.added ?? null,
+    removedLines: stats?.removed ?? null,
+  };
+}
+
+function parseDiffStats(diff: string): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added++;
+    else if (line.startsWith("-") && !line.startsWith("---")) removed++;
+  }
+  return { added, removed };
 }
 
 // ── buildToolHeader ──

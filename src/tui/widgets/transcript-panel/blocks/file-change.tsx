@@ -43,7 +43,9 @@ export function FileChangeBlock(props: {
       {props.block.payload.diff && props.strategy !== "expanded" && info.diffLineCount !== null ? (
         <MutedText
           id={`${props.id}-diff-summary`}
-          text={`  ±${info.diffLineCount} lines changed`}
+          text={info.isDeclined
+            ? `  +${info.addedLines} -${info.removedLines}  (declined)`
+            : `  +${info.addedLines} -${info.removedLines}  [Enter to expand]`}
           theme={props.theme}
         />
       ) : undefined}

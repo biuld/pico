@@ -6,6 +6,7 @@ import type {
   TranscriptCell,
 } from "../../../transcript";
 import type { TuiTheme } from "../../../theme";
+import { SolidText } from "../../solid-text";
 import { mainTranscriptMuteStrategyForCell } from "../preview";
 import { CommandBlock } from "./command";
 import { FileChangeBlock } from "./file-change";
@@ -79,28 +80,39 @@ function TranscriptBlockView(props: TranscriptBlockViewProps) {
   const id = `pico-transcript-block-${safeId(props.cell.id)}-${props.blockIndex}`;
   const strategy = mainTranscriptMuteStrategyForCell(props.cell);
   switch (props.block.type) {
-    case "markdown":
+    case "markdown": {
+      const mermaidBlocks = detectMermaidBlocks(props.block.payload.text);
       return (
-        <markdown
-          id={id}
-          width="100%"
-          content={props.block.payload.text}
-          syntaxStyle={props.syntaxStyle}
-          fg={props.theme.colors.text}
-          bg={props.theme.colors.background}
-          conceal={true}
-          concealCode={false}
-          streaming={Boolean(props.block.payload.streaming)}
-          internalBlockMode="top-level"
-          tableOptions={{
-            style: "columns",
-            widthMode: "full",
-            wrapMode: "word",
-            borders: false,
-            cellPadding: 0,
-          }}
-        />
+        <box id={id} width="100%" flexDirection="column" rowGap={0} backgroundColor={props.theme.colors.background}>
+          <markdown
+            id={`${id}-md`}
+            width="100%"
+            content={props.block.payload.text}
+            syntaxStyle={props.syntaxStyle}
+            fg={props.theme.colors.text}
+            bg={props.theme.colors.background}
+            conceal={true}
+            concealCode={false}
+            streaming={Boolean(props.block.payload.streaming)}
+            internalBlockMode="top-level"
+            tableOptions={{
+              style: "columns",
+              widthMode: "full",
+              wrapMode: "word",
+              borders: false,
+              cellPadding: 0,
+            }}
+          />
+          {mermaidBlocks.map((source, i) => (
+            <MermaidPlaceholder
+              id={`${id}-mermaid-${i}`}
+              source={source}
+              theme={props.theme}
+            />
+          ))}
+        </box>
       );
+    }
     case "reasoning":
       return (
         <ReasoningBlock
@@ -137,6 +149,63 @@ function TranscriptBlockView(props: TranscriptBlockViewProps) {
         />
       );
   }
+}
+
+// ── Mermaid ──
+
+function detectMermaidBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  const regex = /```mermaid\s*\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    blocks.push(match[1].trim());
+  }
+  return blocks;
+}
+
+function MermaidPlaceholder(props: {
+  id: string;
+  source: string;
+  theme: TuiTheme;
+}) {
+  const previewLines = props.source.split("\n").slice(0, 3);
+  return (
+    <box
+      id={props.id}
+      width="100%"
+      flexDirection="column"
+      borderStyle="single"
+      borderColor={props.theme.colors.muted}
+      marginTop={1}
+      marginBottom={1}
+      paddingX={1}
+      backgroundColor={props.theme.colors.background}
+    >
+      <SolidText
+        id={`${props.id}-label`}
+        content=" Mermaid diagram "
+        fg={props.theme.colors.status}
+        bg={props.theme.colors.background}
+        wrapMode="word"
+      />
+      {previewLines.map((line, i) => (
+        <SolidText
+          id={`${props.id}-preview-${i}`}
+          content={` ${line.slice(0, 60)}${line.length > 60 ? "..." : ""}`}
+          fg={props.theme.colors.muted}
+          bg={props.theme.colors.background}
+          wrapMode="word"
+        />
+      ))}
+      <SolidText
+        id={`${props.id}-hint`}
+        content=" [diagram rendering coming soon]"
+        fg={props.theme.colors.placeholder}
+        bg={props.theme.colors.background}
+        wrapMode="word"
+      />
+    </box>
+  );
 }
 
 // ── Utilities ──

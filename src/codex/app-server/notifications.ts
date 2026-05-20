@@ -244,7 +244,7 @@ export function normalizeServerRequest(request: JSONRPCRequest): CodexApprovalRe
  * Classify a ServerRequest method into an ApprovalRequestKind.
  * Uses exact string matching against the known protocol methods.
  */
-function classifyServerRequestMethod(method: ServerRequest["method"]): ApprovalRequestKind {
+export function classifyServerRequestMethod(method: ServerRequest["method"]): ApprovalRequestKind {
   switch (method) {
     case "item/commandExecution/requestApproval":
     case "applyPatchApproval":

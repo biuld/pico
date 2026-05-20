@@ -34,6 +34,7 @@ export type {
 } from "@pico/codex-app-server-protocol";
 export type { CodexPersistentThread } from "./types";
 export {
+  classifyServerRequestMethod,
   isCodexEvent,
   normalizeNotification,
   normalizeServerRequest,

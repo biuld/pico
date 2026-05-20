@@ -1,4 +1,6 @@
+import type { ServerRequest } from "@pico/codex-app-server-protocol";
 import type { CliRenderer } from "@opentui/core";
+import { classifyServerRequestMethod } from "../codex/app-server";
 import { filterSlashCommands } from "./commands";
 import { buildApprovalOptions, type ApprovalDecision } from "./widgets/bottom/approval";
 import type { TuiState } from "./core/state";
@@ -127,10 +129,9 @@ let lastCtrlDAt = 0;
 
 function handleApprovalKey(sequence: string, runtime: KeybindingRuntime): boolean {
   const state = runtime.getState();
-  const options = buildApprovalOptions(
-    runtime.pendingApprovalMethod() || "",
-    state.approvalSelection,
-  );
+  const method = (runtime.pendingApprovalMethod() || "") as ServerRequest["method"];
+  const kind = classifyServerRequestMethod(method);
+  const options = buildApprovalOptions(kind, state.approvalSelection);
   const lower = sequence.toLowerCase();
 
   if (sequence === "\u001b") {

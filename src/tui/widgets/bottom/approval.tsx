@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { For } from "solid-js";
+import { normalizeServerRequest, type CodexApprovalRequestedEvent, type ApprovalRequestKind } from "../../../codex/app-server";
 import type { JSONRPCRequest } from "../../../codex/app-server";
 import type { TuiTheme } from "../../theme";
 import { SolidText } from "../solid-text";
@@ -39,10 +40,11 @@ export function buildApprovalPanel(
 ): ApprovalPanelState {
   if (!request) return emptyApprovalPanel();
 
-  const detailLines = approvalDetailLines(request, Math.max(12, width - 4));
+  const event = normalizeServerRequest(request);
+  const detailLines = approvalDetailLines(event, Math.max(12, width - 4));
   const lines = [
     ...detailLines,
-    ...buildApprovalOptions(request.method, selectedIndex).map((option) =>
+    ...buildApprovalOptions(event.kind, selectedIndex).map((option) =>
       `  ${formatApprovalOption(option)}`
     ),
     APPROVAL_PANEL_HINT,
@@ -106,42 +108,17 @@ export function ApprovalPanelView(props: {
   );
 }
 
-export function buildApprovalOptions(method: string, selectedIndex: number): ApprovalOption[] {
-  const permissionRequest = method === "item/permissions/requestApproval";
-  const labels: Omit<ApprovalOption, "isSelected">[] = permissionRequest
+export function buildApprovalOptions(kind: ApprovalRequestKind, selectedIndex: number): ApprovalOption[] {
+  const isPermissions = kind === "permissions";
+  const labels: Omit<ApprovalOption, "isSelected">[] = isPermissions
     ? [
-        {
-          decision: "accept",
-          shortcut: "a",
-          label: "Yes, grant permissions",
-          description: "",
-        },
-        {
-          decision: "decline",
-          shortcut: "d",
-          label: "No, deny request",
-          description: "",
-        },
+        { decision: "accept", shortcut: "a", label: "Yes, grant permissions", description: "" },
+        { decision: "decline", shortcut: "d", label: "No, deny request", description: "" },
       ]
     : [
-        {
-          decision: "accept",
-          shortcut: "a",
-          label: "Yes, proceed",
-          description: "",
-        },
-        {
-          decision: "acceptForSession",
-          shortcut: "s",
-          label: "Yes, don't ask again this session",
-          description: "",
-        },
-        {
-          decision: "decline",
-          shortcut: "d",
-          label: "No, tell Codex what to do differently",
-          description: "",
-        },
+        { decision: "accept", shortcut: "a", label: "Yes, proceed", description: "" },
+        { decision: "acceptForSession", shortcut: "s", label: "Yes, don't ask again this session", description: "" },
+        { decision: "decline", shortcut: "d", label: "No, tell Codex what to do differently", description: "" },
       ];
 
   return labels.map((option, index) => ({ ...option, isSelected: index === selectedIndex }));
@@ -157,49 +134,35 @@ function approvalLineColor(index: number, isSelected: boolean, theme: TuiTheme):
   return theme.colors.placeholder;
 }
 
-function approvalDetailLines(request: JSONRPCRequest, width: number): string[] {
-  const params = objectValue(request.params);
+function approvalDetailLines(event: CodexApprovalRequestedEvent, width: number): string[] {
   const lines: string[] = [];
-  const command = commandValue(params);
-  const reason = stringValue(params, "reason");
-  const cwd = stringValue(params, "cwd");
-
-  if (reason) lines.push(`  ${truncateInline(reason, width)}`);
-  if (command) lines.push(`  command: ${truncateInline(command, width)}`);
-  if (cwd) lines.push(`  cwd: ${truncateInline(cwd, width)}`);
-
-  return lines.slice(0, 3);
+  const kindLabel = approvalKindLabel(event.kind);
+  if (kindLabel) lines.push(`  ${kindLabel}`);
+  if (event.reason) lines.push(`  ${truncateInline(event.reason, width)}`);
+  if (event.command) lines.push(`  command: ${truncateInline(event.command, width)}`);
+  if (event.cwd) lines.push(`  cwd: ${truncateInline(event.cwd, width)}`);
+  if (event.filePath) lines.push(`  file: ${truncateInline(event.filePath, width)}`);
+  if (event.permissionTool) lines.push(`  tool: ${event.permissionTool}`);
+  if (event.mcpServerName) lines.push(`  MCP server: ${event.mcpServerName}`);
+  if (event.toolName) lines.push(`  tool: ${event.toolName}`);
+  if (event.inputPrompt) lines.push(`  ${truncateInline(event.inputPrompt, width)}`);
+  return lines.slice(0, 4);
 }
 
-function commandValue(value: Record<string, unknown>): string | undefined {
-  const command = value.command;
-  if (typeof command === "string" && command.trim()) return inlineText(command);
-  if (Array.isArray(command) && command.every((item) => typeof item === "string")) {
-    return inlineText(command.join(" "));
+function approvalKindLabel(kind: string): string | undefined {
+  switch (kind) {
+    case "command": return "Run command";
+    case "fileChange": return "File change";
+    case "permissions": return "Grant permissions";
+    case "mcpElicitation": return "MCP elicitation";
+    case "toolUserInput": return "Tool input request";
+    case "dynamicToolCall": return "Dynamic tool call";
+    default: return undefined;
   }
-
-  const argv = value.argv;
-  if (Array.isArray(argv) && argv.every((item) => typeof item === "string")) {
-    return inlineText(argv.join(" "));
-  }
-
-  return undefined;
-}
-
-function objectValue(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-}
-
-function stringValue(value: Record<string, unknown>, key: string): string | undefined {
-  const item = value[key];
-  return typeof item === "string" && item.trim() ? inlineText(item) : undefined;
-}
-
-function inlineText(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 function truncateInline(value: string, width: number): string {
-  if (value.length <= width) return value;
-  return `${value.slice(0, Math.max(1, width - 3))}...`;
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  if (trimmed.length <= width) return trimmed;
+  return `${trimmed.slice(0, Math.max(1, width - 3))}...`;
 }

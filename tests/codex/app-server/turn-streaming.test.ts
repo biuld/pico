@@ -211,7 +211,7 @@ test("CodexAppServerClient emits approval.requested for raw serverRequest", asyn
   ]);
 
   try {
-    const approvalSeen = new Promise<{ type: string; reason?: string; command?: string; cwd?: string }>((resolve) => {
+    const approvalSeen = new Promise<{ type: string; kind?: string; reason?: string; command?: string; cwd?: string }>((resolve) => {
       fixture.client.on("codex:event", (event) => {
         if (event.type === "approval.requested") resolve(event);
       });

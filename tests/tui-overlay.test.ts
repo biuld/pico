@@ -63,12 +63,12 @@ test("approval panel renders in the composer pane without overlay chrome", () =>
   }, 1, 72);
 
   expect(panel.visible).toBe(true);
-  expect(panel.lines[0]).toBe("  needs workspace access");
-  expect(panel.lines).toContain("  needs workspace access");
+  expect(panel.lines[0]).toBe("  Grant permissions");
+  expect(panel.lines[1]).toBe("  needs workspace access");
   expect(panel.lines.join("\n")).not.toContain("reason:");
   expect(panel.lines).toContain("  Yes, grant permissions");
   expect(panel.lines).toContain("  No, deny request");
-  expect(panel.selectedLineIndex).toBe(2);
+  expect(panel.selectedLineIndex).toBe(3);
   expect(panel.lines.at(-1)).toBe("  Enter choose · Esc deny · Up/Down move · type to queue");
   expect(panel.height).toBe(panel.lines.length);
 
@@ -76,8 +76,8 @@ test("approval panel renders in the composer pane without overlay chrome", () =>
     id: 2,
     method: "item/permissions/requestApproval",
   }, 0, 72);
-  expect(withoutDetails.lines[0]).toBe("  Yes, grant permissions");
-  expect(withoutDetails.selectedLineIndex).toBe(0);
+  expect(withoutDetails.lines[0]).toBe("  Grant permissions");
+  expect(withoutDetails.selectedLineIndex).toBe(1);
   expect(withoutDetails.lines.join("\n")).not.toContain("item/permissions/requestApproval");
 });
 

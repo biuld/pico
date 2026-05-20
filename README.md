@@ -48,12 +48,14 @@ See `docs/pico-product-direction.md` for full product direction and roadmap.
 ## Features
 
 - [x] Codex JSON-RPC stdio client with typed SDK
-- [x] Rich transcript rendering (markdown, diffs, code blocks)
+- [x] Notification normalization layer (semantic events)
+- [x] Rich transcript rendering (markdown, code blocks)
 - [x] OpenTUI foundation with streaming support
 - [x] History overlay for turn browsing
-- [ ] Notification normalization layer
+- [x] Basic diff rendering (unified view via OpenTUI diff widget)
+- [x] Basic approval panel with keyboard interaction
+- [ ] Rich diff display (file-level fold, add/delete stats, expand/collapse)
 - [ ] Mermaid diagram support
-- [ ] Better approval UI with structured info
 - [ ] Transcript search
 - [ ] Export to markdown / HTML
 - [ ] Bookmarks and local annotations

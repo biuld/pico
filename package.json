@@ -2,7 +2,7 @@
   "name": "pico",
   "version": "0.1.0",
   "type": "module",
-  "description": "A terminal tool that rides on Codex's harness with autonomous persistence and branch management",
+  "description": "Better Codex TUI — a richer terminal client for the official Codex app-server",
   "workspaces": [
     "packages/*"
   ],

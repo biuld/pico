@@ -37,12 +37,15 @@ export function buildApprovalPanel(
   request: JSONRPCRequest | undefined,
   selectedIndex: number,
   width = 80,
+  queueCount = 1,
 ): ApprovalPanelState {
   if (!request) return emptyApprovalPanel();
 
   const event = normalizeServerRequest(request);
   const detailLines = approvalDetailLines(event, Math.max(12, width - 4));
+  const queueHeader = queueCount > 1 ? [`  [${queueCount} pending approvals]`] : [];
   const lines = [
+    ...queueHeader,
     ...detailLines,
     ...buildApprovalOptions(event.kind, selectedIndex).map((option) =>
       `  ${formatApprovalOption(option)}`
@@ -54,7 +57,7 @@ export function buildApprovalPanel(
     visible: true,
     lines,
     height: lines.length,
-    selectedLineIndex: detailLines.length + selectedIndex,
+    selectedLineIndex: queueHeader.length + detailLines.length + selectedIndex,
   };
 }
 

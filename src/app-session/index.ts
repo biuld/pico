@@ -29,6 +29,7 @@ export interface PicoAppSessionSnapshot {
   running: boolean;
   streamingText: string;
   pendingApproval?: JSONRPCRequest;
+  pendingApprovalCount: number;
   queuedMessages: readonly QueuedMessage[];
   activeCodexThreadId?: string;
   activeCodexTurnId?: string;
@@ -52,7 +53,7 @@ export interface PicoAppSessionOptions {
 
 export class PicoAppSession extends EventEmitter {
   private currentApp: DraftAppState;
-  private pendingApproval: PendingApproval | undefined;
+  private pendingApprovals: PendingApproval[] = [];
   private running = false;
   private queuedMessages: QueuedMessage[] = [];
   private nextQueuedMessageId = 1;
@@ -96,7 +97,8 @@ export class PicoAppSession extends EventEmitter {
       app: this.currentApp,
       running: this.running,
       streamingText: vs?.streamingText ?? "",
-      pendingApproval: this.pendingApproval?.request,
+      pendingApproval: this.pendingApprovals[0]?.request,
+      pendingApprovalCount: this.pendingApprovals.length,
       queuedMessages: [...this.queuedMessages],
       activeCodexThreadId: this.activeCodexThreadId,
       activeCodexTurnId: this.activeCodexTurnId,
@@ -105,7 +107,7 @@ export class PicoAppSession extends EventEmitter {
   }
 
   isBusy(): boolean {
-    return this.running || Boolean(this.pendingApproval);
+    return this.running || this.pendingApprovals.length > 0;
   }
 
   static listThreads(cwd: string, codex?: CodexAppServerClient): Promise<ThreadInfo[]> {
@@ -196,16 +198,22 @@ export class PicoAppSession extends EventEmitter {
   }
 
   resolveApproval(decision: PicoAppApprovalDecision): void {
-    if (!this.pendingApproval) return;
-    this.pendingApproval.resolve(approvalResult(this.pendingApproval.request.method, decision));
-    this.pendingApproval = undefined;
-    this.emitAppSession(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, { running: this.running });
+    const pending = this.pendingApprovals.shift();
+    if (!pending) return;
+    pending.resolve(approvalResult(pending.request.method, decision));
+    this.emitAppSession(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, {
+      running: this.running,
+      remainingCount: this.pendingApprovals.length,
+    });
   }
 
   async shutdown(): Promise<void> {
-    if (this.pendingApproval) {
-      this.pendingApproval.resolve(approvalResult(this.pendingApproval.request.method, "decline"));
-      this.pendingApproval = undefined;
+    const hadPending = this.pendingApprovals.length > 0;
+    while (this.pendingApprovals.length > 0) {
+      const pending = this.pendingApprovals.shift()!;
+      pending.resolve(approvalResult(pending.request.method, "decline"));
+    }
+    if (hadPending) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     this.detachCodexStatus?.();
@@ -294,9 +302,13 @@ export class PicoAppSession extends EventEmitter {
 
   private askApproval(request: JSONRPCRequest): Promise<unknown> {
     return new Promise((resolve) => {
-      this.pendingApproval = { request, resolve };
+      this.pendingApprovals.push({ request, resolve });
       this.emitAppSession(PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED, request);
     });
+  }
+
+  get pendingApprovalCount(): number {
+    return this.pendingApprovals.length;
   }
 
   private emitTurnFailed(error: unknown, turnId?: string): void {
@@ -359,7 +371,7 @@ export class PicoAppSession extends EventEmitter {
     await previous.codex.shutdown().catch(() => {});
 
     this.currentApp = await this.createDraftApp(cwd);
-    this.pendingApproval = undefined;
+    this.pendingApprovals.length = 0;
     this.clearActiveCodexTurn();
     this.clearQueuedMessages();
     this.attachCodexStatus(this.currentApp);

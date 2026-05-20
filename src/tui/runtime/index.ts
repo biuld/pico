@@ -80,6 +80,7 @@ export function runOpenTuiRuntime(
       streamingText: snapshot.streamingText,
       liveThreadItems: snapshot.liveThreadItems,
       pendingApproval: snapshot.pendingApproval,
+      pendingApprovalCount: snapshot.pendingApprovalCount,
       queuedMessages: snapshot.queuedMessages,
       running: snapshot.running,
       ...clocks.snapshot(),

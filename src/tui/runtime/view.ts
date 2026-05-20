@@ -36,6 +36,7 @@ export interface RuntimeViewInput {
   inputValue: string;
   streamingText: string;
   pendingApproval?: JSONRPCRequest;
+  pendingApprovalCount?: number;
   queuedMessages?: readonly PendingInputPreviewMessage[];
   running: boolean;
   liveThreadItems?: readonly ThreadItem[];
@@ -72,6 +73,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     state,
     theme,
     pendingApproval: input.pendingApproval,
+    pendingApprovalCount: input.pendingApprovalCount ?? 0,
     queuedMessage: input.queuedMessages?.[0],
     slashCommands,
     themeRows,
@@ -104,6 +106,7 @@ export function buildRuntimeLayoutUpdate(input: RuntimeViewInput): OpenTuiLayout
     state,
     theme,
     pendingApproval: input.pendingApproval,
+    pendingApprovalCount: input.pendingApprovalCount ?? 0,
     queuedMessage: input.queuedMessages?.[0],
     slashCommands,
     themeRows: buildThemeRows(TUI_THEMES, state.themeName, state.themeSelection),

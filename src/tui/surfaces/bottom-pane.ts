@@ -37,6 +37,7 @@ export interface BottomPanePanelInput {
   state: TuiState;
   theme: TuiTheme;
   pendingApproval?: JSONRPCRequest;
+  pendingApprovalCount?: number;
   queuedMessage?: PendingInputPreviewMessage;
   slashCommands: readonly SlashCommandSpec[];
   themeRows: readonly ThemeRow[];
@@ -54,6 +55,7 @@ export function buildBottomPanePanel(input: BottomPanePanelInput): BottomPanePan
       input.pendingApproval,
       input.state.approvalSelection,
       width,
+      input.pendingApprovalCount ?? 1,
     );
     return panelFromRows({
       kind: "approval",

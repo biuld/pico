@@ -122,7 +122,7 @@ test("normalizeNotification handles snake_case params", () => {
 
 // ── normalizeServerRequest ──
 
-test("normalizeServerRequest maps server request to approval.requested", () => {
+test("normalizeServerRequest maps permissions request to approval.requested", () => {
   const event = normalizeServerRequest({
     id: 1,
     method: "item/permissions/requestApproval",
@@ -130,11 +130,12 @@ test("normalizeServerRequest maps server request to approval.requested", () => {
   });
 
   expect(event.type).toBe("approval.requested");
+  expect(event.kind).toBe("permissions");
   expect(event.request.id).toBe(1);
   expect(event.method).toBe("item/permissions/requestApproval");
   expect(event.reason).toBe("needs file access");
-  expect(event.command).toBe("cat file.txt");
   expect(event.cwd).toBe("/app");
+  expect(event.command).toBeUndefined();
 });
 
 test("normalizeServerRequest handles missing params gracefully", () => {

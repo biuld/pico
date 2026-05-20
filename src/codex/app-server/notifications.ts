@@ -1,3 +1,4 @@
+import type { ServerRequest } from "@pico/codex-app-server-protocol";
 import type { JSONRPCNotification, JSONRPCRequest } from "./types";
 import type { ThreadItem, FileUpdateChange } from "@pico/codex-app-server-protocol/v2";
 
@@ -125,15 +126,37 @@ export interface CodexPlanUpdatedEvent {
   params: unknown;
 }
 
+export type ApprovalRequestKind =
+  | "command"
+  | "fileChange"
+  | "permissions"
+  | "mcpElicitation"
+  | "toolUserInput"
+  | "dynamicToolCall"
+  | "other";
+
 export interface CodexApprovalRequestedEvent {
   type: "approval.requested";
   request: JSONRPCRequest;
-  /** Raw protocol method (e.g. "item/permissions/requestApproval"). Debug/routing only; UI must not display this. */
-  method?: string;
-  /** Normalized approval metadata. UI should use these, not raw request.params. */
+  /** The exact protocol method string (from ServerRequest). Debug/routing only. */
+  method: ServerRequest["method"];
+  /** Normalized approval kind for UI routing. */
+  kind: ApprovalRequestKind;
+  /** Human-readable reason string. */
   reason?: string;
-  command?: string;
   cwd?: string;
+  /** For command/fileChange requests. */
+  command?: string;
+  filePath?: string;
+  /** For permission requests. */
+  permissionTool?: string;
+  permissionArgs?: Record<string, unknown>;
+  /** For MCP elicitation requests. */
+  mcpServerName?: string;
+  elicitationSchema?: unknown;
+  /** For tool user input / dynamic tool call requests. */
+  toolName?: string;
+  inputPrompt?: string;
 }
 
 export interface CodexWarningEvent {
@@ -169,18 +192,83 @@ function stringValue(value: unknown, ...keys: string[]): string | undefined {
 
 /**
  * Normalize a JSON-RPC server request into a semantic approval event.
- * Extracts human-readable metadata so the UI never displays raw method names.
+ * Uses exact ServerRequest method matching — no substring heuristics.
  */
 export function normalizeServerRequest(request: JSONRPCRequest): CodexApprovalRequestedEvent {
   const p = (request.params ?? {}) as Record<string, unknown>;
-  return {
-    type: "approval.requested",
+  const method = request.method as ServerRequest["method"];
+  const kind = classifyServerRequestMethod(method);
+
+  const base = {
+    type: "approval.requested" as const,
     request,
-    method: request.method,
+    method,
     reason: stringValue(p, "reason"),
-    command: stringValue(p, "command"),
     cwd: stringValue(p, "cwd"),
   };
+
+  switch (kind) {
+    case "command": {
+      const cmd = stringValue(p, "command") ?? arrayStringValue(p, "argv");
+      return { ...base, kind, command: cmd };
+    }
+    case "fileChange": {
+      const filePath = stringValue(p, "filePath", "file_path") ?? stringValue(p, "path");
+      return { ...base, kind, filePath, command: stringValue(p, "command") };
+    }
+    case "permissions": {
+      const permTool = stringValue(p, "toolName", "tool_name");
+      const permArgs = (p.args ?? p.toolArgs ?? p.tool_args) as Record<string, unknown> | undefined;
+      return { ...base, kind, permissionTool: permTool, permissionArgs: permArgs };
+    }
+    case "mcpElicitation": {
+      const mcpServer = stringValue(p, "serverName", "server_name");
+      const schema = p.schema ?? p.elicitation;
+      return { ...base, kind, mcpServerName: mcpServer, elicitationSchema: schema };
+    }
+    case "toolUserInput": {
+      const tool = stringValue(p, "toolName", "tool_name");
+      const prompt = stringValue(p, "prompt", "message");
+      return { ...base, kind, toolName: tool, inputPrompt: prompt };
+    }
+    case "dynamicToolCall": {
+      const tool = stringValue(p, "toolName", "tool_name") ?? stringValue(p, "tool");
+      return { ...base, kind, toolName: tool };
+    }
+    default:
+      return { ...base, kind: "other" };
+  }
+}
+
+/**
+ * Classify a ServerRequest method into an ApprovalRequestKind.
+ * Uses exact string matching against the known protocol methods.
+ */
+function classifyServerRequestMethod(method: ServerRequest["method"]): ApprovalRequestKind {
+  switch (method) {
+    case "item/commandExecution/requestApproval":
+    case "applyPatchApproval":
+    case "execCommandApproval":
+      return "command";
+    case "item/fileChange/requestApproval":
+      return "fileChange";
+    case "item/permissions/requestApproval":
+      return "permissions";
+    case "mcpServer/elicitation/request":
+      return "mcpElicitation";
+    case "item/tool/requestUserInput":
+      return "toolUserInput";
+    case "item/tool/call":
+      return "dynamicToolCall";
+    default:
+      return "other";
+  }
+}
+
+function arrayStringValue(value: Record<string, unknown>, key: string): string | undefined {
+  const v = value[key];
+  if (Array.isArray(v) && v.every((item) => typeof item === "string")) return v.join(" ");
+  return undefined;
 }
 
 /**

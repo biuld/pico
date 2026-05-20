@@ -37,6 +37,7 @@ export {
   isCodexEvent,
   normalizeNotification,
   normalizeServerRequest,
+  type ApprovalRequestKind,
   type CodexApprovalRequestedEvent,
   type CodexAssistantDeltaEvent,
   type CodexCommandOutputDeltaEvent,

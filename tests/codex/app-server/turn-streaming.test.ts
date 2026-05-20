@@ -228,9 +228,10 @@ test("CodexAppServerClient emits approval.requested for raw serverRequest", asyn
     const completed = fixture.client.waitForTurnCompleted(thread.thread.id, turn.turn.id);
 
     const [ev, legacyRequest] = await Promise.all([approvalSeen, legacySeen]);
+    expect(ev.kind).toBe("permissions");
     expect(ev.reason).toBe("file access");
-    expect(ev.command).toBe("cat /etc/hosts");
     expect(ev.cwd).toBe("/app");
+    expect(ev.command).toBeUndefined();
     expect((legacyRequest as { id?: unknown }).id).toBe(41);
     await expect(completed).resolves.toMatchObject({ status: "completed" });
 

@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { normalizeServerRequest } from "../codex/app-server";
 import { approvalResult, runTurn } from "../app/turn-runner";
 import { createDraftApp, ensureAppThread, loadApp } from "../app/factory";
 import type {
@@ -200,10 +201,13 @@ export class PicoAppSession extends EventEmitter {
   resolveApproval(decision: PicoAppApprovalDecision): void {
     const pending = this.pendingApprovals.shift();
     if (!pending) return;
+    const event = normalizeServerRequest(pending.request);
+    const summary = approvalSummary(event, decision);
     pending.resolve(approvalResult(pending.request.method, decision));
     this.emitAppSession(PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED, {
       running: this.running,
       remainingCount: this.pendingApprovals.length,
+      summary,
     });
   }
 
@@ -407,4 +411,19 @@ export class PicoAppSession extends EventEmitter {
   ): boolean {
     return super.emit(eventName, ...args);
   }
+}
+
+function approvalSummary(
+  event: ReturnType<typeof normalizeServerRequest>,
+  decision: string,
+): string {
+  const detail = event.command
+    ?? event.permissionTool
+    ?? event.mcpServerName
+    ?? event.toolName
+    ?? event.filePath
+    ?? "request";
+  const verb = decision === "decline" ? "Declined" : "Approved";
+  const sessionNote = decision === "acceptForSession" ? " for session" : "";
+  return `${verb}${sessionNote} ${event.kind} "${detail}"`;
 }

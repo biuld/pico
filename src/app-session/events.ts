@@ -57,7 +57,7 @@ export interface PicoAppSessionEventPayloads {
   [PICO_APP_SESSION_EVENTS.TURN_FAILED]: TurnFailedEvent;
   [PICO_APP_SESSION_EVENTS.TURN_FINISHED]: void;
   [PICO_APP_SESSION_EVENTS.APPROVAL_REQUESTED]: JSONRPCRequest;
-  [PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED]: { running: boolean; remainingCount: number };
+  [PICO_APP_SESSION_EVENTS.APPROVAL_RESOLVED]: { running: boolean; remainingCount: number; summary: string };
   [PICO_APP_SESSION_EVENTS.QUEUE_CHANGED]: { queuedCount: number };
   [PICO_APP_SESSION_EVENTS.DRAFT_RESET]: { reason: "new" | "clear" };
   [PICO_APP_SESSION_EVENTS.THREAD_ITEM]: ThreadItem;

@@ -7,6 +7,8 @@ export type TuiInputCommand =
   | { type: "theme" }
   | { type: "statusline" }
   | { type: "status" }
+  | { type: "search"; query?: string }
+  | { type: "export"; format?: string }
   | { type: "quit" }
   | { type: "unknown"; message: string };
 
@@ -23,6 +25,8 @@ export const SLASH_COMMANDS: readonly SlashCommandSpec[] = [
   { name: "theme", description: "choose a color theme" },
   { name: "statusline", description: "configure status line items" },
   { name: "status", description: "show current thread status" },
+  { name: "search", description: "search transcript", takesArgument: true },
+  { name: "export", description: "export transcript (md | html)", takesArgument: true },
   { name: "quit", description: "exit Pico" },
   { name: "exit", description: "exit Pico" },
 ];
@@ -40,6 +44,14 @@ export function parseTuiInput(input: string): TuiInputCommand {
   if (command === "theme") return { type: "theme" };
   if (command === "statusline") return { type: "statusline" };
   if (command === "status") return { type: "status" };
+  if (command === "search") {
+    const query = trimmed.slice("/search".length).trim();
+    return { type: "search", query: query || undefined };
+  }
+  if (command === "export") {
+    const format = trimmed.slice("/export".length).trim();
+    return { type: "export", format: format || undefined };
+  }
   if (command === "quit" || command === "exit") return { type: "quit" };
 
   return { type: "unknown", message: `Unknown command: /${command}` };

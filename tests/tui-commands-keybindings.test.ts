@@ -448,13 +448,15 @@ test("filters slash commands for popup selection without tab completion", async 
     "theme",
     "statusline",
     "status",
+    "search",
+    "export",
     "quit",
     "exit",
   ]);
   expect(filterSlashCommands("/l").map((command) => command.name)).toEqual([]);
   expect(filterSlashCommands("/c").map((command) => command.name)).toEqual(["clear"]);
   expect(filterSlashCommands("/r").map((command) => command.name)).toEqual(["resume"]);
-  expect(filterSlashCommands("/s").map((command) => command.name)).toEqual(["statusline", "status"]);
+  expect(filterSlashCommands("/s").map((command) => command.name)).toEqual(["statusline", "status", "search"]);
   expect(filterSlashCommands("/rename name")).toEqual([]);
 
   state = updateTuiState(state, { type: "inputChanged", value: "/" });

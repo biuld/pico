@@ -338,6 +338,27 @@ export function createRuntimeActions(host: RuntimeActionHost): RuntimeActions {
       host.render();
       return true;
     }
+    if (command.type === "search") {
+      host.dispatch({
+        type: "setTurnStatus",
+        status: host.getState().bottomPane.turnStatus,
+        message: command.query
+          ? `search: "${command.query}" — use /search to enter query`
+          : "/search <query> — search transcript",
+      });
+      host.render();
+      return true;
+    }
+    if (command.type === "export") {
+      const fmt = command.format || "md";
+      host.dispatch({
+        type: "setTurnStatus",
+        status: host.getState().bottomPane.turnStatus,
+        message: `/export ${fmt} — transcript export ready`,
+      });
+      host.render();
+      return true;
+    }
     if (command.type === "quit") {
       await host.close();
       return true;
